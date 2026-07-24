@@ -55,6 +55,9 @@ importers:
       '@types/node':
         specifier: 20.19.39
         version: 20.19.39
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.2.14
       semver:
         specifier: ^7.7.3
         version: 7.7.3

@@ -162,6 +162,7 @@
         "doc": "docs"
     },
   "devDependencies": {
+    "@types/react": "^19.2.0",
     "@types/node": "20.19.39",
     "semver": "^7.7.3",
     "tar": "^7.5.11",
