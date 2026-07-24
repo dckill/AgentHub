@@ -6,8 +6,10 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUTPUT_DIR="${PROJECT_DIR}/docs/assets/readme/showcase"
 SCREEN_DIR="${OUTPUT_DIR}/screens"
 PHONE_DIR="${OUTPUT_DIR}/phones"
+COMPOSITE_DIR="${OUTPUT_DIR}/composites"
 FRAME_SOURCE="${PROJECT_DIR}/design/phone.png"
 FRAME_OVERLAY="${OUTPUT_DIR}/phone-frame-overlay.png"
+LABEL_FONT="${README_SHOWCASE_FONT:-$(fc-match -f '%{file}\n' 'Source Han Sans SC' | head -n 1)}"
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
@@ -29,7 +31,21 @@ showcases=(
   "设置页面-暗.jpg|settings-dark"
 )
 
-mkdir -p "${SCREEN_DIR}" "${PHONE_DIR}"
+light_composite=(
+  "settings-light|设置 · 浅色"
+  "devices-light|仪表盘 · 浅色"
+  "conversation-light|对话总结 · 浅色"
+  "git-diff-light|Git 文件查看 · 浅色"
+)
+
+dark_composite=(
+  "sessions-dark|会话中心 · 深色"
+  "new-session-dark|新建会话 · 深色"
+  "conversation-dark|工具调用 · 深色"
+  "git-dark|Git 管理 · 深色"
+)
+
+mkdir -p "${SCREEN_DIR}" "${PHONE_DIR}" "${COMPOSITE_DIR}"
 
 convert "${FRAME_SOURCE}" \
   -resize 1080x2337! \
@@ -63,4 +79,40 @@ for showcase in "${showcases[@]}"; do
     "${phone_webp}"
 done
 
-identify "${FRAME_OVERLAY}" "${SCREEN_DIR}"/*.jpg "${PHONE_DIR}"/*.webp
+build_composite() {
+  local output_name="$1"
+  shift
+  local cards=()
+
+  for showcase in "$@"; do
+    local slug="${showcase%%|*}"
+    local label="${showcase#*|}"
+    local card="${TEMP_DIR}/${output_name}-${slug}.png"
+
+    convert "${PHONE_DIR}/${slug}.webp" \
+      -resize 540x1169! \
+      -font "${LABEL_FONT}" \
+      -fill '#24272d' \
+      -pointsize 30 \
+      -gravity north \
+      -annotate +0+34 "${label}" \
+      "${card}"
+    cards+=("${card}")
+  done
+
+  convert "${cards[@]}" +append "${TEMP_DIR}/${output_name}.png"
+
+  convert "${TEMP_DIR}/${output_name}.png" \
+    -strip \
+    -quality 92 \
+    "${COMPOSITE_DIR}/${output_name}.webp"
+}
+
+build_composite "showcase-light" "${light_composite[@]}"
+build_composite "showcase-dark" "${dark_composite[@]}"
+
+identify \
+  "${FRAME_OVERLAY}" \
+  "${SCREEN_DIR}"/*.jpg \
+  "${PHONE_DIR}"/*.webp \
+  "${COMPOSITE_DIR}"/*.webp

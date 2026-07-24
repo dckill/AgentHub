@@ -37,29 +37,13 @@ AgentHub 在你的电脑上启动并管理 Claude Code 或 Codex，通过端到�
 
 ## 产品界面
 
-以下展示来自 Android 真机页面。隐私相关的主机名、工作路径和进程号已替换为安全示例；内容较少的仪表盘与会话页只复用了页面现有的分组、机器行、项目和会话卡片进行补充，没有添加不存在的功能。所有原始截图均为 **1080 × 2376**，点击手机可查看完整页面。
+以下展示来自 Android 真机页面。隐私相关的主机名、工作路径和进程号已替换为安全示例；页面内容只使用现有功能与安全演示数据。所有原始截图均为 **1080 × 2376**，下方按 50% 尺寸统一处理并以四台设备为一组呈现。
 
-> 左右拖动下方图片轨道查看更多；深色与浅色主题、会话工具调用、文件预览和 Git 变更均来自同一套真实界面。
+> 第一行展示浅色主题，第二行展示深色主题；每组四个页面使用完全一致的画布、设备尺寸和间距。
 
-<table>
-  <tr>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/设备页面-亮.jpg"><img src="docs/assets/readme/showcase/phones/devices-light.webp" width="230" alt="AgentHub 仪表盘浅色主题"></a><br><sub><strong>仪表盘 · 浅色</strong><br>设备分组与在线状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/设备页面-暗.jpg"><img src="docs/assets/readme/showcase/phones/devices-dark.webp" width="230" alt="AgentHub 仪表盘深色主题"></a><br><sub><strong>仪表盘 · 深色</strong><br>多机器与离线状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/会话页面-暗.jpg"><img src="docs/assets/readme/showcase/phones/sessions-dark.webp" width="230" alt="AgentHub 会话页面深色主题"></a><br><sub><strong>会话中心</strong><br>项目、分支与会话状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/新建会话-亮.jpg"><img src="docs/assets/readme/showcase/phones/new-session-light.webp" width="230" alt="AgentHub 新建会话浅色主题"></a><br><sub><strong>新建会话 · 浅色</strong><br>设备、目录与模型</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/新建会话-暗.jpg"><img src="docs/assets/readme/showcase/phones/new-session-dark.webp" width="230" alt="AgentHub 新建会话深色主题"></a><br><sub><strong>新建会话 · 深色</strong><br>权限、凭据与 Worktree</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/对话页面-亮.jpg"><img src="docs/assets/readme/showcase/phones/conversation-light.webp" width="230" alt="AgentHub 对话总结浅色主题"></a><br><sub><strong>对话总结 · 浅色</strong><br>Markdown 与运行状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/对话页面-暗.jpg"><img src="docs/assets/readme/showcase/phones/conversation-dark.webp" width="230" alt="AgentHub 工具调用深色主题"></a><br><sub><strong>工具调用 · 深色</strong><br>终端执行与完成状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/对话页面-对话折叠.jpg"><img src="docs/assets/readme/showcase/phones/conversation-collapsed-dark.webp" width="230" alt="AgentHub 折叠工具调用深色主题"></a><br><sub><strong>折叠工具详情</strong><br>聚合用量与错误信息</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/文件管理-暗.jpg"><img src="docs/assets/readme/showcase/phones/files-dark.webp" width="230" alt="AgentHub 文件管理器深色主题"></a><br><sub><strong>文件管理器</strong><br>搜索、目录与文件类型</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/文件查看-暗.jpg"><img src="docs/assets/readme/showcase/phones/file-preview-dark.webp" width="230" alt="AgentHub Markdown 文件预览"></a><br><sub><strong>文件预览</strong><br>源码、预览与下载</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/Git管理-亮.jpg"><img src="docs/assets/readme/showcase/phones/git-light.webp" width="230" alt="AgentHub Git 管理浅色主题"></a><br><sub><strong>Git 管理 · 浅色</strong><br>暂存、拉取与文件状态</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/Git管理-暗.jpg"><img src="docs/assets/readme/showcase/phones/git-dark.webp" width="230" alt="AgentHub Git 管理深色主题"></a><br><sub><strong>Git 管理 · 深色</strong><br>变更筛选与状态标记</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/Git-diff.jpg"><img src="docs/assets/readme/showcase/phones/git-diff-light.webp" width="230" alt="AgentHub Git 文件查看器"></a><br><sub><strong>Git 文件查看</strong><br>语法高亮与暂存操作</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/设置页面-亮.jpg"><img src="docs/assets/readme/showcase/phones/settings-light.webp" width="230" alt="AgentHub 设置页面浅色主题"></a><br><sub><strong>设置 · 浅色</strong><br>账户、凭据与共享链接</sub></td>
-    <td align="center" width="250" nowrap><a href="docs/assets/readme/showcase/screens/设置页面-暗.jpg"><img src="docs/assets/readme/showcase/phones/settings-dark.webp" width="230" alt="AgentHub 设置页面深色主题"></a><br><sub><strong>设置 · 深色</strong><br>外观、功能与更新</sub></td>
-  </tr>
-</table>
+[![AgentHub 浅色主题：设置、仪表盘、对话总结与 Git 文件查看](docs/assets/readme/showcase/composites/showcase-light.webp)](docs/assets/readme/showcase/composites/showcase-light.webp)
+
+[![AgentHub 深色主题：会话中心、新建会话、工具调用与 Git 管理](docs/assets/readme/showcase/composites/showcase-dark.webp)](docs/assets/readme/showcase/composites/showcase-dark.webp)
 
 
 ## 3 分钟开始
