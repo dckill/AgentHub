@@ -42,7 +42,7 @@ describe("supply-chain package floors", () => {
     const manifest = readManifest("package.json");
     expect(Object.keys(manifest.dependencies ?? {})).toEqual([]);
     expect(Object.keys(manifest.devDependencies ?? {}).sort()).toEqual([
-      "@types/node", "semver", "tar", "tsx", "typescript", "vitest", "yaml",
+      "@types/node", "@types/react", "semver", "tar", "tsx", "typescript", "vitest", "yaml",
     ]);
   });
 
