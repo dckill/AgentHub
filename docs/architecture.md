@@ -37,6 +37,14 @@ AgentHub Server
   └─ 执行来自 App 或 agenthub-agent 的 RPC 请求
 ```
 
+### 全景架构图
+
+[![AgentHub 全景架构图](./assets/diagrams/agenthub-full-architecture.webp)](./assets/diagrams/agenthub-full-architecture.webp)
+
+图中主链路只覆盖当前生产范围：AgentHub 客户端、Server、本机
+CLI/daemon、每会话 runner，以及 Claude Code/Codex。机器文件传输方向为
+`machine → App`，不是通用双向文件同步。
+
 ## 信任边界
 
 - 服务端负责认证、路由、排序、持久化和广播，但不应看到明文会话内容。

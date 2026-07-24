@@ -25,6 +25,14 @@
 
 服务端地址优先级为：MMKV 中的用户自定义地址、`EXPO_PUBLIC_AGENTHUB_SERVER_URL`、默认 `https://agenthub.yzsd.asia:8443`。该配置保存在独立 `server-config` MMKV 实例中，退出登录后仍保留。
 
+### OTA 更新流程
+
+[![AgentHub OTA 更新流程](./assets/diagrams/agenthub-ota-update-flow.webp)](./assets/diagrams/agenthub-ota-update-flow.webp)
+
+OTA 通过 EAS Update 和对应 channel 分发，只应用与当前
+`runtimeVersion` 兼容的资源更新。涉及原生模块、权限或其他原生能力变化时，
+必须重新构建并安装 Native 包，不能用 OTA 替代。
+
 ## Android 本机 APK
 
 当前本机交付包默认使用 `production` 变体：

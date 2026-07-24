@@ -120,6 +120,14 @@ flowchart LR
     D --> P["你的项目与工具链"]
 ```
 
+<details>
+<summary><strong>查看 AgentHub 完整架构图</strong></summary>
+<br>
+<a href="docs/assets/diagrams/agenthub-full-architecture.webp">
+  <img src="docs/assets/diagrams/agenthub-full-architecture.webp" width="100%" alt="AgentHub 客户端、Server、本机 daemon、runner 与 Claude Code/Codex 的完整架构">
+</a>
+</details>
+
 - **客户端**保存账号密钥和 UI 状态，拉取快照并接收实时更新。
 - **Server**负责认证、路由、排序、密文持久化和多端广播。
 - **daemon / runner**在目标机器上启动代理、执行 RPC，并收敛会话生命周期。

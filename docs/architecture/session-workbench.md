@@ -31,6 +31,15 @@ AgentHub 手机端是电脑端官方工具的补充接管层，不是整台机�
 - Archived AgentHub record: 已归档会话
 - Full-machine search: 高级恢复
 
+## Session Message Journey
+
+[![AgentHub 会话消息旅程](../assets/diagrams/agenthub-session-message-journey.webp)](../assets/diagrams/agenthub-session-message-journey.webp)
+
+一条消息由 App 生成会话事件，经 Server 完成认证、密文持久化和
+machine-scoped RPC 转发，再由目标机器上的 daemon/runner 驱动 Claude Code
+或 Codex。文本、工具、文件和状态事件沿同一路径回流，App 以 `thinking`、
+工具调用和 `turn-end` 呈现当前任务进度。
+
 ## Lifecycle Rules
 
 - “移出工作台”是默认结束类前台动作，表示用户不再希望这个条目出现在当前工作台。
