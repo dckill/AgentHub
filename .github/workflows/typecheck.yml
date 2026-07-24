@@ -7,6 +7,8 @@ on:
             - main
         paths:
             - 'packages/agenthub-app/**'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
             - '.github/workflows/typecheck.yml'
     push:
         branches:
@@ -14,6 +16,8 @@ on:
             - main
         paths:
             - 'packages/agenthub-app/**'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
             - '.github/workflows/typecheck.yml'
 
 jobs:
