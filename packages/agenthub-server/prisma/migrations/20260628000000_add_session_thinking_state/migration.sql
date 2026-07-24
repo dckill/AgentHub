@@ -1,0 +1,3 @@
+ALTER TABLE "Session"
+ADD COLUMN "thinking" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "thinkingAt" TIMESTAMP(3);

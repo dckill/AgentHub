@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "AgentHub (preview)",
+  "identifier": "com.artsum.agenthub.preview",
+  "app": {
+    "windows": [
+      {
+        "title": "AgentHub (preview)"
+      }
+    ]
+  }
+}

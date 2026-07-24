@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "AgentHub",
+  "version": "1.0.0",
+  "identifier": "com.artsum.agenthub",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:8081",
+    "beforeDevCommand": "pnpm start",
+    "beforeBuildCommand": "pnpm exec expo export --platform web --output-dir dist --clear"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AgentHub",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https: wss:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

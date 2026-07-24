@@ -1,0 +1,83 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: agenthub-require-immutable-images
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    matchPolicy: Equivalent
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  matchConditions:
+    - name: agenthub-server-only
+      expression: "object.metadata.name.startsWith('agenthub-')"
+  variables:
+    - name: podSpec
+      expression: object.spec.template.spec
+  validations:
+    - expression: >-
+        variables.podSpec.containers.size() > 0 &&
+        variables.podSpec.containers.all(container,
+          container.image.matches('^.+@sha256:[0-9a-f]{64}$') &&
+          !container.image.endsWith('@sha256:0000000000000000000000000000000000000000000000000000000000000000'))
+      message: Every AgentHub workload container image must use a non-zero sha256 digest.
+    - expression: >-
+        !has(variables.podSpec.initContainers) ||
+        variables.podSpec.initContainers.all(container,
+          container.image.matches('^.+@sha256:[0-9a-f]{64}$') &&
+          !container.image.endsWith('@sha256:0000000000000000000000000000000000000000000000000000000000000000'))
+      message: Every AgentHub workload initContainer image must use a non-zero sha256 digest.
+    - expression: >-
+        !has(variables.podSpec.ephemeralContainers) ||
+        variables.podSpec.ephemeralContainers.all(container,
+          container.image.matches('^.+@sha256:[0-9a-f]{64}$') &&
+          !container.image.endsWith('@sha256:0000000000000000000000000000000000000000000000000000000000000000'))
+      message: Every AgentHub workload ephemeralContainer image must use a non-zero sha256 digest.
+    - expression: >-
+        has(variables.podSpec.automountServiceAccountToken) &&
+        variables.podSpec.automountServiceAccountToken == false
+      message: AgentHub workloads must disable service-account token automounting.
+    - expression: >-
+        has(variables.podSpec.securityContext) &&
+        variables.podSpec.securityContext.runAsNonRoot == true &&
+        variables.podSpec.securityContext.seccompProfile.type == 'RuntimeDefault'
+      message: AgentHub workloads must run as non-root with RuntimeDefault seccomp.
+    - expression: >-
+        variables.podSpec.containers.all(container,
+          has(container.securityContext) &&
+          container.securityContext.allowPrivilegeEscalation == false &&
+          (!has(container.securityContext.privileged) || container.securityContext.privileged == false) &&
+          container.securityContext.capabilities.drop.exists(capability, capability == 'ALL'))
+      message: Every AgentHub workload container must deny privilege escalation and drop ALL capabilities.
+    - expression: >-
+        !has(variables.podSpec.initContainers) ||
+        variables.podSpec.initContainers.all(container,
+          has(container.securityContext) &&
+          container.securityContext.allowPrivilegeEscalation == false &&
+          (!has(container.securityContext.privileged) || container.securityContext.privileged == false) &&
+          container.securityContext.capabilities.drop.exists(capability, capability == 'ALL'))
+      message: Every AgentHub workload initContainer must deny privilege escalation and drop ALL capabilities.
+    - expression: >-
+        !has(variables.podSpec.ephemeralContainers) ||
+        variables.podSpec.ephemeralContainers.all(container,
+          has(container.securityContext) &&
+          container.securityContext.allowPrivilegeEscalation == false &&
+          (!has(container.securityContext.privileged) || container.securityContext.privileged == false) &&
+          container.securityContext.capabilities.drop.exists(capability, capability == 'ALL'))
+      message: Every AgentHub workload ephemeralContainer must deny privilege escalation and drop ALL capabilities.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: agenthub-require-immutable-images
+spec:
+  policyName: agenthub-require-immutable-images
+  validationActions:
+    - Deny

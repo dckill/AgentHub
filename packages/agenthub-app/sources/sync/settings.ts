@@ -1,0 +1,165 @@
+import * as z from 'zod';
+
+//
+// Settings Schema
+//
+
+// Current schema version for backward compatibility
+export const SUPPORTED_SCHEMA_VERSION = 2;
+
+export const SettingsSchema = z.object({
+    // Schema version for compatibility detection
+    schemaVersion: z.number().default(SUPPORTED_SCHEMA_VERSION).describe('Settings schema version for compatibility checks'),
+
+    viewInline: z.boolean().describe('Whether to view inline tool calls'),
+    inferenceOpenAIKey: z.string().nullish().describe('OpenAI API key for inference'),
+    expandTodos: z.boolean().describe('Whether to expand todo lists'),
+    showLineNumbers: z.boolean().describe('Whether to show line numbers in diffs'),
+    showLineNumbersInToolViews: z.boolean().describe('Whether to show line numbers in tool view diffs'),
+    wrapLinesInDiffs: z.boolean().describe('Whether to wrap long lines in diff, file, and terminal output views'),
+    diffStyle: z.enum(['unified', 'split']).describe('Diff view style (split is web-only)'),
+    analyticsOptOut: z.boolean().describe('Whether to opt out of anonymous analytics'),
+    experiments: z.boolean().describe('Whether to enable experimental features'),
+    alwaysShowContextSize: z.boolean().describe('Always show context size in agent input'),
+    agentInputEnterToSend: z.boolean().describe('Whether pressing Enter submits/sends in the agent input (web)'),
+
+    hideInactiveSessions: z.boolean().describe('Hide inactive sessions in the main list'),
+    expResumeSession: z.boolean().describe('Enable experimental session resume feature'),
+    fileDiffsSidebar: z.boolean().describe('Show the file diffs sidebar next to the chat on desktop'),
+    groupToolCalls: z.boolean().describe('Collapse consecutive tool calls into grouped containers in chat'),
+    collapseAgentWork: z.boolean().describe('Automatically collapse completed agent work in chat'),
+    reviewPromptAnswered: z.boolean().describe('Whether the review prompt has been answered'),
+    reviewPromptLikedApp: z.boolean().nullish().describe('Whether user liked the app when asked'),
+    preferredLanguage: z.string().nullable().describe('Preferred UI language (null for auto-detect from device locale)'),
+    recentMachinePaths: z.array(z.object({
+        machineId: z.string(),
+        path: z.string()
+    })).describe('Last 10 machine-path combinations, ordered by most recent first'),
+    lastUsedAgent: z.string().nullable().describe('Last selected agent type for new sessions'),
+    lastUsedPermissionMode: z.string().nullable().describe('Last selected permission mode for new sessions'),
+    lastUsedModelMode: z.string().nullable().describe('Last selected model mode for new sessions'),
+    // Dismissed CLI warning banners (supports both per-machine and global dismissal)
+    dismissedCLIWarnings: z.object({
+        perMachine: z.record(z.string(), z.object({
+            claude: z.boolean().optional(),
+            codex: z.boolean().optional(),
+        })).default({}),
+        global: z.object({
+            claude: z.boolean().optional(),
+            codex: z.boolean().optional(),
+        }).default({}),
+    }).default({ perMachine: {}, global: {} }).describe('Tracks which CLI installation warnings user has dismissed (per-machine or globally)'),
+    // Machine groups - synced so device organization is shared across all signed-in clients
+    machineGroups: z.record(z.string(), z.string()).describe('Machine ID to group name mapping'),
+    machineGroupOrder: z.array(z.string()).describe('Ordered group names, including empty groups'),
+    // Project customizations - per-project name, icon, and archive overrides
+    projectCustomizations: z.record(z.string(), z.object({
+        name: z.string().optional(),
+        icon: z.string().optional(),
+        archived: z.boolean().optional(),
+    })).describe('Per-project customizations keyed by machineId:path'),
+});
+
+//
+// NOTE: Settings must be a flat object with no to minimal nesting, one field == one setting,
+// you can name them with a prefix if you want to group them, but don't nest them.
+// You can nest if value is a single value (like image with url and width and height)
+// Settings are always merged with defaults and field by field.
+//
+// This structure must be forward and backward compatible. Meaning that some versions of the app
+// could be missing some fields or have a new fields. Everything must be preserved and client must
+// only touch the fields it knows about.
+//
+
+const SettingsSchemaPartial = SettingsSchema.partial();
+
+export type Settings = z.infer<typeof SettingsSchema>;
+
+//
+// Defaults
+//
+
+export const settingsDefaults: Settings = {
+    schemaVersion: SUPPORTED_SCHEMA_VERSION,
+    viewInline: false,
+    inferenceOpenAIKey: null,
+    expandTodos: true,
+    showLineNumbers: true,
+    showLineNumbersInToolViews: false,
+    wrapLinesInDiffs: true,
+    diffStyle: 'unified',
+    analyticsOptOut: false,
+    experiments: false,
+    alwaysShowContextSize: false,
+    agentInputEnterToSend: true,
+
+    hideInactiveSessions: false,
+    expResumeSession: false,
+    fileDiffsSidebar: false,
+    groupToolCalls: false,
+    collapseAgentWork: true,
+    reviewPromptAnswered: false,
+    reviewPromptLikedApp: null,
+    preferredLanguage: null,
+    recentMachinePaths: [],
+    lastUsedAgent: null,
+    lastUsedPermissionMode: null,
+    lastUsedModelMode: null,
+    dismissedCLIWarnings: { perMachine: {}, global: {} },
+    machineGroups: {},
+    machineGroupOrder: [],
+    projectCustomizations: {},
+};
+Object.freeze(settingsDefaults);
+
+//
+// Resolving
+//
+
+export function settingsParse(settings: unknown): Settings {
+    // Handle null/undefined/invalid inputs
+    if (!settings || typeof settings !== 'object') {
+        return { ...settingsDefaults };
+    }
+
+    const parsed = SettingsSchemaPartial.safeParse(settings);
+    if (!parsed.success) {
+        // For invalid settings, preserve unknown fields but use defaults for known fields
+        const unknownFields = { ...(settings as any) };
+        // Remove all known schema fields from unknownFields
+        const knownFields = Object.keys(SettingsSchema.shape);
+        knownFields.forEach(key => delete unknownFields[key]);
+        return { ...settingsDefaults, ...unknownFields };
+    }
+
+    // Migration: Convert old 'zh' language code to 'zh-Hans'
+    if (parsed.data.preferredLanguage === 'zh') {
+        parsed.data.preferredLanguage = 'zh-Hans';
+    }
+
+    // Merge defaults, parsed settings, and preserve unknown fields
+    const unknownFields = { ...(settings as any) };
+    // Remove known fields from unknownFields to preserve only the unknown ones
+    Object.keys(parsed.data).forEach(key => delete unknownFields[key]);
+
+    return { ...settingsDefaults, ...parsed.data, ...unknownFields };
+}
+
+//
+// Applying changes
+// NOTE: May be something more sophisticated here around defaults and merging, but for now this is fine.
+//
+
+export function applySettings(settings: Settings, delta: Partial<Settings>): Settings {
+    // Original behavior: start with settings, apply delta, fill in missing with defaults
+    const result = { ...settings, ...delta };
+
+    // Fill in any missing fields with defaults
+    Object.keys(settingsDefaults).forEach(key => {
+        if (!(key in result)) {
+            (result as any)[key] = (settingsDefaults as any)[key];
+        }
+    });
+
+    return result;
+}

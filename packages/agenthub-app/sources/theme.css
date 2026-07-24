@@ -1,0 +1,164 @@
+/* Disable overscroll bounce / pull-to-refresh on the whole page.
+   Prevents scroll-chaining from inner scrollable elements to the body. */
+html, body {
+    overscroll-behavior: none;
+    background: var(--ah-canvas-texture, var(--ah-color-canvas, var(--colors-canvas, #070a0b)));
+    background-attachment: fixed;
+    color: var(--ah-color-text-primary);
+}
+
+:root {
+    --ah-color-canvas: #f6f9fa;
+    --ah-color-canvas-elevated: #eef4f6;
+    --ah-color-surface: rgba(255, 255, 255, 0.62);
+    --ah-color-surface-raised: rgba(255, 255, 255, 0.88);
+    --ah-color-surface-hover: #f1f6f7;
+    --ah-color-border: rgba(28, 44, 52, 0.14);
+    --ah-color-border-strong: rgba(217, 144, 18, 0.36);
+    --ah-color-accent: #d99012;
+    --ah-color-accent-dark: #b76d00;
+    --ah-color-accent-soft: rgba(217, 144, 18, 0.105);
+    --ah-color-accent-glow: rgba(217, 144, 18, 0.20);
+    --ah-color-focus-ring: rgba(217, 144, 18, 0.36);
+    --ah-color-text-primary: #0e1720;
+    --ah-color-text-secondary: #485866;
+    --ah-color-text-muted: #75828c;
+    --ah-color-scrollbar-thumb: rgba(72, 88, 102, 0.28);
+    --ah-color-scrollbar-thumb-hover: rgba(217, 144, 18, 0.36);
+    --ah-glass-blur: blur(18px) saturate(118%);
+    --ah-web-window-border: rgba(28, 44, 52, 0.14);
+    --ah-web-window-shadow: 0 18px 40px rgba(62, 82, 90, 0.16);
+    --ah-canvas-texture:
+        radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0) 28%),
+        radial-gradient(circle at 86% 18%, rgba(223, 234, 239, 0.56), rgba(223, 234, 239, 0) 30%),
+        linear-gradient(132deg, rgba(255, 255, 255, 0.34) 0 1px, rgba(255, 255, 255, 0) 1px 76px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(235, 243, 246, 0.50)),
+        var(--ah-color-canvas);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ah-color-canvas: #070a0b;
+        --ah-color-canvas-elevated: #0b1012;
+        --ah-color-surface: rgba(12, 17, 19, 0.72);
+        --ah-color-surface-raised: rgba(17, 24, 27, 0.84);
+        --ah-color-surface-hover: #182126;
+        --ah-color-border: rgba(238, 248, 250, 0.13);
+        --ah-color-border-strong: rgba(255, 202, 116, 0.52);
+        --ah-color-accent: #ffb22e;
+        --ah-color-accent-dark: #f6a21a;
+        --ah-color-accent-soft: rgba(255, 178, 46, 0.12);
+        --ah-color-accent-glow: rgba(255, 178, 46, 0.32);
+        --ah-color-focus-ring: rgba(255, 202, 116, 0.52);
+        --ah-color-text-primary: #f3efe7;
+        --ah-color-text-secondary: #c8c0b4;
+        --ah-color-text-muted: #7a8790;
+        --ah-color-scrollbar-thumb: rgba(238, 248, 250, 0.13);
+        --ah-color-scrollbar-thumb-hover: rgba(255, 202, 116, 0.52);
+        --ah-web-window-border: rgba(238, 248, 250, 0.13);
+        --ah-web-window-shadow: 0 18px 42px rgba(0, 0, 0, 0.52);
+        --ah-canvas-texture:
+            radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.030), rgba(255, 255, 255, 0) 28%),
+            radial-gradient(circle at 86% 18%, rgba(255, 178, 46, 0.030), rgba(255, 178, 46, 0) 32%),
+            linear-gradient(132deg, rgba(255, 255, 255, 0.020) 0 1px, rgba(255, 255, 255, 0) 1px 76px),
+            var(--ah-color-canvas);
+    }
+}
+
+html {
+    scrollbar-gutter: stable;
+}
+
+body {
+    min-height: 100vh;
+    accent-color: var(--ah-color-accent);
+}
+
+::selection {
+    color: var(--ah-color-text-primary);
+    background: var(--ah-color-accent-soft);
+}
+
+:where(a, button, [role="button"], input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--ah-color-focus-ring);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--ah-color-accent-glow);
+}
+
+:where(input, textarea, select)::placeholder {
+    color: var(--ah-color-text-muted);
+}
+
+[data-tauri-drag-region="true"] {
+    -webkit-app-region: drag;
+    border-color: var(--ah-web-window-border);
+}
+
+[data-tauri-drag-region="false"],
+[data-tauri-drag-region="true"] :where(a, button, [role="button"], input, textarea, select, [tabindex]) {
+    -webkit-app-region: no-drag;
+}
+
+@media (hover: hover) {
+    :where(a, button, [role="button"], [tabindex]):not(:disabled) {
+        transition:
+            background-color 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            border-color 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            box-shadow 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            color 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    :where(button, [role="button"], [tabindex]):not(:disabled):hover {
+        border-color: var(--ah-color-border-strong);
+    }
+}
+
+/* Theme-aware scrollbar styles using Unistyles CSS variables.
+   Use text-secondary for the thumb so it stays visible on all
+   surface colors (divider == surfaceHighest in dark theme). */
+
+/* Webkit Scrollbars (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--ah-color-scrollbar-thumb);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--ah-color-scrollbar-thumb-hover);
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* All browsers — scrollbar-color overrides webkit pseudo-elements
+   in modern Chrome/Edge, so this must also use text-secondary. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ah-color-scrollbar-thumb) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}

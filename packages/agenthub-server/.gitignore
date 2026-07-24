@@ -1,0 +1,20 @@
+node_modules
+.env
+.env.dev
+deploy/overlays/local/secrets.yaml
+dist
+.pgdata
+.minio
+
+.env.local
+.env
+
+.logs/
+
+.claude/
+
+# Standalone build artifacts
+data/
+happy-server
+pglite.wasm
+pglite.data

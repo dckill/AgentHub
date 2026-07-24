@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-app
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  progressDeadlineSeconds: 120
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: agenthub-app
+  template:
+    metadata:
+      labels:
+        app: agenthub-app
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+      - name: agenthub-registry
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: agenthub-app
+        image: agenthub-app@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        startupProbe:
+          httpGet:
+            path: /
+            port: http
+          periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-logs
+          mountPath: /var/log/nginx
+        - name: nginx-run
+          mountPath: /run
+      volumes:
+      - name: nginx-cache
+        emptyDir:
+          sizeLimit: 64Mi
+      - name: nginx-logs
+        emptyDir:
+          sizeLimit: 64Mi
+      - name: nginx-run
+        emptyDir:
+          sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-app
+spec:
+  selector:
+    app: agenthub-app
+  ports:
+  - port: 3000
+    targetPort: http
+  type: ClusterIP

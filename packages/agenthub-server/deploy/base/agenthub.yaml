@@ -1,0 +1,232 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-server
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agenthub-server
+  template:
+    metadata:
+      labels:
+        app: agenthub-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+      - name: agenthub-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: wait-for-dependencies
+        image: busybox:1.37.0-musl@sha256:222ad6d973c0d198014546a65cd02c5fdedcc172123c5b4c2bf0af636550bd94
+        command:
+        - sh
+        - -ec
+        args:
+        - |
+          until nc -z agenthub-postgres 5432; do sleep 2; done
+          until nc -z agenthub-redis 6379; do sleep 2; done
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 5m
+            memory: 8Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+      containers:
+      - name: agenthub
+        image: agenthub-server@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 13017
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "13017"
+        - name: REDIS_URL
+          value: redis://agenthub-redis:6379
+        - name: S3_PUBLIC_URL
+          value: https://files.cluster-fluster.com/agenthub
+        envFrom:
+        - secretRef:
+            name: agenthub-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 13017
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 13017
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agenthub-server-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: agenthub-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-server
+spec:
+  selector:
+    app: agenthub-server
+  ports:
+  - port: 3000
+    targetPort: 13017
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-redis
+  labels:
+    app: agenthub-redis
+spec:
+  ports:
+  - port: 6379
+    name: redis
+  selector:
+    app: agenthub-redis
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agenthub-redis-config
+data:
+  redis.conf: |
+    dir /data
+    appendonly yes
+    appendfsync everysec
+    save 900 1
+    save 300 10
+    save 60 10000
+    maxmemory-policy noeviction
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agenthub-redis
+spec:
+  serviceName: agenthub-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-redis
+  template:
+    metadata:
+      labels:
+        app: agenthub-redis
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: redis
+        image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        command:
+          - redis-server
+          - "/etc/redis/redis.conf"
+        ports:
+        - containerPort: 6379
+          name: redis
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 2Gi
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.67.0-alpine@sha256:ef9e3c9afa9072b8a4db8bc2b01471cd582a6a1db23760bc5fdb9e3c21842205
+        securityContext:
+          runAsUser: 59000
+          runAsGroup: 59000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 9121
+          name: metrics
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      volumes:
+      - name: redis-config
+        configMap:
+          name: agenthub-redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

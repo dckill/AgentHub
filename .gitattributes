@@ -1,0 +1,2 @@
+packages/agenthub-app/sources/assets/vendor/*.mermaidjs -whitespace
+reports/** -whitespace

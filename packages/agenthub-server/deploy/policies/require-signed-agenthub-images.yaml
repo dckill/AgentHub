@@ -1,0 +1,65 @@
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: ClusterImagePolicy
+metadata:
+  name: agenthub-server-signed-by-protected-master
+spec:
+  mode: enforce
+  images:
+    - glob: "__AGENTHUB_REGISTRY_PREFIX__/agenthub-server@sha256:*"
+  authorities:
+    - name: protected-master-keyless
+      signatureFormat: bundle
+      keyless:
+        url: https://fulcio.sigstore.dev
+        identities:
+          - issuer: "__AGENTHUB_CERTIFICATE_ISSUER__"
+            subject: "__AGENTHUB_CERTIFICATE_IDENTITY__"
+      ctlog:
+        url: https://rekor.sigstore.dev
+      attestations:
+        - name: require-cosign-v3-image-signature
+          predicateType: https://sigstore.dev/cosign/sign/v1
+---
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: ClusterImagePolicy
+metadata:
+  name: agenthub-server-migration-signed-by-protected-master
+spec:
+  mode: enforce
+  images:
+    - glob: "__AGENTHUB_REGISTRY_PREFIX__/agenthub-server-migration@sha256:*"
+  authorities:
+    - name: protected-master-keyless
+      signatureFormat: bundle
+      keyless:
+        url: https://fulcio.sigstore.dev
+        identities:
+          - issuer: "__AGENTHUB_CERTIFICATE_ISSUER__"
+            subject: "__AGENTHUB_CERTIFICATE_IDENTITY__"
+      ctlog:
+        url: https://rekor.sigstore.dev
+      attestations:
+        - name: require-cosign-v3-image-signature
+          predicateType: https://sigstore.dev/cosign/sign/v1
+---
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: ClusterImagePolicy
+metadata:
+  name: agenthub-app-signed-by-protected-master
+spec:
+  mode: enforce
+  images:
+    - glob: "__AGENTHUB_REGISTRY_PREFIX__/agenthub-app@sha256:*"
+  authorities:
+    - name: protected-master-keyless
+      signatureFormat: bundle
+      keyless:
+        url: https://fulcio.sigstore.dev
+        identities:
+          - issuer: "__AGENTHUB_CERTIFICATE_ISSUER__"
+            subject: "__AGENTHUB_CERTIFICATE_IDENTITY__"
+      ctlog:
+        url: https://rekor.sigstore.dev
+      attestations:
+        - name: require-cosign-v3-image-signature
+          predicateType: https://sigstore.dev/cosign/sign/v1

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: agenthub-postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-postgres
+  template:
+    metadata:
+      labels:
+        app: agenthub-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: agenthub
+            - name: POSTGRES_PASSWORD
+              value: agenthub
+            - name: POSTGRES_DB
+              value: agenthub

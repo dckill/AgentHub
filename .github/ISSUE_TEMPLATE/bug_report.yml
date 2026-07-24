@@ -1,0 +1,55 @@
+name: Bug 报告
+description: 报告可复现的 AgentHub 问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: 请先移除日志中的 token、密钥、服务端凭据、绝对路径和用户内容。
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: App、CLI、Server 或 commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: 组件
+      options:
+        - CLI / Daemon
+        - App / Web / Desktop
+        - Server
+        - agenthub-agent
+        - Wire / Protocol
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 提供最小、可重复的步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为与脱敏日志
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 安全确认
+      options:
+        - label: 我确认内容不含凭据、私钥或用户敏感数据
+          required: true

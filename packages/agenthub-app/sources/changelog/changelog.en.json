@@ -1,0 +1,245 @@
+{
+  "entries": [
+    {
+      "version": 19,
+      "date": "2026-07-18",
+      "summary": "AgentHub completes a full-stack security and reliability hardening pass and aligns the active product scope around Claude Code and Codex, making the self-hosted remote workspace safer and more dependable for long-running work.",
+      "changes": [
+        "Keep the Web root secret in memory only; refreshing or closing the page now requires signing in again instead of persisting the root secret in browser storage",
+        "Harden server pairing, token lifetime and revocation, replay protection, request limits, concurrency backpressure, tenant boundaries, and sensitive-log redaction",
+        "Improve daemon, runner, and systemd recovery so active turns, thinking state, and archives finish correctly during updates, stops, and abnormal exits",
+        "Optimize long sessions, file previews, cancellable prefetching, bounded caches, and lazy-loaded resources to reduce memory and startup cost on large projects",
+        "Add local sharing for explicitly selected content and revocable, time-limited, scope-limited end-to-end encrypted external shares",
+        "Improve accessibility and interaction consistency across buttons, tabs, selection rows, focus states, touch targets, page states, and localized copy",
+        "Limit the active runtime to Claude Code and Codex; legacy Provider messages remain read-only and no longer expose creation, authentication, or configuration entry points",
+        "Align the release with CLI 1.0.4, the Android production arm64 package, and the server key-migration guidance"
+      ]
+    },
+    {
+      "version": 18,
+      "date": "2026-07-07",
+      "summary": "AgentHub enters a new visual identity phase while completing official session synchronization, creating a more consistent experience across mobile, Web, and desktop.",
+      "changes": [
+        "Refresh the AgentHub visual identity with richer glass, ceramic, highlight, and soft-texture treatments in both dark and light themes",
+        "Unify the chat composer, tool-call cards, settings, file details, and code panels under the new visual language",
+        "Add official Claude and Codex session synchronization and recovery so the App can take over and continue official threads more reliably",
+        "Replace pull-to-sync on the session screen with a top-right manual sync action to avoid accidental refreshes while scrolling desktop session children",
+        "Refine the mobile 1.0 experience across navigation, session titles, chat layout, settings, and common actions",
+        "Refresh the AgentHub 1.0 documentation, brand boundaries, and project status for clearer release and collaboration workflows",
+        "Fix stability issues found during the 1.0 audit and ensure the AgentHub CLI executable keeps the correct permissions"
+      ]
+    },
+    {
+      "version": 17,
+      "date": "2026-07-04",
+      "summary": "The Android production package, daemon update workflow, and Web verification path now form a complete loop, substantially improving pre-release engineering reliability.",
+      "changes": [
+        "Standardize Android production builds under the artifacts directory and automatically refresh the latest APK",
+        "Improve Android splash, preview, and production build scripts to reduce manual delivery errors",
+        "Harden daemon updates so systemd-managed processes are not terminated incorrectly and sessions do not remain stuck in a thinking state",
+        "Ensure agent runners finish an active turn on SIGTERM, archive, and abnormal exit",
+        "Establish an authenticated Web verification flow that avoids repeated QR scanning and reliably reuses a signed-in development environment",
+        "Improve continuous branch rendering in Git Graph for more coherent lines in complex histories",
+        "Fix weak hierarchy, harsh edges, and insufficient contrast across multiple light-theme surfaces"
+      ]
+    },
+    {
+      "version": 16,
+      "date": "2026-06-28",
+      "summary": "File transfer, remote file workflows, and session synchronization receive focused improvements, making real project work on mobile more reliable.",
+      "changes": [
+        "Add device file-transfer management for viewing and managing remote transfer tasks",
+        "Improve remote downloads, retries, status feedback, and opening files on mobile",
+        "Strengthen recovery after transfer failures so unstable networks are easier to resume from",
+        "Fix Markdown code-block previews, empty code blocks, and file-preview edge cases",
+        "Synchronize session thinking state to reduce disagreement between the App and the running Agent",
+        "Fix the context-usage ring and usage queries so statistics reflect update times accurately",
+        "Improve daemon restart and session convergence to reduce state drift after restarts"
+      ]
+    },
+    {
+      "version": 15,
+      "date": "2026-06-27",
+      "summary": "Android interaction, theming, and client Agent support receive a full cleanup in preparation for release.",
+      "changes": [
+        "Streamline Android session entry, recovery, and management flows",
+        "Make output handling more consistent across Claude, Codex, and other client Agents",
+        "Improve Android dark and light themes, the composer, tools, and common status displays",
+        "Add App interaction previews and refine Codex output handling for better coverage of real chat scenarios",
+        "Rework the Android preview-package pipeline for clearer artifacts and configuration",
+        "Stop tracking APK and other build outputs to reduce repository size and commit noise",
+        "Improve public deployment and stabilization verification for cross-device testing"
+      ]
+    },
+    {
+      "version": 14,
+      "date": "2026-05-08",
+      "summary": "Settings, device management, synchronization protocols, and scaling gain foundational capabilities that make the App better suited to everyday long-running use.",
+      "changes": [
+        "Add independent scaling for the session list, chat screen, and file preview to fit different displays and reading preferences",
+        "Improve device grouping, group state, and navigation to machine details",
+        "Introduce the v4 synchronization protocol foundation and harden server protocols and sensitive endpoints",
+        "Expand v4 synchronization route coverage, recent features, and edge-case tests",
+        "Fix client routing and authentication state for more reliable switching between Web and App pages",
+        "Add 80 curated Twemoji PNG assets for project icons and visual identity",
+        "Add a standalone Web test script for faster App page and interaction verification"
+      ]
+    },
+    {
+      "version": 13,
+      "date": "2026-05-07",
+      "summary": "This release introduces project-grouped sessions, customizable project icons, and several stability and reliability improvements.",
+      "changes": [
+        "Group sessions by project directory and support viewing archived sessions within each project",
+        "Allow every project to use a custom name and one of 80 curated Emoji icons, editable from the project header",
+        "Replace the old pixel, gradient, and brutalist Avatar systems with project Emoji icons",
+        "Remove Avatar style and AI Provider icon choices from appearance settings",
+        "Fix thinking-animation flicker during message synchronization",
+        "Forward complete tool-call results to clients, including output and error state",
+        "Support completed, failed, cancelled, and timed-out tool states from more AI Agent backends"
+      ]
+    },
+    {
+      "version": 12,
+      "date": "2026-05-06",
+      "summary": "The file browser gains folder navigation and breadcrumbs, larger icons, and a dark-mode-aware preview panel.",
+      "changes": [
+        "Add folder navigation to the file picker for browsing directories level by level",
+        "Add a breadcrumb path bar for quick navigation to any parent directory",
+        "Increase file icons throughout the directory tree and file list for easier recognition",
+        "Use theme colors in the preview panel so it renders correctly in dark mode",
+        "Add cache cleanup and automatic artifact naming to the Android build script"
+      ]
+    },
+    {
+      "version": 11,
+      "date": "2026-05-05",
+      "summary": "The chat composer now supports image attachments and slash commands while a more focused interface removes social features.",
+      "changes": [
+        "Send image attachments to AI directly from the photo library",
+        "Add a unified attachment menu for project files and local images",
+        "Add a slash-command menu for inserting common commands quickly",
+        "Add folder creation to the file browser",
+        "Refine the directory drawer and file-preview layout with a wider desktop preview area",
+        "Remove friends, inbox, and activity features, leaving focused Sessions and Settings tabs",
+        "Remove the voice button from the chat composer"
+      ]
+    },
+    {
+      "version": 10,
+      "date": "2026-05-04",
+      "summary": "A new visual folder browser lets users choose remote directories when creating a session without typing paths manually.",
+      "changes": [
+        "Add a visual folder browser to the new-session screen",
+        "Add a Browse action to machine details for fast folder selection",
+        "Support switching between browsing and manual path entry",
+        "Support hidden folders plus quick access to recent paths and the home directory"
+      ]
+    },
+    {
+      "version": 9,
+      "date": "2026-04-26",
+      "summary": "Voice-call reliability, content rendering, and a new diff viewer improve the day-to-day experience.",
+      "changes": [
+        "Fix voice calls ending during a second session so repeated calls remain reliable",
+        "Allow horizontal scrolling for tables and code blocks instead of overflowing the screen",
+        "Add a syntax-highlighted diff viewer with unified and split layouts on desktop and Web",
+        "Persist model and effort-level selections on mobile",
+        "Preserve accept and reject permission prompts",
+        "Prevent settings from resetting unpredictably during synchronization",
+        "Add a scroll-to-bottom action to chat",
+        "Allow unused machines to be deleted from Settings"
+      ]
+    },
+    {
+      "version": 7,
+      "date": "2026-04-08",
+      "summary": "This update adds current Gemini models, smarter voice guidance, and more reliable plan approval and Codex turns in AgentHub CLI sessions.",
+      "changes": [
+        "Update AgentHub CLI by running `npm i -g /agenthub`",
+        "Add current Gemini models to the model picker",
+        "Improve first-use voice guidance and make free-tier upgrade guidance clearer",
+        "Fix AgentHub CLI plan approval so accept and reject actions appear reliably in plan mode",
+        "Fix background task updates and occasional Codex turns that hang or fail to complete"
+      ]
+    },
+    {
+      "version": 6,
+      "date": "2026-03-19",
+      "summary": "Our largest update since launch introduces a new session-creation experience, Git worktree management, and broader Agent support.",
+      "changes": [
+        "Redesign session creation with machine and worktree selection, draft persistence, and visibility for offline machines",
+        "Add Git worktree listing, creation, and selection, with automatic cleanup when a session is deleted",
+        "Switch automatically into plan mode when the Agent enters plan mode",
+        "Add OpenClaw alongside Claude Code and Codex as an optional AI Agent",
+        "Add session quick actions for faster interaction with active sessions",
+        "Resume sessions from where they stopped",
+        "Delete sessions directly from session information",
+        "Rename the bypass permission mode to yolo and refresh its styling",
+        "Improve Markdown rendering and message formatting",
+        "Fix edge cases and improve message synchronization reliability",
+        "Refine UI details including send-loading animation, hidden internal tool calls, and spacing"
+      ]
+    },
+    {
+      "version": 5,
+      "date": "2025-12-22",
+      "summary": "This update broadens AI Agent support, refines voice interactions, and improves Markdown rendering for a better chat experience.",
+      "changes": [
+        "Begin adding Gemini through ACP and prepare the same approach for Codex stability improvements",
+        "Remove mobile Agent model configuration because model changes outpaced the App; configure it through the CLI and AgentHub will use the default",
+        "Require a subscription after three free ElevenLabs voice calls while preparing support for connecting a user-owned ElevenLabs Agent",
+        "Render real formatted Markdown tables in chat instead of ASCII pipe layouts, with further layout refinements still in progress"
+      ]
+    },
+    {
+      "version": 4,
+      "date": "2025-09-12",
+      "summary": "Codex integration and daemon mode transform remote development with instant AI assistance while preserving full control of the development environment.",
+      "changes": [
+        "Add Codex support for advanced AI-assisted code completion and generation",
+        "Make daemon mode the default so remote sessions can start immediately without launching the CLI manually",
+        "Start sessions from a mobile device with one tap and connect to the development machine automatically",
+        "Add account connections for Anthropic and GPT"
+      ]
+    },
+    {
+      "version": 3,
+      "date": "2025-08-29",
+      "summary": "This update brings developer identity into AgentHub through seamless GitHub integration while maintaining our commitment to privacy and security.",
+      "changes": [
+        "Add GitHub account connection through a secure OAuth flow",
+        "Synchronize profile data including GitHub avatar, name, and bio",
+        "Store tokens encrypted on the backend for additional protection",
+        "Enhance Settings with the connected personalized profile",
+        "Add one-tap GitHub disconnection with confirmation protection",
+        "Improve account management with clear connection-state indicators"
+      ]
+    },
+    {
+      "version": 2,
+      "date": "2025-06-26",
+      "summary": "This release focuses on seamless device connection, visual polish, and intelligent voice interactions.",
+      "changes": [
+        "Add QR authentication for instant, secure cross-platform device pairing",
+        "Introduce a complete dark theme with automatic system-preference detection",
+        "Improve voice-assistant speed and latency",
+        "Show visual indicators for modified files directly in the session list",
+        "Add preferred-language selection for the voice assistant with support for more than 15 languages"
+      ]
+    },
+    {
+      "version": 1,
+      "date": "2025-05-12",
+      "summary": "Welcome to AgentHub, your secure and encrypted mobile companion for Claude Code. The first release establishes private, powerful AI interaction from anywhere.",
+      "changes": [
+        "Implement end-to-end encrypted session management for complete privacy",
+        "Integrate an intelligent voice assistant for natural conversations",
+        "Add an experimental file manager with syntax highlighting and tree navigation",
+        "Build seamless real-time synchronization across devices",
+        "Support iOS, Android, and responsive Web interfaces"
+      ]
+    }
+  ],
+  "latestVersion": 19
+}

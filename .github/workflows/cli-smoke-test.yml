@@ -1,0 +1,71 @@
+name: CLI Smoke Test
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "packages/agenthub-cli/**"
+      - "packages/agenthub-wire/**"
+      - "scripts/postinstall.cjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/cli-smoke-test.yml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "packages/agenthub-cli/**"
+      - "packages/agenthub-wire/**"
+      - "scripts/postinstall.cjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/cli-smoke-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 24]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI
+        run: pnpm --filter @artsum/agenthub build
+
+      - name: Pack CLI
+        shell: bash
+        run: pnpm --filter @artsum/agenthub pack --pack-destination packages/agenthub-cli
+
+      - name: Install packed CLI
+        shell: bash
+        run: npm install --global packages/agenthub-cli/artsum-agenthub-*.tgz
+
+      - name: Smoke test CLI
+        shell: bash
+        run: |
+          agenthub --help
+          agenthub --version
+          agenthub doctor
+          agenthub daemon status

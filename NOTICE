@@ -1,0 +1,13 @@
+AgentHub
+
+This project is derived from Happy:
+https://github.com/slopus/happy
+
+Happy and its original contributions are licensed under the MIT License.
+Copyright (c) 2026 Happy Coder Contributors.
+
+AgentHub modifications are licensed under the same MIT License.
+Copyright (c) 2026 AgentHub Contributors.
+
+Third-party notices for binaries bundled with the AgentHub CLI are stored in:
+packages/agenthub-cli/tools/licenses/

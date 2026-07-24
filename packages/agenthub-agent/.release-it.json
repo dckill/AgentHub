@@ -1,0 +1,19 @@
+{
+  "git": {
+    "commitMessage": "Release agenthub-agent ${version}",
+    "tagName": "agenthub-agent-v${version}",
+    "push": true,
+    "requireCleanWorkingDir": true,
+    "requireBranch": "main",
+    "addUntrackedFiles": false
+  },
+  "github": {
+    "release": true,
+    "releaseName": "agenthub-agent-v${version}",
+    "releaseNotes": "node .release-it.notes.js ${version}"
+  },
+  "npm": {
+    "publish": true
+  },
+  "hooks": {}
+}

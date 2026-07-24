@@ -1,0 +1,138 @@
+{
+  "name": "@artsum/agenthub",
+  "version": "1.1.4",
+  "description": "Mobile and Web client for Claude Code and Codex",
+  "author": "Kirill Dubovitskiy",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/dckill/AgentHub",
+  "bugs": "https://github.com/dckill/AgentHub/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dckill/AgentHub.git",
+    "directory": "packages/agenthub-cli"
+  },
+  "bin": {
+    "agenthub": "./bin/agenthub.mjs",
+    "agenthub-mcp": "./bin/agenthub-mcp.mjs"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      }
+    },
+    "./lib": {
+      "require": {
+        "types": "./dist/lib.d.cts",
+        "default": "./dist/lib.cjs"
+      },
+      "import": {
+        "types": "./dist/lib.d.mts",
+        "default": "./dist/lib.mjs"
+      }
+    },
+    "./claude-sdk": {
+      "require": {
+        "types": "./dist/claude-sdk.d.cts",
+        "default": "./dist/claude-sdk.cjs"
+      },
+      "import": {
+        "types": "./dist/claude-sdk.d.mts",
+        "default": "./dist/claude-sdk.mjs"
+      }
+    },
+    "./codex/agenthubMcpStdioBridge": {
+      "require": {
+        "types": "./dist/codex/agenthubMcpStdioBridge.d.cts",
+        "default": "./dist/codex/agenthubMcpStdioBridge.cjs"
+      },
+      "import": {
+        "types": "./dist/codex/agenthubMcpStdioBridge.d.mts",
+        "default": "./dist/codex/agenthubMcpStdioBridge.mjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "scripts",
+    "tools/archives/*.tar.gz",
+    "tools/licenses",
+    "package.json"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "shx rm -rf dist && tsc --noEmit && pkgroll",
+    "test": "pnpm run build && vitest run",
+    "test:unit": "pnpm run build && vitest run --project unit",
+    "test:integration": "vitest run --project integration-empty --project integration-plan-mode --project integration-authenticated",
+    "cli:install": "node scripts/install-local.cjs",
+    "prepublishOnly": "pnpm run build && pnpm run test:unit",
+    "postinstall": "node scripts/unpack-tools.cjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "^0.0.37",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1",
+    "@paralleldrive/cuid2": "^2.2.2",
+    "@stablelib/base64": "^2.0.1",
+    "@stablelib/hex": "^2.0.1",
+    "@types/cross-spawn": "^6.0.6",
+    "@types/http-proxy": "^1.17.17",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/react": "^19.2.7",
+    "@types/tmp": "^0.2.6",
+    "axios": "^1.16.0",
+    "chalk": "^5.6.2",
+    "cross-spawn": "^7.0.6",
+    "expo-server-sdk": "^3.15.0",
+    "fastify": "^5.8.5",
+    "fastify-type-provider-zod": "4.0.2",
+    "http-proxy": "^1.18.1",
+    "http-proxy-middleware": "^3.0.7",
+    "ink": "^6.5.1",
+    "inquirer": "^13.2.2",
+    "open": "^10.2.0",
+    "ps-list": "^8.1.1",
+    "qrcode-terminal": "^0.12.0",
+    "react": "^19.2.0",
+    "socket.io-client": "^4.8.1",
+    "tar": "^7.5.11",
+    "tmp": "^0.2.7",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.21.0",
+    "zod": "3.25.76",
+    "@artsum/agenthub-wire": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^1",
+    "@types/inquirer": "^9.0.9",
+    "@types/node": ">=20",
+    "@types/ws": "^8.18.1",
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.6.1",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10",
+    "pkgroll": "^2.14.2",
+    "shx": "^0.3.3",
+    "ts-node": "^10",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.6"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

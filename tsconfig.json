@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {},
+  "extends": "./packages/agenthub-app/node_modules/expo/tsconfig.base.json",
+  "exclude": [
+    "packages/agenthub-app/src-tauri/target"
+  ]
+}

@@ -1,0 +1,15 @@
+packages:
+  - "packages/agenthub-app"
+  - "packages/agenthub-agent"
+  - "packages/agenthub-cli"
+  - "packages/agenthub-server"
+  - "packages/agenthub-wire"
+  - "packages/agenthub-app-logs"
+  - "packages/codium"
+
+# react-native-screen-transitions still declares the removed @types/react-native
+# stub. React Native 0.83 ships its own types; installing that stub recursively
+# resolves another React Native version and breaks the React 19 JSX type graph.
+peerDependencyRules:
+  ignoreMissing:
+    - "@types/react-native"

@@ -1,0 +1,90 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+/ios
+/android
+/packages/agenthub-app/ios
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+._*
+
+# local env files
+.env*.local
+.env
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+.claude/settings.local.json
+.claude/*.lock
+.claude/worktrees/
+.plan
+
+CLAUDE.local.md
+CLAUDE.md
+.claude/CLAUDE.md
+
+.dev/worktree/*
+.worktrees/
+
+# Local dev environments
+.environments/
+environments/data/
+
+# Development planning notes (keep local, don't commit)
+notes/
+docs/notes/
+# ralphex progress logs
+progress*.txt
+
+# OpenCode trace output (script is committed, output is not)
+docs/competition/opencode/traces/
+
+# scratch tooling
+.cdp-scripts/
+agenthub-workspaces/
+
+# Server logs
+*.log
+
+# Android local build artifacts
+/packages/agenthub-app/build/
+/packages/agenthub-app/.build-env-check
+/packages/agenthub-app/android/.agenthub-prebuild-stamp
+/packages/agenthub-app/coverage/
+/packages/agenthub-app/reports/
+/artifacts/
+
+# Public snapshots keep raw internal evidence and machine diagnostics in the
+# private GitLab repository.
+/docs/audits/evidence/
+/reports/
+/packages/agenthub-cli/.env.dev
+/packages/agenthub-cli/.env.integration-test

@@ -1,0 +1,113 @@
+# Stage 1: install dependencies with workspace context
+FROM node:20@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5 AS deps
+
+ENV COREPACK_DEFAULT_TO_LATEST=0
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y python3 ffmpeg make g++ build-essential && rm -rf /var/lib/apt/lists/*
+RUN corepack enable
+
+WORKDIR /repo
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY scripts/postinstall.cjs ./scripts/postinstall.cjs
+COPY patches ./patches
+
+RUN mkdir -p packages/agenthub-server packages/agenthub-server-runtime packages/agenthub-wire
+
+COPY packages/agenthub-server/package.json packages/agenthub-server/
+COPY packages/agenthub-server-runtime/package.json packages/agenthub-server-runtime/
+COPY packages/agenthub-server-runtime/pnpm-lock.yaml packages/agenthub-server-runtime/
+COPY packages/agenthub-wire/package.json packages/agenthub-wire/
+
+# Workspace postinstall requirements
+COPY packages/agenthub-server/prisma packages/agenthub-server/prisma
+
+RUN SKIP_AGENTHUB_WIRE_BUILD=1 SKIP_AGENTHUB_APP_PATCHES=1 pnpm --filter agenthub-server... \
+    --config.node-linker=isolated --config.shamefully-hoist=false \
+    install --frozen-lockfile
+RUN pnpm --dir packages/agenthub-server-runtime --ignore-workspace fetch --prod --frozen-lockfile
+
+# Stage 2: build the server
+FROM deps AS builder
+
+COPY packages/agenthub-wire ./packages/agenthub-wire
+COPY packages/agenthub-server ./packages/agenthub-server
+
+RUN pnpm --filter @artsum/agenthub-wire build
+RUN pnpm --filter agenthub-server build
+RUN pnpm --filter agenthub-server build:runtime
+
+# Stage 3: rebuild the runtime tree from the reviewed lock without network access.
+# The builder needs TypeScript/test/generator tooling, but none of those packages
+# should survive solely because they were present during compilation.
+FROM builder AS production-deps
+
+RUN rm -rf /repo/node_modules \
+        /repo/packages/agenthub-server/node_modules \
+        /repo/packages/agenthub-wire/node_modules \
+    && CI=1 SKIP_AGENTHUB_WIRE_BUILD=1 SKIP_AGENTHUB_APP_PATCHES=1 \
+       pnpm --filter agenthub-server... \
+       --config.node-linker=isolated --config.shamefully-hoist=false \
+       install --prod --offline --frozen-lockfile
+
+# Stage 4: retain the generated Prisma client, then install only dependencies
+# imported by the compiled online runtime. Prisma CLI/generators stay in the
+# migration-only dependency stage.
+FROM builder AS runtime-deps
+
+RUN node ./packages/agenthub-server/scripts/stagePrismaClient.mjs export /tmp/agenthub-prisma-client \
+    && rm -rf /repo/node_modules \
+        /repo/packages/agenthub-server/node_modules \
+        /repo/packages/agenthub-server-runtime/node_modules \
+        /repo/packages/agenthub-wire/node_modules \
+    && CI=1 SKIP_AGENTHUB_WIRE_BUILD=1 SKIP_AGENTHUB_APP_PATCHES=1 \
+       pnpm --dir packages/agenthub-server-runtime --ignore-workspace \
+       --config.node-linker=isolated --config.shamefully-hoist=false --config.auto-install-peers=false \
+       install --prod --offline --frozen-lockfile \
+    && node ./packages/agenthub-server/scripts/patchRuntimeDependencies.mjs \
+    && node ./packages/agenthub-server/scripts/stagePrismaClient.mjs restore /tmp/agenthub-prisma-client \
+    && rm -rf /tmp/agenthub-prisma-client
+
+# Stage 5: common non-root runtime base.
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runtime-base
+
+WORKDIR /repo
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system --gid 10001 agenthub \
+    && useradd --system --uid 10001 --gid agenthub --create-home --home-dir /home/agenthub agenthub
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Stage 6: one-shot database migration image. It retains the Prisma CLI,
+# schema and migrations but never serves online traffic.
+FROM runtime-base AS migration
+
+COPY --from=production-deps --chown=agenthub:agenthub /repo/node_modules /repo/node_modules
+COPY --from=production-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/node_modules /repo/packages/agenthub-server/node_modules
+COPY --from=production-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/package.json /repo/packages/agenthub-server/package.json
+COPY --from=production-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/prisma /repo/packages/agenthub-server/prisma
+
+WORKDIR /repo/packages/agenthub-server
+USER agenthub
+CMD ["/repo/packages/agenthub-server/node_modules/.bin/prisma", "migrate", "deploy", "--schema=/repo/packages/agenthub-server/prisma/schema.prisma"]
+
+# Stage 7: online runtime.
+FROM runtime-base AS runner
+
+# Copy only the production-pruned dependency tree and compiled runtime.
+COPY --from=runtime-deps --chown=agenthub:agenthub /repo/packages/agenthub-server-runtime/node_modules /repo/packages/agenthub-server/node_modules
+COPY --from=runtime-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/package.json /repo/packages/agenthub-server/package.json
+COPY --from=runtime-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/prisma/migrations /repo/packages/agenthub-server/prisma/migrations
+COPY --from=runtime-deps --chown=agenthub:agenthub /repo/packages/agenthub-server/dist/runtime /repo/packages/agenthub-server/dist/runtime
+
+# Expose the port the app will run on
+EXPOSE 13017
+
+# Command to run the application
+WORKDIR /repo/packages/agenthub-server
+USER agenthub
+CMD ["node", "/repo/packages/agenthub-server/dist/runtime/main.mjs"]

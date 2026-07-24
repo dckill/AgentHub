@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "765829299579",
+    "project_id": "agenthub-38949",
+    "storage_bucket": "agenthub-38949.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:765829299579:android:92ab0966504e1c637f91de",
+        "android_client_info": {
+          "package_name": "com.artsum.agenthub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7I_P2WOJG9Gn1OjuiDEqgsQ6cPiwoxDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,184 @@
+{
+    "name": "monorepo",
+    "private": true,
+    "scripts": {
+        "cli": "pnpm --filter @artsum/agenthub cli",
+        "release": "node ./scripts/release.cjs",
+        "metadata:check": "tsx scripts/releaseMetadata.ts",
+        "release:doctor": "pnpm metadata:check -- --json",
+        "gitlab:evidence": "node scripts/gitlabReleaseEvidence.cjs",
+        "gitlab:evidence:test": "node --test scripts/gitlabReleaseEvidence.test.cjs",
+        "documentation:status": "node scripts/currentDocumentationStatus.cjs",
+        "documentation:status:test": "node --test scripts/currentDocumentationStatus.test.cjs",
+        "ci:verify": "pnpm dependency-boundary:test && pnpm gitlab:evidence:test && pnpm documentation:status:test && pnpm documentation:status && pnpm pack-contract:test && pnpm cli-pack-install:test && pnpm cli-registry-release-drill:test && pnpm web:budget:test && pnpm web:contract:test && pnpm app:perf:baseline:test && pnpm check && pnpm env:policy && pnpm docker:policy && pnpm release-image:policy && pnpm sbom:test && pnpm provenance:test && pnpm provenance:verify:test && pnpm audit:test && pnpm reachability:test && pnpm license:test && pnpm provider-matrix:test && pnpm metadata:check -- --json && pnpm supply-chain:policy",
+        "sbom:generate": "node scripts/generateSbom.cjs",
+        "provenance:test": "node --test scripts/generateProvenance.test.cjs",
+        "provenance:verify:test": "node --test scripts/verifyProvenance.test.cjs",
+        "sbom:test": "node scripts/generateSbom.test.cjs",
+        "audit:test": "node --test scripts/checkDependencyAudit.test.cjs",
+        "audit:check": "node scripts/checkDependencyAudit.cjs",
+        "reachability:test": "node --test scripts/checkReachableAudit.test.cjs",
+        "reachability:check": "node scripts/checkReachableAudit.cjs",
+    "dependency-boundary:test": "node --test scripts/rootDependencyBoundary.test.cjs scripts/trackedGeneratedFiles.test.cjs scripts/reactNativeDrawerOverlayPatch.test.cjs scripts/nobleHashesMetroExportsPatch.test.cjs scripts/pglitePrismaBytesPatch.test.cjs scripts/serverCompiledRuntime.test.cjs scripts/serverRuntimeManifest.test.cjs",
+        "supply-chain:policy": "vitest run --root scripts supplyChainPolicy.test.ts",
+        "docker:policy": "vitest run scripts/dockerBuildScope.test.ts scripts/kubernetesAdmissionPolicy.test.ts",
+        "release-image:policy": "vitest run scripts/signedKubernetesRelease.test.ts",
+        "license:test": "node --test scripts/checkLicenses.test.cjs",
+        "license:check": "node scripts/checkLicenses.cjs",
+        "provider-matrix:test": "node --test scripts/checkProviderMatrixOutput.test.cjs scripts/checkPlanModeOutput.test.cjs scripts/productProviderScope.test.cjs",
+        "pack-contract:test": "node --test scripts/wirePackContract.test.cjs",
+        "cli-pack-install:test": "node --test scripts/unpackTools.test.cjs scripts/cliPackInstall.test.cjs",
+        "cli-registry-release-drill:test": "node --test scripts/localNpmRegistry.test.cjs scripts/cliRegistryReleaseDrill.test.cjs",
+        "web:budget": "node scripts/webBundleBudget.cjs",
+        "web:budget:test": "node --test scripts/webBundleBudget.test.cjs",
+        "typecheck": "pnpm --recursive --if-present typecheck",
+        "lint": "pnpm typecheck",
+        "format:check": "git diff --check",
+        "test:guardrails": "pnpm --filter agenthub-server exec vitest run sources/app/api/routes/protocolInventory.test.ts && pnpm --filter @artsum/agenthub-wire exec vitest run src/v4Sync.test.ts",
+        "check": "pnpm format:check && pnpm lint && pnpm test:guardrails",
+        "web": "pnpm --filter agenthub-app web",
+        "web:contract:test": "node --test scripts/webContractCI.test.cjs && pnpm --filter agenthub-app exec vitest run sources/auth/tokenStorage.test.ts sources/auth/authRouteGuard.test.ts sources/auth/accountRuntime.test.ts sources/router/productionRouterBoundary.test.ts sources/testing/rootInitialization.test.ts sources/testing/corePageAccessibilityBoundary.test.ts sources/testing/settingsSubpageAccessibilityBoundary.test.ts sources/testing/sessionWorkbenchAccessibilityBoundary.test.ts sources/testing/appLinksSecurityPolicy.test.ts sources/testing/webPlatformPayloadBoundary.test.ts",
+        "app:perf:baseline": "node scripts/runAppPerformanceBaseline.cjs",
+        "app:perf:baseline:test": "node --test scripts/appPerformanceBaseline.test.cjs",
+        "codium": "pnpm --filter codium dev",
+        "app-logs": "pnpm --filter agenthub-app-logs start",
+        "postinstall": "node ./scripts/postinstall.cjs",
+        "env:new": "tsx environments/environments.ts new",
+        "env:list": "tsx environments/environments.ts list",
+        "env:use": "tsx environments/environments.ts use",
+        "env:remove": "tsx environments/environments.ts remove",
+        "env:current": "tsx environments/environments.ts current",
+        "env:doctor": "tsx environments/environments.ts doctor",
+        "env:prune": "tsx environments/environments.ts prune",
+        "env:policy": "vitest run environments/environments.test.ts",
+        "env:server": "tsx environments/environments.ts run server",
+        "env:web": "tsx environments/environments.ts run web",
+        "env:ios": "tsx environments/environments.ts run ios",
+        "env:android": "tsx environments/environments.ts run android",
+        "env:cli": "tsx environments/environments.ts run cli",
+        "env:seed": "tsx environments/environments.ts seed",
+        "env:up": "tsx environments/environments.ts up",
+        "env:up:authenticated": "pnpm env:up --template authenticated-empty",
+        "env:down": "tsx environments/environments.ts down",
+        "env:tailscale": "tsx environments/environments.ts tailscale"
+    },
+    "workspaces": {
+        "packages": [
+            "packages/agenthub-app",
+            "packages/agenthub-agent",
+            "packages/agenthub-cli",
+            "packages/agenthub-server",
+            "packages/agenthub-wire",
+            "packages/agenthub-app-logs",
+            "packages/codium"
+        ]
+    },
+  "pnpm": {
+    "packageExtensions": {
+      "@more-tech/react-native-libsodium@1.5.6": {
+        "dependencies": {
+          "@expo/config-plugins": "55.0.7"
+        }
+      },
+      "@expo/cli@55.0.18": {
+        "dependencies": {
+          "metro-runtime": "0.83.5"
+        }
+      },
+      "react-native-worklets@0.7.2": {
+        "dependencies": {
+          "@babel/generator": "7.29.7",
+          "@babel/traverse": "7.29.0",
+          "@babel/types": "7.29.0"
+        }
+      },
+      "react-native-svg@15.12.1": {
+        "dependencies": {
+          "buffer": "6.0.3"
+        }
+      }
+    },
+    "overrides": {
+            "whatwg-url": "14.2.0",
+            "parse-path": "7.0.3",
+            "@types/parse-path": "7.0.3",
+            "@anthropic-ai/sdk": "0.91.1",
+            "@babel/core": "7.29.6",
+            "@hono/node-server": "1.19.14",
+            "@xmldom/xmldom": "0.8.13",
+            "ajv@6": "6.14.0",
+            "ajv@8": "8.20.0",
+            "brace-expansion@1": "1.1.13",
+            "brace-expansion@5": "5.0.7",
+            "dompurify": "3.4.12",
+            "effect": "3.20.0",
+            "fast-xml-parser": "5.10.1",
+            "follow-redirects": "1.16.0",
+            "ip-address": "10.2.0",
+            "js-yaml@3": "3.15.0",
+            "js-yaml@4": "4.2.0",
+            "lodash": "4.18.0",
+            "mermaid": "11.16.0",
+            "minimatch@3": "3.1.4",
+            "postcss@8": "8.5.19",
+            "qs": "6.15.3",
+            "react-router": "7.18.1",
+            "rollup": "4.59.0",
+            "shell-quote": "1.8.4",
+            "socket.io-parser": "4.2.6",
+            "tmp": "0.2.7",
+            "undici": "6.27.0",
+            "uuid@3": "11.1.1",
+            "uuid@7": "11.1.1",
+            "uuid@9": "11.1.1",
+            "uuid@11": "11.1.1",
+            "lodash-es": "4.18.0",
+            "picomatch@2": "2.3.2",
+            "vite@7": "7.3.5",
+            "ws@7": "7.5.11",
+            "ws@8": "8.21.0",
+            "yaml@1": "1.10.3",
+            "yaml@2": "2.9.0"
+        },
+        "onlyBuiltDependencies": [
+            "@more-tech/react-native-libsodium",
+            "@prisma/client",
+            "@prisma/engines",
+            "@shopify/react-native-skia",
+            "@tailwindcss/oxide",
+            "better-sqlite3",
+            "electron",
+            "esbuild",
+            "node-pty",
+            "prisma",
+            "sharp"
+        ]
+    },
+    "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977",
+    "version": "1.0.0",
+    "description": "AgentHub 是一个面向 Claude Code 与 Codex 的移动端、Web 端、桌面端和远程控制客户端，通过端到端加密把你自己电脑上的智能体会话同步到手机、浏览器或远程控制 CLI。",
+    "main": "index.js",
+    "directories": {
+        "doc": "docs"
+    },
+  "devDependencies": {
+    "@types/node": "20.19.39",
+    "semver": "^7.7.3",
+    "tar": "^7.5.11",
+    "tsx": "^4.21.0",
+        "typescript": "5.9.3",
+        "vitest": "^3.2.7",
+        "yaml": "^2.9.0"
+    },
+    "dependencies": {},
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "homepage": "https://github.com/dckill/AgentHub",
+    "bugs": "https://github.com/dckill/AgentHub/issues",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dckill/AgentHub.git"
+    },
+    "type": "commonjs"
+}

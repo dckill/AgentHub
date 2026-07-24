@@ -1,0 +1,11 @@
+{
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "latestVersion": 19
+    },
+    "zh-Hans": {
+      "latestVersion": 19
+    }
+  }
+}

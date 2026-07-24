@@ -1,0 +1,125 @@
+import Constants from 'expo-constants';
+import { tracking } from './tracking';
+import type { Metadata, Session } from '@/sync/storageTypes';
+
+// Re-export tracking for direct access
+export { tracking } from './tracking';
+
+/**
+ * Initialize tracking with an anonymous user ID.
+ * Should be called once during auth initialization.
+ */
+export function initializeTracking(anonymousUserId: string) {
+    tracking?.identify(anonymousUserId, { name: anonymousUserId });
+}
+
+/**
+ * Auth events
+ */
+export function trackAccountCreated() {
+    tracking?.capture('account_created');
+}
+
+export function trackAccountRestored() {
+    tracking?.capture('account_restored');
+}
+
+export function trackLogout() {
+    tracking?.reset();
+}
+
+/**
+ * Core user interactions
+ */
+export function trackConnectAttempt() {
+    tracking?.capture('connect_attempt');
+}
+
+export function trackSessionSwitched(session: Pick<Session, 'id' | 'createdAt' | 'activeAt' | 'updatedAt'>) {
+    tracking?.capture('session_switched', {
+        session_id: session.id,
+        session_created_at: session.createdAt,
+        last_active_at: session.activeAt,
+        last_updated_at: session.updatedAt,
+    });
+}
+
+export type MessageSentSource = 'chat' | 'new_session' | 'option' | 'question';
+
+export function trackMessageSent(source: MessageSentSource, metadata?: Metadata | null) {
+    tracking?.capture('message_sent', {
+        source,
+        session_agent: metadata?.flavor === 'gpt' || metadata?.flavor === 'openai'
+            ? 'codex'
+            : metadata?.flavor ?? null,
+        session_started_source: metadata?.startedBy === 'daemon' || metadata?.startedFromDaemon === true
+            ? 'daemon'
+            : metadata?.startedBy === 'terminal' || metadata?.startedFromDaemon === false
+                ? 'cli'
+                : null,
+        agenthub_cli_version: metadata?.version ?? null,
+        ota_version: null,
+        ota_runtime_version: typeof Constants.expoConfig?.runtimeVersion === 'string' ? Constants.expoConfig.runtimeVersion : null,
+    });
+}
+
+/**
+ * What's New / Changelog events
+ */
+export function trackPaywallButtonClicked(flow?: string) {
+    tracking?.capture('paywall_button_clicked', flow ? { flow } : undefined);
+}
+
+export function trackPaywallPresented(flow?: string) {
+    tracking?.capture('paywall_presented', flow ? { flow } : undefined);
+}
+
+export function trackPaywallPurchased(flow?: string) {
+    tracking?.capture('paywall_purchased', flow ? { flow } : undefined);
+}
+
+export function trackPaywallCancelled(flow?: string) {
+    tracking?.capture('paywall_cancelled', flow ? { flow } : undefined);
+}
+
+export function trackPaywallRestored(flow?: string) {
+    tracking?.capture('paywall_restored', flow ? { flow } : undefined);
+}
+
+export function trackPaywallError(error: string, flow?: string) {
+    const properties: Record<string, string> = { error };
+    if (flow) {
+        properties.flow = flow;
+    }
+    tracking?.capture('paywall_error', properties);
+}
+
+/**
+ * Review request events
+ */
+export function trackReviewPromptShown() {
+    tracking?.capture('review_prompt_shown');
+}
+
+export function trackReviewPromptResponse(likesApp: boolean) {
+    tracking?.capture('review_prompt_response', { likes_app: likesApp });
+}
+
+export function trackReviewStoreShown() {
+    tracking?.capture('review_store_shown');
+}
+
+export function trackReviewRetryScheduled(daysUntilRetry: number) {
+    tracking?.capture('review_retry_scheduled', { days_until_retry: daysUntilRetry });
+}
+
+/**
+ * What's New / Changelog events
+ */
+export function trackWhatsNewClicked() {
+    tracking?.capture('whats_new_clicked');
+}
+
+export function trackGitHubConnected() {
+    tracking?.capture('github_connected');
+}

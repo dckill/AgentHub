@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-minio
+spec:
+  ports:
+  - port: 9000
+    name: api
+  - port: 9001
+    name: console
+  selector:
+    app: agenthub-minio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-minio
+  template:
+    metadata:
+      labels:
+        app: agenthub-minio
+    spec:
+      initContainers:
+      - name: init-bucket
+        image: busybox:1.37.0-musl@sha256:222ad6d973c0d198014546a65cd02c5fdedcc172123c5b4c2bf0af636550bd94
+        command: ["mkdir", "-p", "/data/agenthub"]
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+        args: ["server", "/data", "--console-address", ":9001"]
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          value: minioadmin
+        - name: MINIO_ROOT_PASSWORD
+          value: minioadmin
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+      volumes:
+      - name: minio-data
+        emptyDir: {}

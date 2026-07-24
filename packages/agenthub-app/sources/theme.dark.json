@@ -1,0 +1,61 @@
+{
+  "designSystem": "AgentHub Amber Crystal",
+  "mode": "dark",
+  "colors": {
+    "canvas": "#070A0B",
+    "canvasElevated": "#0B1012",
+    "surface": "rgba(12, 17, 19, 0.72)",
+    "surfaceRaised": "rgba(17, 24, 27, 0.84)",
+    "surfaceHover": "#182126",
+    "border": "rgba(238, 248, 250, 0.13)",
+    "borderStrong": "rgba(255, 202, 116, 0.52)",
+    "accent": "#FFB22E",
+    "accentDark": "#F6A21A",
+    "accentSoft": "rgba(255, 178, 46, 0.12)",
+    "accentGlow": "rgba(255, 178, 46, 0.32)",
+    "textPrimary": "#F3EFE7",
+    "textSecondary": "#C8C0B4",
+    "textMuted": "#7A8790",
+    "success": "#50C878",
+    "warning": "#FFB22E",
+    "danger": "#EF3D3D",
+    "info": "#5FA8FF"
+  },
+  "spacing": {
+    "margins": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 24,
+      "xxl": 32
+    },
+    "borderRadius": {
+      "sm": 4,
+      "md": 6,
+      "lg": 8,
+      "xl": 10,
+      "xxl": 16
+    },
+    "iconSize": {
+      "small": 12,
+      "medium": 16,
+      "large": 20,
+      "xlarge": 24
+    }
+  },
+  "glass": {
+    "blur": {
+      "sm": 12,
+      "md": 18,
+      "lg": 28
+    },
+    "saturation": 1.18
+  },
+  "motion": {
+    "fast": 120,
+    "normal": 180,
+    "slow": 260,
+    "easingStandard": "cubic-bezier(0.2, 0.8, 0.2, 1)"
+  }
+}

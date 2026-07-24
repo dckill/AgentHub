@@ -1,0 +1,564 @@
+stages:
+  - test
+  - build
+  - deploy
+
+include:
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+variables:
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+default:
+  image: node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5
+  before_script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+cache:
+  key:
+    prefix: "$CI_COMMIT_REF_PROTECTED"
+    files:
+      - pnpm-lock.yaml
+  unprotect: false
+  paths:
+    - .pnpm-store/
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+.required:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  interruptible: true
+
+validate:
+  extends: .required
+  script:
+    - pnpm dependency-boundary:test
+    - pnpm check
+  allow_failure: false
+
+secret-policy:
+  extends: .required
+  script:
+    - pnpm --filter agenthub-server exec vitest run sources/config/trackedSecrets.test.ts sources/config/env.security.test.ts
+  allow_failure: false
+
+secret_detection:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      variables:
+        SECRET_DETECTION_HISTORIC_SCAN: "true"
+  allow_failure: false
+
+supply-chain:sbom:
+  extends: .required
+  script:
+    - pnpm sbom:test
+    - pnpm provenance:test
+    - pnpm provenance:verify:test
+    - mkdir -p reports/sbom
+    - pnpm sbom:generate --output reports/sbom/agenthub.cdx.json
+    - pnpm sbom:generate --lockfile scripts/provider-tools/pnpm-lock.yaml --output reports/sbom/provider-tools.cdx.json
+    - pnpm sbom:generate --lockfile packages/agenthub-server-runtime/pnpm-lock.yaml --output reports/sbom/server-runtime.cdx.json
+    - pnpm exec node scripts/generateProvenance.cjs reports/sbom/agenthub.provenance.json reports/sbom/agenthub.cdx.json reports/sbom/provider-tools.cdx.json reports/sbom/server-runtime.cdx.json
+    - pnpm exec node scripts/verifyProvenance.cjs reports/sbom/agenthub.provenance.json
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    reports:
+      cyclonedx:
+        - reports/sbom/agenthub.cdx.json
+        - reports/sbom/provider-tools.cdx.json
+        - reports/sbom/server-runtime.cdx.json
+    paths:
+      - reports/sbom/agenthub.cdx.json
+      - reports/sbom/provider-tools.cdx.json
+      - reports/sbom/server-runtime.cdx.json
+      - reports/sbom/agenthub.provenance.json
+
+supply-chain:sign:
+  extends: .required
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_COMMIT_REF_PROTECTED == "true"'
+  image: node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5
+  before_script: []
+  needs:
+    - job: supply-chain:sbom
+      artifacts: true
+  id_tokens:
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
+  variables:
+    COSIGN_YES: "true"
+    COSIGN_VERSION: "v3.1.1"
+    COSIGN_SHA256: "ae1ecd212663f3693ad9edf8b1a183900c9a52d3155ba6e354237f9a0f6463fc"
+  script:
+    - mkdir -p reports/sbom
+    - curl --fail --silent --show-error --location "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" --output /tmp/cosign
+    - echo "${COSIGN_SHA256}  /tmp/cosign" | sha256sum -c -
+    - chmod 0700 /tmp/cosign
+    - /tmp/cosign version
+    - test -n "${SIGSTORE_ID_TOKEN:-}"
+    - node scripts/verifyProvenance.cjs reports/sbom/agenthub.provenance.json
+    - /tmp/cosign sign-blob --yes --bundle reports/sbom/agenthub.cdx.sigstore.json reports/sbom/agenthub.cdx.json
+    - /tmp/cosign sign-blob --yes --bundle reports/sbom/provider-tools.cdx.sigstore.json reports/sbom/provider-tools.cdx.json
+    - /tmp/cosign sign-blob --yes --bundle reports/sbom/server-runtime.cdx.sigstore.json reports/sbom/server-runtime.cdx.json
+    - /tmp/cosign sign-blob --yes --bundle reports/sbom/agenthub.provenance.sigstore.json reports/sbom/agenthub.provenance.json
+    - /tmp/cosign verify-blob reports/sbom/agenthub.cdx.json --bundle reports/sbom/agenthub.cdx.sigstore.json --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-oidc-issuer "${CI_SERVER_URL}"
+    - /tmp/cosign verify-blob reports/sbom/provider-tools.cdx.json --bundle reports/sbom/provider-tools.cdx.sigstore.json --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-oidc-issuer "${CI_SERVER_URL}"
+    - /tmp/cosign verify-blob reports/sbom/server-runtime.cdx.json --bundle reports/sbom/server-runtime.cdx.sigstore.json --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-oidc-issuer "${CI_SERVER_URL}"
+    - /tmp/cosign verify-blob reports/sbom/agenthub.provenance.json --bundle reports/sbom/agenthub.provenance.sigstore.json --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-oidc-issuer "${CI_SERVER_URL}"
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/sbom/agenthub.cdx.json
+      - reports/sbom/provider-tools.cdx.json
+      - reports/sbom/server-runtime.cdx.json
+      - reports/sbom/agenthub.provenance.json
+      - reports/sbom/agenthub.cdx.sigstore.json
+      - reports/sbom/provider-tools.cdx.sigstore.json
+      - reports/sbom/server-runtime.cdx.sigstore.json
+      - reports/sbom/agenthub.provenance.sigstore.json
+
+supply-chain:audit:
+  extends: .required
+  script:
+    - pnpm audit:test
+    - pnpm reachability:test
+    - mkdir -p reports/security
+    - set +e; pnpm audit --json > reports/security/pnpm-audit.json; audit_exit=$?; set -e; test "$audit_exit" -eq 0 -o "$audit_exit" -eq 1
+    - pnpm audit:check reports/security/pnpm-audit.json high
+    - pnpm reachability:check reports/security/pnpm-audit.json --output reports/security/reachable-high-critical.json
+    - set +e; pnpm --dir scripts/provider-tools --ignore-workspace audit --json > reports/security/provider-tools-pnpm-audit.json; provider_audit_exit=$?; set -e; test "$provider_audit_exit" -eq 0 -o "$provider_audit_exit" -eq 1
+    - pnpm audit:check reports/security/provider-tools-pnpm-audit.json high
+    - pnpm reachability:check reports/security/provider-tools-pnpm-audit.json --output reports/security/provider-tools-reachable-high-critical.json
+    - set +e; pnpm --dir packages/agenthub-server-runtime --ignore-workspace audit --json > reports/security/server-runtime-pnpm-audit.json; runtime_audit_exit=$?; set -e; test "$runtime_audit_exit" -eq 0 -o "$runtime_audit_exit" -eq 1
+    - pnpm audit:check reports/security/server-runtime-pnpm-audit.json high
+    - pnpm reachability:check reports/security/server-runtime-pnpm-audit.json --output reports/security/server-runtime-reachable-high-critical.json
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/security/pnpm-audit.json
+      - reports/security/reachable-high-critical.json
+      - reports/security/provider-tools-pnpm-audit.json
+      - reports/security/provider-tools-reachable-high-critical.json
+      - reports/security/server-runtime-pnpm-audit.json
+      - reports/security/server-runtime-reachable-high-critical.json
+
+supply-chain:osv:
+  extends: .required
+  image:
+    name: ghcr.io/google/osv-scanner@sha256:5116601dedc01c1c580eb92371883ec052fc4c13c3fbc109d621a63ac416d475
+    entrypoint: [""]
+  before_script: []
+  script:
+    - mkdir -p reports/security
+    - /osv-scanner scan source --lockfile pnpm-lock.yaml --format json --output-file reports/security/osv-scanner.json --verbosity warn
+    - /osv-scanner scan source --lockfile scripts/provider-tools/pnpm-lock.yaml --format json --output-file reports/security/provider-tools-osv-scanner.json --verbosity warn
+    - /osv-scanner scan source --lockfile packages/agenthub-server-runtime/pnpm-lock.yaml --format json --output-file reports/security/server-runtime-osv-scanner.json --verbosity warn
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/security/osv-scanner.json
+      - reports/security/provider-tools-osv-scanner.json
+      - reports/security/server-runtime-osv-scanner.json
+
+supply-chain:license:
+  extends: .required
+  script:
+    - pnpm license:test
+    - mkdir -p reports/security
+    - pnpm licenses list --prod --json > reports/security/licenses.json
+    - pnpm license:check reports/security/licenses.json docs/audits/evidence/2026-07-12-supply-chain/license-provenance.json
+    - pnpm --dir scripts/provider-tools --ignore-workspace licenses list --prod --json > reports/security/provider-tools-licenses.json
+    - pnpm --dir packages/agenthub-server-runtime --ignore-workspace --config.auto-install-peers=false install --prod --frozen-lockfile --ignore-scripts
+    - pnpm --dir packages/agenthub-server-runtime --ignore-workspace licenses list --prod --json > reports/security/server-runtime-licenses.json
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/security/licenses.json
+      - reports/security/provider-tools-licenses.json
+      - reports/security/server-runtime-licenses.json
+      - docs/audits/evidence/2026-07-12-supply-chain/license-provenance.json
+
+server:test:
+  extends: .required
+  script:
+    - pnpm --filter agenthub-server test
+    - pnpm --filter agenthub-server build
+  allow_failure: false
+
+wire:test:
+  extends: .required
+  script:
+    - pnpm --filter @artsum/agenthub-wire test
+    - pnpm --filter @artsum/agenthub-wire typecheck
+  allow_failure: false
+
+cli:unit:
+  extends: .required
+  script:
+    - pnpm --filter @artsum/agenthub test:unit
+  allow_failure: false
+
+# Codex and Claude Code lifecycle matrix. This remains schedule-only because
+# it needs protected credentials; Linux unit results do not replace live provider evidence.
+cli:provider-matrix:
+  stage: test
+  image: node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37
+  tags:
+    - provider-matrix
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AGENTHUB_PROVIDER_MATRIX == "true"'
+    - when: never
+  script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends python3 make g++
+    - pnpm --dir scripts/provider-tools --ignore-workspace install --frozen-lockfile
+    - export PATH="$CI_PROJECT_DIR/scripts/provider-tools/node_modules/.bin:$PATH"
+    - command -v codex
+    - command -v claude
+    - if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then echo "missing protected Claude credential for plan-mode integration" >&2; exit 1; fi
+    - mkdir -p reports/provider
+    - set +e; pnpm --filter @artsum/agenthub exec vitest run --project integration-authenticated src/daemon/daemon.integration.test.ts -t "archives the real runner and session|closes an active Codex turn|stops a real idle Claude runner|archives the real Claude runner" --reporter=verbose > reports/provider/runner-matrix.log 2>&1; runner_exit=$?; set -e
+    - cat reports/provider/runner-matrix.log
+    - test "$runner_exit" -eq 0
+    - node scripts/checkProviderMatrixOutput.cjs reports/provider/runner-matrix.log
+    - set +e; pnpm --filter @artsum/agenthub exec vitest run --project integration-plan-mode src/claude/planMode.integration.test.ts --reporter=verbose > reports/provider/plan-mode.log 2>&1; plan_mode_exit=$?; set -e
+    - cat reports/provider/plan-mode.log
+    - test "$plan_mode_exit" -eq 0
+    - node scripts/checkPlanModeOutput.cjs reports/provider/plan-mode.log
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/provider/runner-matrix.log
+      - reports/provider/plan-mode.log
+
+# Cross-platform lifecycle evidence is opt-in and schedule-only. The jobs are
+# required (allow_failure=false) once a protected macOS/Windows runner is
+# enabled, but never pretend Linux results prove another platform.
+cli:platform-matrix:macos:
+  stage: test
+  tags:
+    - macos
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AGENTHUB_PLATFORM_INTEGRATION == "true"'
+    - when: never
+  before_script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+  script:
+    - mkdir -p reports/platform
+    - set +e; pnpm --filter @artsum/agenthub exec vitest run --project integration-authenticated src/daemon/daemon.integration.test.ts -t "stop|adopt|bundle|SIGTERM|SIGKILL" --reporter=verbose > reports/platform/macos.log 2>&1; test_exit=$?; set -e
+    - cat reports/platform/macos.log
+    - test "$test_exit" -eq 0
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/platform/macos.log
+
+cli:platform-matrix:windows:
+  stage: test
+  tags:
+    - windows
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AGENTHUB_PLATFORM_INTEGRATION == "true"'
+    - when: never
+  before_script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+  script:
+    - New-Item -ItemType Directory -Force reports/platform | Out-Null
+    - $output = pnpm --filter @artsum/agenthub exec vitest run --project integration-authenticated src/daemon/daemon.integration.test.ts -t "stop|adopt|bundle|SIGTERM|SIGKILL" --reporter=verbose 2>&1
+    - $output | Tee-Object -FilePath reports/platform/windows.log
+    - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/platform/windows.log
+
+contract:test:
+  extends: .required
+  script:
+    - pnpm --filter agenthub-server exec vitest run sources/app/api/routes/protocolInventory.test.ts
+    - pnpm --filter @artsum/agenthub-wire exec vitest run src/v4Sync.test.ts src/rpc.test.ts
+  allow_failure: false
+
+pack:check:
+  extends: .required
+  script:
+    - pnpm --filter @artsum/agenthub build
+    - pnpm cli-pack-install:test
+    - mkdir -p reports/pack
+    - pnpm --filter @artsum/agenthub pack --pack-destination reports/pack
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/pack/
+
+web:export:
+  extends: .required
+  variables:
+    APP_ENV: production
+    NODE_ENV: production
+    EXPO_NO_WEB_SETUP: "1"
+  script:
+    - rm -rf reports/web-export
+    - mkdir -p reports/web-export
+    - pnpm --filter agenthub-app exec expo export --platform web --output-dir reports/web-export --clear
+    - test -f reports/web-export/index.html
+    - pnpm web:budget reports/web-export
+    - '! grep -R --binary-files=without-match -E "EXPO_PUBLIC_DEV_TOKEN|EXPO_PUBLIC_DEV_SECRET" reports/web-export'
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/web-export/
+
+web:contract:
+  extends: .required
+  script:
+    - mkdir -p reports/web-contract
+    - pnpm web:contract:test --reporter=default --reporter=junit --outputFile.junit=../../reports/web-contract/junit.xml
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 30 days
+    reports:
+      junit:
+        - reports/web-contract/junit.xml
+    paths:
+      - reports/web-contract/
+
+release:metadata:
+  extends: .required
+  script:
+    - pnpm metadata:check -- --json
+  allow_failure: false
+
+final:verify:
+  extends: .required
+  script:
+    - pnpm ci:verify
+  allow_failure: false
+
+app:test:
+  extends: .required
+  script:
+    - pnpm --filter agenthub-app test:ci
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    reports:
+      junit:
+        - packages/agenthub-app/reports/junit.xml
+    paths:
+      - packages/agenthub-app/coverage/
+      - packages/agenthub-app/reports/junit.xml
+
+app:nightly:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  variables:
+    AGENTHUB_FLAKE_RUNS: '5'
+  script:
+    - pnpm --filter agenthub-app test:flake
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 14 days
+    reports:
+      junit:
+        - packages/agenthub-app/reports/flake/*.xml
+    paths:
+      - packages/agenthub-app/reports/flake/
+
+.container-build-and-sign:
+  stage: build
+  image: docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      alias: docker
+  tags:
+    - protected-release
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_COMMIT_REF_PROTECTED == "true"'
+  needs:
+    - job: final:verify
+  before_script: []
+  id_tokens:
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: /certs
+    DOCKER_CERT_PATH: /certs/client
+    DOCKER_TLS_VERIFY: "1"
+    COSIGN_YES: "true"
+    COSIGN_VERSION: v3.1.1
+    COSIGN_SHA256: ae1ecd212663f3693ad9edf8b1a183900c9a52d3155ba6e354237f9a0f6463fc
+  script:
+    - apk add --no-cache curl
+    - curl --fail --silent --show-error --location "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" --output /tmp/cosign
+    - echo "${COSIGN_SHA256}  /tmp/cosign" | sha256sum -c -
+    - chmod 0700 /tmp/cosign
+    - test -n "${SIGSTORE_ID_TOKEN:-}"
+    - test -n "${CI_JOB_TOKEN:-}"
+    - printf '%s' "$CI_JOB_TOKEN" | docker login --username gitlab-ci-token --password-stdin "$CI_REGISTRY"
+    - IMAGE_REPOSITORY="${CI_REGISTRY_IMAGE}/${AGENTHUB_IMAGE_NAME}"
+    - IMAGE_TAG="${IMAGE_REPOSITORY}:${CI_COMMIT_SHA}"
+    - docker build --pull --target "$AGENTHUB_DOCKER_TARGET" --file "$AGENTHUB_DOCKERFILE" --tag "$IMAGE_TAG" .
+    - docker push "$IMAGE_TAG"
+    - IMAGE_DIGEST="$(docker image inspect --format='{{index .RepoDigests 0}}' "$IMAGE_TAG")"
+    - DIGEST="${IMAGE_DIGEST#${IMAGE_REPOSITORY}@sha256:}"
+    - test "$IMAGE_DIGEST" = "${IMAGE_REPOSITORY}@sha256:${DIGEST}"
+    - test "${#DIGEST}" -eq 64
+    - printf '%s\n' "$DIGEST" | grep -Eq '^[0-9a-f]{64}$'
+    - /tmp/cosign sign --yes --registry-referrers-mode oci-1-1 --annotations "org.opencontainers.image.revision=${CI_COMMIT_SHA}" "$IMAGE_DIGEST"
+    - /tmp/cosign verify --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-oidc-issuer "${CI_SERVER_URL}" --annotations "org.opencontainers.image.revision=${CI_COMMIT_SHA}" "$IMAGE_DIGEST"
+    - mkdir -p reports/release
+    - printf '%s=%s\n' "$AGENTHUB_DOTENV_NAME" "$IMAGE_DIGEST" > "reports/release/${AGENTHUB_IMAGE_NAME}.env"
+    - chmod 0600 "reports/release/${AGENTHUB_IMAGE_NAME}.env"
+  allow_failure: false
+
+container:build-and-sign:server:
+  extends: .container-build-and-sign
+  variables:
+    AGENTHUB_IMAGE_NAME: agenthub-server
+    AGENTHUB_DOCKERFILE: Dockerfile.server
+    AGENTHUB_DOCKER_TARGET: runner
+    AGENTHUB_DOTENV_NAME: SERVER_RELEASE_IMAGE
+  artifacts:
+    when: always
+    expire_in: 14 days
+    reports:
+      dotenv: reports/release/agenthub-server.env
+    paths:
+      - reports/release/agenthub-server.env
+
+container:build-and-sign:server-migration:
+  extends: .container-build-and-sign
+  variables:
+    AGENTHUB_IMAGE_NAME: agenthub-server-migration
+    AGENTHUB_DOCKERFILE: Dockerfile.server
+    AGENTHUB_DOCKER_TARGET: migration
+    AGENTHUB_DOTENV_NAME: SERVER_MIGRATION_RELEASE_IMAGE
+  artifacts:
+    when: always
+    expire_in: 14 days
+    reports:
+      dotenv: reports/release/agenthub-server-migration.env
+    paths:
+      - reports/release/agenthub-server-migration.env
+
+container:build-and-sign:web:
+  extends: .container-build-and-sign
+  variables:
+    AGENTHUB_IMAGE_NAME: agenthub-app
+    AGENTHUB_DOCKERFILE: Dockerfile.webapp
+    AGENTHUB_DOCKER_TARGET: runner
+    AGENTHUB_DOTENV_NAME: WEB_RELEASE_IMAGE
+  artifacts:
+    when: always
+    expire_in: 14 days
+    reports:
+      dotenv: reports/release/agenthub-app.env
+    paths:
+      - reports/release/agenthub-app.env
+
+.release-deploy:
+  stage: deploy
+  image: node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5
+  tags:
+    - protected-release
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+    - when: never
+  variables:
+    KUBECTL_VERSION: v1.35.1
+    KUBECTL_SHA256: 36e2f4ac66259232341dd7866952d64a958846470f6a9a6a813b9117bd965207
+    COSIGN_VERSION: v3.1.1
+    COSIGN_SHA256: ae1ecd212663f3693ad9edf8b1a183900c9a52d3155ba6e354237f9a0f6463fc
+    AGENTHUB_KUBE_NAMESPACE: agenthub-production
+  before_script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+    - curl --fail --silent --show-error --location "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" --output /tmp/cosign
+    - echo "${COSIGN_SHA256}  /tmp/cosign" | sha256sum -c -
+    - curl --fail --silent --show-error --location "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" --output /tmp/kubectl
+    - echo "${KUBECTL_SHA256}  /tmp/kubectl" | sha256sum -c -
+    - chmod 0700 /tmp/cosign /tmp/kubectl
+    - test -n "${CI_JOB_TOKEN:-}"
+    - test -n "${KUBECONFIG:-}"
+    - install -d -m 0700 "$HOME/.docker"
+    - node -e 'const fs=require("node:fs"); const token=Buffer.from(`gitlab-ci-token:${process.env.CI_JOB_TOKEN}`).toString("base64"); fs.writeFileSync(`${process.env.HOME}/.docker/config.json`, JSON.stringify({auths:{[process.env.CI_REGISTRY]:{auth:token}}}), {mode:0o600});'
+    - mkdir -p reports/release
+  script:
+    - |
+      if [ "$AGENTHUB_COMPONENT" = "server" ]; then
+        node scripts/runSignedKubernetesRelease.cjs --component "$AGENTHUB_COMPONENT" --image "$AGENTHUB_RELEASE_IMAGE" --migration-image "$AGENTHUB_MIGRATION_RELEASE_IMAGE" --registry-prefix "$CI_REGISTRY_IMAGE" --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-issuer "$CI_SERVER_URL" --namespace "$AGENTHUB_KUBE_NAMESPACE" --manifest-output "${CI_PROJECT_DIR}/reports/release/${AGENTHUB_COMPONENT}.yaml" --migration-manifest-output "${CI_PROJECT_DIR}/reports/release/server-migration.yaml" --migration-log-output "${CI_PROJECT_DIR}/reports/release/server-migration.log" --policy-output "${CI_PROJECT_DIR}/reports/release/signature-policy.yaml" --report-output "${CI_PROJECT_DIR}/reports/release/${AGENTHUB_COMPONENT}.release.json" --timeout 120s --cosign /tmp/cosign --kubectl /tmp/kubectl --apply
+      else
+        node scripts/runSignedKubernetesRelease.cjs --component "$AGENTHUB_COMPONENT" --image "$AGENTHUB_RELEASE_IMAGE" --registry-prefix "$CI_REGISTRY_IMAGE" --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/master" --certificate-issuer "$CI_SERVER_URL" --namespace "$AGENTHUB_KUBE_NAMESPACE" --manifest-output "${CI_PROJECT_DIR}/reports/release/${AGENTHUB_COMPONENT}.yaml" --policy-output "${CI_PROJECT_DIR}/reports/release/signature-policy.yaml" --report-output "${CI_PROJECT_DIR}/reports/release/${AGENTHUB_COMPONENT}.release.json" --timeout 120s --cosign /tmp/cosign --kubectl /tmp/kubectl --apply
+      fi
+  after_script:
+    - rm -f "$HOME/.docker/config.json"
+  allow_failure: false
+  when: manual
+  environment: production
+  resource_group: agenthub-production
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/release/
+
+release:deploy:server:
+  extends: .release-deploy
+  needs:
+    - job: container:build-and-sign:server
+      artifacts: true
+    - job: container:build-and-sign:server-migration
+      artifacts: true
+  variables:
+    AGENTHUB_COMPONENT: server
+    AGENTHUB_RELEASE_IMAGE: $SERVER_RELEASE_IMAGE
+    AGENTHUB_MIGRATION_RELEASE_IMAGE: $SERVER_MIGRATION_RELEASE_IMAGE
+
+release:deploy:web:
+  extends: .release-deploy
+  needs:
+    - job: container:build-and-sign:web
+      artifacts: true
+  variables:
+    AGENTHUB_COMPONENT: web
+    AGENTHUB_RELEASE_IMAGE: $WEB_RELEASE_IMAGE
