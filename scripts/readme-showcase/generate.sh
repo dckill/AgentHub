@@ -11,65 +11,56 @@ FRAME_OVERLAY="${OUTPUT_DIR}/phone-frame-overlay.png"
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
-pages=(
-  welcome
-  authorization
-  devices
-  sessions
-  new-session
-  conversation
-  tools
-  files
-  transfers
-  git-workspace
-  git-graph
-  artifacts
-  secure-share
-  usage
-  settings
-  changelog
+showcases=(
+  "设备页面-亮.jpg|devices-light"
+  "设备页面-暗.jpg|devices-dark"
+  "会话页面-暗.jpg|sessions-dark"
+  "新建会话-亮.jpg|new-session-light"
+  "新建会话-暗.jpg|new-session-dark"
+  "对话页面-亮.jpg|conversation-light"
+  "对话页面-暗.jpg|conversation-dark"
+  "对话页面-对话折叠.jpg|conversation-collapsed-dark"
+  "文件管理-暗.jpg|files-dark"
+  "文件查看-暗.jpg|file-preview-dark"
+  "Git管理-亮.jpg|git-light"
+  "Git管理-暗.jpg|git-dark"
+  "Git-diff.jpg|git-diff-light"
+  "设置页面-亮.jpg|settings-light"
+  "设置页面-暗.jpg|settings-dark"
 )
 
 mkdir -p "${SCREEN_DIR}" "${PHONE_DIR}"
 
-# The silver hardware source already has a transparent screen opening.
-# Resize it once, then let the browser place deterministic HTML/CSS
-# product pages behind that opening.
 convert "${FRAME_SOURCE}" \
-  -resize 1080x2338! \
+  -resize 1080x2337! \
   "${FRAME_OVERLAY}"
 
-for page in "${pages[@]}"; do
-  for theme in dark light; do
-    screen_png="${TEMP_DIR}/${page}-${theme}-screen.png"
-    phone_png="${TEMP_DIR}/${page}-${theme}-phone.png"
-    screen_webp="${SCREEN_DIR}/${page}-${theme}.webp"
-    phone_webp="${PHONE_DIR}/${page}-${theme}.webp"
+for showcase in "${showcases[@]}"; do
+  source_name="${showcase%%|*}"
+  slug="${showcase##*|}"
+  source_image="${SCREEN_DIR}/${source_name}"
+  phone_webp="${PHONE_DIR}/${slug}.webp"
+  fitted_screen="${TEMP_DIR}/${slug}-fitted.png"
+  composed_phone="${TEMP_DIR}/${slug}-phone.png"
 
-    google-chrome \
-      --headless \
-      --no-sandbox \
-      --disable-gpu \
-      --hide-scrollbars \
-      --force-device-scale-factor=1 \
-      --window-size=1080,2338 \
-      --screenshot="${screen_png}" \
-      "file://${SCRIPT_DIR}/mobile.html?page=${page}&theme=${theme}" >/dev/null 2>&1
+  identify "${source_image}" | rg -q 'JPEG 1080x2376 '
 
-    google-chrome \
-      --headless \
-      --no-sandbox \
-      --disable-gpu \
-      --hide-scrollbars \
-      --force-device-scale-factor=1 \
-      --virtual-time-budget=1200 \
-      --window-size=1080,2338 \
-      --screenshot="${phone_png}" \
-      "file://${SCRIPT_DIR}/composite.html?page=${page}&theme=${theme}" >/dev/null 2>&1
+  convert "${source_image}" \
+    -resize x1580 \
+    -gravity center \
+    -crop 674x1580+0+0 \
+    +repage \
+    "${fitted_screen}"
 
-    convert "${screen_png}" -strip -quality 88 "${screen_webp}"
-    convert "${phone_png}" -strip -quality 88 "${phone_webp}"
-  done
+  convert -size 1080x2337 xc:none \
+    "${fitted_screen}" -geometry +204+355 -composite \
+    "${FRAME_OVERLAY}" -composite \
+    "${composed_phone}"
+
+  convert "${composed_phone}" \
+    -strip \
+    -quality 90 \
+    "${phone_webp}"
 done
 
-identify "${FRAME_OVERLAY}" "${SCREEN_DIR}"/*.webp "${PHONE_DIR}"/*.webp
+identify "${FRAME_OVERLAY}" "${SCREEN_DIR}"/*.jpg "${PHONE_DIR}"/*.webp

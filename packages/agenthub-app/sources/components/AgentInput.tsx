@@ -298,7 +298,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
     actionButtonsLeft: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 0,
         flexGrow: 1,
         flexShrink: 0,
         alignItems: 'center',
@@ -1378,10 +1378,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 8,
+                                            paddingHorizontal: 6,
                                             paddingVertical: 6,
                                             justifyContent: 'center',
-                                            minWidth: 44,
+                                            minWidth: actionRowLayout.actionIconMinWidth,
                                             minHeight: 44,
                                             opacity: p.pressed ? 0.7 : 1,
                                             backgroundColor: p.pressed ? actionVisuals.pressedBackgroundColor : actionVisuals.backgroundColor,
@@ -1413,10 +1413,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 8,
+                                            paddingHorizontal: 6,
                                             paddingVertical: 6,
                                             justifyContent: 'center',
-                                            minWidth: 44,
+                                            minWidth: actionRowLayout.actionIconMinWidth,
                                             minHeight: 44,
                                             opacity: p.pressed ? 0.7 : 1,
                                             backgroundColor: p.pressed ? actionVisuals.pressedBackgroundColor : actionVisuals.backgroundColor,
@@ -1447,10 +1447,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 8,
+                                            paddingHorizontal: 6,
                                             paddingVertical: 6,
                                             justifyContent: 'center',
-                                            minWidth: 44,
+                                            minWidth: actionRowLayout.actionIconMinWidth,
                                             minHeight: 44,
                                             opacity: p.pressed ? 0.7 : 1,
                                             backgroundColor: p.pressed ? actionVisuals.pressedBackgroundColor : actionVisuals.backgroundColor,
@@ -1475,10 +1475,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 flexDirection: 'row',
                                                 alignItems: 'center',
                                                 borderRadius: Platform.select({ default: 16, android: 20 }),
-                                                paddingHorizontal: 8,
+                                                paddingHorizontal: 6,
                                                 paddingVertical: 6,
                                                 justifyContent: 'center',
-                                                minWidth: 44,
+                                                minWidth: actionRowLayout.actionIconMinWidth,
                                                 minHeight: 44,
                                                 opacity: p.pressed ? 0.7 : 1,
                                                 backgroundColor: p.pressed ? actionVisuals.pressedBackgroundColor : actionVisuals.backgroundColor,
@@ -1638,6 +1638,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
 function ContextRingButton({ percent, onPress }: { percent: number; onPress: () => void }) {
     const { theme } = useUnistyles();
+    const actionRowLayout = getComposerActionRowLayout();
     const size = 22;
     const strokeWidth = 2.4;
     const radius = (size - strokeWidth) / 2;
@@ -1656,9 +1657,9 @@ function ContextRingButton({ percent, onPress }: { percent: number; onPress: () 
             onPress={onPress}
             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
             style={(p) => ({
-                minWidth: 44,
+                minWidth: actionRowLayout.actionIconMinWidth,
                 minHeight: 44,
-                paddingHorizontal: 8,
+                paddingHorizontal: 5,
                 borderRadius: Platform.select({ default: 16, android: 20 }),
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1704,6 +1705,7 @@ function GitStatusButton({ sessionId, onPress }: { sessionId?: string, onPress?:
     const hasMeaningfulGitStatus = useHasMeaningfulGitStatus(sessionId || '');
     const { theme } = useUnistyles();
     const actionVisuals = getComposerActionButtonVisuals(theme);
+    const actionRowLayout = getComposerActionRowLayout();
 
     if (!sessionId || !onPress) {
         return null;
@@ -1722,26 +1724,37 @@ function GitStatusButton({ sessionId, onPress }: { sessionId?: string, onPress?:
                 flexDirection: 'row',
                 alignItems: 'center',
                 borderRadius: Platform.select({ default: 16, android: 20 }),
-                paddingHorizontal: 8,
+                paddingHorizontal: 0,
                 paddingVertical: 6,
                 minHeight: 44,
                 opacity: p.pressed ? 0.7 : 1,
-                minWidth: 44,
+                minWidth: actionRowLayout.actionIconMinWidth,
                 flexShrink: 0,
-                justifyContent: 'center',
+                justifyContent: 'flex-start',
                 backgroundColor: p.pressed ? actionVisuals.pressedBackgroundColor : actionVisuals.backgroundColor,
             })}
             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
             onPress={handlePress}
         >
             {hasMeaningfulGitStatus ? (
-                <GitStatusBadge sessionId={sessionId} />
-            ) : (
-                <Octicons
-                    name="git-branch"
-                    size={16}
-                    color={actionVisuals.iconColor}
+                <GitStatusBadge
+                    sessionId={sessionId}
+                    iconSlotWidth={actionRowLayout.actionIconMinWidth}
                 />
+            ) : (
+                <View
+                    style={{
+                        width: actionRowLayout.actionIconMinWidth,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <Octicons
+                        name="git-branch"
+                        size={16}
+                        color={actionVisuals.iconColor}
+                    />
+                </View>
             )}
         </Pressable>
     );

@@ -17,9 +17,10 @@ export function useHasMeaningfulGitStatus(sessionId: string): boolean {
 
 interface GitStatusBadgeProps {
     sessionId: string;
+    iconSlotWidth?: number;
 }
 
-export function GitStatusBadge({ sessionId }: GitStatusBadgeProps) {
+export function GitStatusBadge({ sessionId, iconSlotWidth = 32 }: GitStatusBadgeProps) {
     // Use project git status first, fallback to session git status for backward compatibility
     const projectGitStatus = useSessionProjectGitStatus(sessionId);
     const sessionGitStatus = useSessionGitStatus(sessionId);
@@ -35,17 +36,18 @@ export function GitStatusBadge({ sessionId }: GitStatusBadgeProps) {
     const hasLineChanges = gitStatus.unstagedLinesAdded > 0 || gitStatus.unstagedLinesRemoved > 0;
 
     return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {/* Git icon - always shown */}
-            <Octicons
-                name="git-branch"
-                size={16}
-                color={actionVisuals.iconColor}
-            />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+            <View style={{ width: iconSlotWidth, alignItems: 'center', justifyContent: 'center' }}>
+                <Octicons
+                    name="git-branch"
+                    size={16}
+                    color={actionVisuals.iconColor}
+                />
+            </View>
 
             {/* Line changes only */}
             {hasLineChanges && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0, paddingRight: 8 }}>
                     {gitStatus.unstagedLinesAdded > 0 && (
                         <Text
                             style={{

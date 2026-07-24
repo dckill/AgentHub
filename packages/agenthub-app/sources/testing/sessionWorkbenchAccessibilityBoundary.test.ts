@@ -100,17 +100,26 @@ describe('session workbench accessibility boundary', () => {
         expect(source).toContain("paddingBottom={Platform.OS === 'web' ? 11 : 8}");
     });
 
-    it('preserves the original composer visuals while left-aligning actions without displacing send', () => {
+    it('keeps composer icons in contiguous 32px slots without displacing send', () => {
         expect(source).toMatch(/actionButtonsContainer:\s*\{[\s\S]{0,180}justifyContent: 'flex-start',[\s\S]{0,80}minHeight: 54,[\s\S]{0,80}paddingVertical: 4,/);
-        expect(source).toMatch(/actionButtonsLeft:\s*\{[\s\S]{0,180}gap: 8,[\s\S]{0,100}justifyContent: 'flex-start',[\s\S]{0,100}minHeight: 54,/);
+        expect(source).toMatch(/actionButtonsLeft:\s*\{[\s\S]{0,180}gap: 0,[\s\S]{0,100}justifyContent: 'flex-start',[\s\S]{0,100}minHeight: 54,/);
         expect(source).toMatch(/actionButtonsViewport:\s*\{[\s\S]{0,140}flex: 1,[\s\S]{0,60}minWidth: 0,[\s\S]{0,60}height: 54,/);
         expect(source).toMatch(/actionButtonsRail:\s*\{[\s\S]{0,160}justifyContent: 'flex-start',[\s\S]{0,80}flex: 1,[\s\S]{0,60}minWidth: 0,[\s\S]{0,60}minHeight: 54,/);
         expect(source).toMatch(/sendButton:\s*\{[\s\S]{0,180}flexShrink: 0,/);
+        const rail = section('{/* File reference picker button', '{/* Send/Voice button');
         const git = source.slice(source.indexOf('function GitStatusButton'));
+        const gitBadge = fs.readFileSync(path.resolve(__dirname, '../components/GitStatusBadge.tsx'), 'utf8');
         expect(source).toContain('showsHorizontalScrollIndicator={false}');
-        expect(source).toContain('minWidth: 44');
+        expect(rail.match(/minWidth: actionRowLayout\.actionIconMinWidth/g)).toHaveLength(4);
+        expect(rail).not.toContain('minWidth: 44');
         expect(source).not.toContain('actionRowLayout.gitStatusMinWidth');
-        expect(git).toContain('minWidth: 44');
+        expect(git).toContain('minWidth: actionRowLayout.actionIconMinWidth');
+        expect(git).toContain('paddingHorizontal: 0');
+        expect(git).toContain('justifyContent: \'flex-start\'');
+        expect(git).toContain('iconSlotWidth={actionRowLayout.actionIconMinWidth}');
+        expect(gitBadge).toContain('iconSlotWidth?: number');
+        expect(gitBadge).toContain('width: iconSlotWidth');
+        expect(gitBadge).toContain('justifyContent: \'center\'');
     });
 
     it('exposes composer overlays as named menu and radio structures', () => {
