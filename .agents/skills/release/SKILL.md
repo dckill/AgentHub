@@ -247,13 +247,13 @@ Expected outputs:
 
 ### App Store Connect
 
-    Apple ID:    steve@bulkovo.com
-    Team ID:     466DQWDR8C
+Apple ID、Team ID、App Store Connect App ID 和签名凭据属于维护者私有发布
+配置，不得写入仓库。通过 EAS credentials、App Store Connect 或受保护的发布
+环境配置它们；公开仓库只保留以下非敏感的 bundle identifier 与构建 profile：
 
-    App Store Connect App IDs:
-    Production:   6748571505  (com.artsum.agenthub)
-    Preview:      6749025570  (com.artsum.agenthub.preview)
-    Development:  6748984254  (com.artsum.agenthub.dev)
+- Production：`com.artsum.agenthub`
+- Preview：`com.artsum.agenthub.preview`
+- Development：`com.artsum.agenthub.dev`
 
 ---
 

@@ -174,7 +174,7 @@
     "dependencies": {},
     "keywords": [],
     "author": "",
-    "license": "MIT",
+    "license": "Apache-2.0",
     "homepage": "https://github.com/dckill/AgentHub",
     "bugs": "https://github.com/dckill/AgentHub/issues",
     "repository": {

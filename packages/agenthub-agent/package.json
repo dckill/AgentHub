@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "CLI client for controlling AgentHub agents remotely",
   "author": "Kirill Dubovitskiy",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "homepage": "https://github.com/dckill/AgentHub",
   "bugs": "https://github.com/dckill/AgentHub/issues",
@@ -33,6 +33,8 @@
   "files": [
     "dist",
     "bin",
+    "LICENSE-MIT",
+    "NOTICE",
     "package.json"
   ],
   "scripts": {

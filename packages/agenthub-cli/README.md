@@ -89,4 +89,6 @@ npx -y pnpm@10.11.0 --filter @artsum/agenthub test
 
 ## 许可证
 
-MIT。CLI 内置工具的第三方许可证位于 `tools/licenses/`。
+Apache-2.0。Happy 上游代码的 MIT 许可证与归属保留在仓库根目录
+`LICENSE-MIT` 和 `NOTICE` 中；CLI 内置工具的第三方许可证位于
+`tools/licenses/`。

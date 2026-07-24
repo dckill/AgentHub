@@ -9,7 +9,7 @@
 
 ## 当前判断
 
-源码许可已经统一为 MIT，并保留 Happy Coder Contributors 与 AgentHub Contributors 的版权通知。README、CLI README、隐私说明和当前状态页已按 Claude Code/Codex 双 Provider 范围收口。
+AgentHub 新增贡献的主许可证已经统一为 Apache-2.0；Happy 上游代码继续保留 MIT 许可证和 Happy Coder Contributors 版权通知。README、各发布包元数据、App 使用条款和 NOTICE 已同步许可证边界，并按 Claude Code/Codex 双 Provider 范围收口。
 
 当前仍不应直接把现有完整 Git 历史推送到公开 GitHub。历史中曾跟踪具体服务端 secret，并包含旧 APK、CPU profile、上游二进制和本地索引数据库等大对象。即使当前工作树已删除或忽略，它们仍存在于 Git 对象中。
 
@@ -20,7 +20,7 @@
 1. 在内部仓库保留完整历史和审计证据。
 2. 从审核后的当前树创建一个不带旧 `.git` 历史的新仓库。
 3. 排除 `artifacts/`、本地数据、构建输出、覆盖率、日志和不需要公开的原始性能产物。
-4. 以当前 MIT `LICENSE`、`NOTICE` 和上游来源说明作为首次公开提交。
+4. 以当前 Apache-2.0 `LICENSE`、上游 `LICENSE-MIT`、`NOTICE` 和来源说明作为首次公开提交。
 5. 在新仓库记录内部基线 commit SHA，便于维护者追溯，但不要附带内部地址或凭据。
 
 若必须保留提交历史，应先使用专门的 history rewrite 工具移除所有 secret 和大对象，再从全新 clone 复检。历史重写会改变 commit/tag SHA，不应在未备份和未通知协作者的情况下直接对当前内部远端执行。

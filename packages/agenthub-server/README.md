@@ -88,4 +88,5 @@ Server-encrypted managed credentials follow the same overlap procedure with `AGE
 
 ## License
 
-MIT - Use it, modify it, deploy it anywhere.
+Apache-2.0。Happy 上游代码的 MIT 许可证与归属保留在仓库根目录
+`LICENSE-MIT` 和 `NOTICE` 中。

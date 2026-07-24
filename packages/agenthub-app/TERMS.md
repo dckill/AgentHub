@@ -8,18 +8,27 @@ By downloading, installing, or using AgentHub, you agree to be bound by these Te
 
 ## About AgentHub
 
-AgentHub is a free, open-source mobile client for AI code assistance, released under the MIT License. The software is provided as-is by the open-source community without any warranties or guarantees.
+AgentHub is a free, open-source mobile client for AI code assistance, released under the Apache License 2.0. The software is provided as-is by the open-source community without any warranties or guarantees.
 
 ## License
 
-AgentHub is licensed under the MIT License. This means you are free to:
+AgentHub contributions are licensed under the Apache License 2.0. Subject to
+that license, you may:
 
 - Use the software for any purpose, including commercial use
 - Modify the source code
 - Distribute copies of the software
 - Distribute modified versions
 
-The full MIT License text is available in the source code repository.
+Redistributions must include the Apache License, preserve applicable
+copyright, patent, trademark, and attribution notices, retain the repository
+NOTICE where required, and identify modified files. The license also includes
+an express patent grant and does not grant permission to use project
+trademarks.
+
+Portions derived from Happy remain available under the MIT License. The full
+Apache License, upstream MIT License, and attribution notices are available in
+the source repository as `LICENSE`, `LICENSE-MIT`, and `NOTICE`.
 
 ## Acceptable Use
 

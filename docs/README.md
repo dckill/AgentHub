@@ -7,6 +7,7 @@
 - [快速开始](./getting-started.md)：安装、登录、启动 Claude Code/Codex 会话。
 - [新电脑加入 Server](./add-new-machine.md)：把新电脑或服务器注册为当前账号下的在线设备。
 - [项目当前状态](./project-status.md)：当前版本、包名、服务、验证和风险概览。
+- [功能与代码映射](./feature-map.md)：用户能力、实现入口和专题文档之间的对应关系。
 - [验证覆盖矩阵](./validation-coverage.md)：当前自动化、Web、Android 与未覆盖项。
 - [系统架构](./architecture.md)：组件、数据流和信任边界。
 - [CLI 架构](./cli.md)：`agenthub` 命令、daemon、远程启动、恢复和诊断。
@@ -19,6 +20,8 @@
 - [Daemon 与机器](./daemon-and-machines.md)：后台服务、机器注册、远程 spawn/resume。
 - [Sandbox](./sandbox.md)：实验性 OS 级沙箱配置与限制。
 - [Artifacts、Credentials 与 KV](./artifacts-credentials-kv.md)：制品、托管凭据和用户键值存储。
+- [文件传输](./file-transfers.md)：在线机器到 App 的分块下载、续传、本地保存和安全边界。
+- [加密外部分享](./external-sharing.md)：选中文本临时分享、客户端加密、撤销和有效期。
 - [agenthub-wire](./agenthub-wire.md)：共享 wire schema 与生产协议状态。
 - [agenthub-agent](./agenthub-agent.md)：远程控制 CLI 的使用方式。
 - [Codium 桌面实验](./codium.md)：Electron 桌面包定位。

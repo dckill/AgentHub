@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Shared message wire types and Zod schemas for AgentHub clients and services",
   "author": "Kirill Dubovitskiy",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "homepage": "https://github.com/dckill/AgentHub",
   "bugs": "https://github.com/dckill/AgentHub/issues",
@@ -29,6 +29,8 @@
   },
   "files": [
     "dist",
+    "LICENSE-MIT",
+    "NOTICE",
     "package.json",
     "README.md"
   ],
