@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AgentHub 手机界面合成</title>
+  <style>
+    @font-face {
+      font-family: "Source Han Sans";
+      src: url("file:///home/yzsd/.local/share/fonts/SourceHanSansSC-Regular.otf");
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 1080px;
+      height: 2338px;
+      margin: 0;
+      overflow: hidden;
+      background: #e5e6e7;
+      font-family: "Source Han Sans", "WenQuanYi Zen Hei", sans-serif;
+    }
+    .canvas {
+      position: relative;
+      width: 1080px;
+      height: 2338px;
+      overflow: hidden;
+    }
+    .screen-window {
+      position: absolute;
+      z-index: 1;
+      left: 204px;
+      top: 356px;
+      width: 674px;
+      height: 1579px;
+      overflow: hidden;
+      border-radius: 58px;
+      background: #070a0b;
+    }
+    body.light .screen-window { background: #f6f9fa; }
+    .screen-window iframe {
+      display: block;
+      width: 1080px;
+      height: 2338px;
+      border: 0;
+      margin-top: 60px;
+      transform: scale(0.62407407);
+      transform-origin: 0 0;
+      pointer-events: none;
+    }
+    .frame {
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      width: 1080px;
+      height: 2338px;
+      pointer-events: none;
+    }
+    .title {
+      position: absolute;
+      z-index: 3;
+      top: 86px;
+      left: 120px;
+      right: 120px;
+      color: #596167;
+      text-align: center;
+      font-size: 38px;
+      line-height: 1.25;
+    }
+    .theme {
+      position: absolute;
+      z-index: 3;
+      top: 139px;
+      left: 120px;
+      right: 120px;
+      color: #7b8388;
+      text-align: center;
+      font-size: 17px;
+      letter-spacing: .03em;
+    }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <div class="screen-window">
+      <iframe id="screen" title="AgentHub 产品界面"></iframe>
+    </div>
+    <img class="frame" src="../../docs/assets/readme/showcase/phone-frame-overlay.png" alt="">
+    <div class="title" id="title"></div>
+    <div class="theme" id="theme"></div>
+  </main>
+  <script>
+    const query = new URLSearchParams(location.search);
+    const page = query.get("page") || "welcome";
+    const theme = query.get("theme") === "light" ? "light" : "dark";
+    document.body.classList.toggle("light", theme === "light");
+    const titles = {
+      welcome: "欢迎与创建账户",
+      authorization: "设备授权与账户恢复",
+      devices: "设备仪表盘与设备详情",
+      sessions: "会话工作台",
+      "new-session": "新建远程会话",
+      conversation: "AI 对话工作台",
+      tools: "工具调用与权限审批",
+      files: "文件管理器与代码预览",
+      transfers: "下载与传输管理",
+      "git-workspace": "Git 工作区与差异",
+      "git-graph": "Git 提交树与详情",
+      artifacts: "端到端加密 Artifacts",
+      "secure-share": "安全外部分享",
+      usage: "模型与 Token 使用情况",
+      settings: "设置、主题与凭据",
+      changelog: "版本亮点与更新"
+    };
+    document.getElementById("screen").src = `mobile.html?page=${encodeURIComponent(page)}&theme=${theme}`;
+    document.getElementById("title").textContent = titles[page] || titles.welcome;
+    document.getElementById("theme").textContent = `AGENTHUB · ${theme.toUpperCase()} THEME`;
+  </script>
+</body>
+</html>

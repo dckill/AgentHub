@@ -37,17 +37,380 @@ AgentHub 在你的电脑上启动并管理 Claude Code 或 Codex，通过端到�
 
 ## 产品界面
 
+以下界面使用与现有功能一致的中文演示数据，同时展示 Amber Crystal 深色与浅色主题。点击手机模型可查看对应的 **1080 × 2338** 原始页面。
+
+### 接入与设备
+
+#### 欢迎与创建账户
+
+未登录用户可以创建本地加密账户、关联或恢复已有账户，也可以切换到自己的 AgentHub Server。
+
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/assets/agenthub-1.0/desktop-current-new-session.png" width="360" alt="AgentHub 新建会话">
+      <a href="docs/assets/readme/showcase/screens/welcome-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/welcome-dark.webp" width="420" alt="AgentHub 欢迎与创建账户深色主题">
+      </a>
       <br>
-      <sub><strong>远程创建会话</strong> — 选择机器、工作目录、代理、模型与权限模式。</sub>
+      <sub><strong>深色主题</strong> — 创建账户、授权登录、账户恢复与自托管服务端。</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/assets/agenthub-1.0/desktop-current-settings.png" width="360" alt="AgentHub 设置页">
+      <a href="docs/assets/readme/showcase/screens/welcome-light.webp">
+        <img src="docs/assets/readme/showcase/phones/welcome-light.webp" width="420" alt="AgentHub 欢迎与创建账户浅色主题">
+      </a>
       <br>
-      <sub><strong>统一管理</strong> — 账号、托管凭据、外观、功能开关与开发工具。</sub>
+      <sub><strong>浅色主题</strong> — 连接状态、Server 地址和端到端加密定位。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 设备授权与账户恢复
+
+临时公钥二维码用于关联新设备，也可以改用恢复密钥；服务端不会获得账户解密密钥。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/authorization-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/authorization-dark.webp" width="420" alt="AgentHub 设备授权深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 二维码授权、倒计时、请求设备和安全说明。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/authorization-light.webp">
+        <img src="docs/assets/readme/showcase/phones/authorization-light.webp" width="420" alt="AgentHub 设备授权浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 扫码步骤、手动恢复入口与待确认状态。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 设备仪表盘与详情
+
+统一查看 Linux、macOS 与 Windows 机器，核对 daemon、CLI、runner、在线状态和文件传输。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/devices-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/devices-dark.webp" width="420" alt="AgentHub 设备仪表盘深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 设备分组、在线状态、活跃会话与传输进度。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/devices-light.webp">
+        <img src="docs/assets/readme/showcase/phones/devices-light.webp" width="420" alt="AgentHub 设备仪表盘浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — daemon、CLI 版本、Runner 和设备快捷操作。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 新建远程会话
+
+在一处选择机器、目录、Codex 或 Claude Code、模型、推理强度、权限模式、凭据和 Worktree。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/new-session-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/new-session-dark.webp" width="420" alt="AgentHub 新建会话深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 完整运行环境与初始任务配置。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/new-session-light.webp">
+        <img src="docs/assets/readme/showcase/phones/new-session-light.webp" width="420" alt="AgentHub 新建会话浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 文件引用、会话模板与隔离 Worktree。</sub>
+    </td>
+  </tr>
+</table>
+
+### 会话与智能体
+
+#### 会话工作台
+
+当前任务按机器和项目组织，同时展示 AgentHub 会话、少量电脑端候选、待审批和完成状态。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/sessions-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/sessions-dark.webp" width="420" alt="AgentHub 会话工作台深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 项目分组、执行中、思考中和权限状态。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/sessions-light.webp">
+        <img src="docs/assets/readme/showcase/phones/sessions-light.webp" width="420" alt="AgentHub 会话工作台浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 电脑端会话候选、接管入口和完成任务折叠。</sub>
+    </td>
+  </tr>
+</table>
+
+#### AI 对话工作台
+
+消息流不仅显示回答，也持续呈现目标进度、上下文用量、思考状态、文件引用和工具执行。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/conversation-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/conversation-dark.webp" width="420" alt="AgentHub AI 对话深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 用户消息、智能体回复、进度更新与代码块。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/conversation-light.webp">
+        <img src="docs/assets/readme/showcase/phones/conversation-light.webp" width="420" alt="AgentHub AI 对话浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 上下文进度、内联工具状态与多端继续对话。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 工具调用与权限审批
+
+Shell、文件编辑、Diff 与 MCP 调用共享统一状态卡片，危险动作由用户明确批准。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/tools-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/tools-dark.webp" width="420" alt="AgentHub 工具调用深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 命令输出、文件修改、Diff 和检查结果。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/tools-light.webp">
+        <img src="docs/assets/readme/showcase/phones/tools-light.webp" width="420" alt="AgentHub 权限审批浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 拒绝、本次允许、命令级与会话级授权。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 文件管理器与代码预览
+
+浏览在线机器的目录树，搜索并预览代码、Markdown 和图片，再从机器下载到 App。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/files-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/files-dark.webp" width="420" alt="AgentHub 文件管理器深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 目录树、文件搜索、语法类型和路径信息。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/files-light.webp">
+        <img src="docs/assets/readme/showcase/phones/files-light.webp" width="420" alt="AgentHub 文件管理器浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — Markdown 预览、文件信息和下载操作。</sub>
+    </td>
+  </tr>
+</table>
+
+### 文件与 Git
+
+#### 下载与传输管理
+
+机器到 App 的文件传输支持进度、暂停、重试、断线续传、授权目录和本地记录管理。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/transfers-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/transfers-dark.webp" width="420" alt="AgentHub 下载管理深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 多任务进度、速度、剩余时间与暂停。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/transfers-light.webp">
+        <img src="docs/assets/readme/showcase/phones/transfers-light.webp" width="420" alt="AgentHub 下载管理浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 完成记录、失败恢复与系统授权目录。</sub>
+    </td>
+  </tr>
+</table>
+
+#### Git 工作区与差异
+
+集中处理暂存、撤销、统一或分栏 Diff、增删行统计和提交信息。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/git-workspace-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/git-workspace-dark.webp" width="420" alt="AgentHub Git 工作区深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 已暂存、未暂存、未跟踪文件和分支状态。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/git-workspace-light.webp">
+        <img src="docs/assets/readme/showcase/phones/git-workspace-light.webp" width="420" alt="AgentHub Git 工作区浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 分栏 Diff、撤销、暂存和提交。</sub>
+    </td>
+  </tr>
+</table>
+
+#### Git 提交树与详情
+
+查看当前分支、远端、标签、合并节点、作者、父提交和单次提交的文件变化。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/git-graph-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/git-graph-dark.webp" width="420" alt="AgentHub Git 提交树深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 分支、标签、HEAD 和提交搜索。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/git-graph-light.webp">
+        <img src="docs/assets/readme/showcase/phones/git-graph-light.webp" width="420" alt="AgentHub Git 提交树浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 提交图、合并节点、哈希和提交详情。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 端到端加密 Artifacts
+
+把发布清单、运行手册和项目笔记作为加密 Artifact 在授权客户端之间同步。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/artifacts-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/artifacts-dark.webp" width="420" alt="AgentHub Artifacts 深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 置顶、搜索、分类和最近更新。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/artifacts-light.webp">
+        <img src="docs/assets/readme/showcase/phones/artifacts-light.webp" width="420" alt="AgentHub Artifacts 浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 加密内容、检查清单和关联资源。</sub>
+    </td>
+  </tr>
+</table>
+
+### 数据、安全与管理
+
+#### 安全外部分享
+
+选中文本后在客户端加密，创建带有效期的临时链接，并随时查看或撤销。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/secure-share-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/secure-share-dark.webp" width="420" alt="AgentHub 安全外部分享深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 文本选择、有效期和客户端加密说明。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/secure-share-light.webp">
+        <img src="docs/assets/readme/showcase/phones/secure-share-light.webp" width="420" alt="AgentHub 安全外部分享浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 链接复制、访问状态和撤销管理。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 模型与 Token 使用情况
+
+按时间、智能体和模型查看 Token、缓存命中、缓存读写与会话数量。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/usage-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/usage-dark.webp" width="420" alt="AgentHub 使用情况深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — Token 趋势、会话数和缓存命中。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/usage-light.webp">
+        <img src="docs/assets/readme/showcase/phones/usage-light.webp" width="420" alt="AgentHub 使用情况浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — Codex、Claude Code 与模型用量明细。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 设置、主题与凭据
+
+管理本地加密账户、关联设备、托管 API 凭据、语言、缩放和工作台显示偏好。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/settings-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/settings-dark.webp" width="420" alt="AgentHub 设置深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 账户安全、加密凭据与功能开关。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/settings-light.webp">
+        <img src="docs/assets/readme/showcase/phones/settings-light.webp" width="420" alt="AgentHub 设置浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — 主题、自动折叠、Diff、缩放和语言。</sub>
+    </td>
+  </tr>
+</table>
+
+#### 版本亮点与更新
+
+在 App 内查看版本亮点、OTA 状态和各台机器的 AgentHub CLI 更新情况。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/changelog-dark.webp">
+        <img src="docs/assets/readme/showcase/phones/changelog-dark.webp" width="420" alt="AgentHub 版本亮点深色主题">
+      </a>
+      <br>
+      <sub><strong>深色主题</strong> — 会话接管、断点续传、Git 与双主题亮点。</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/showcase/screens/changelog-light.webp">
+        <img src="docs/assets/readme/showcase/phones/changelog-light.webp" width="420" alt="AgentHub 版本亮点浅色主题">
+      </a>
+      <br>
+      <sub><strong>浅色主题</strong> — App OTA、runtimeVersion 与设备 CLI 更新。</sub>
     </td>
   </tr>
 </table>
