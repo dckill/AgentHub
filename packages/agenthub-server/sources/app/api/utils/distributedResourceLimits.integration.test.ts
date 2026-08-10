@@ -6,8 +6,9 @@ import { io as createSocketClient, type Socket } from 'socket.io-client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { enableResourceLimits } from './enableResourceLimits';
 import { enableSocketResourceLimits } from './enableSocketResourceLimits';
+import { resolveRedisIntegrationPolicy } from './redisIntegrationPolicy';
 
-const redisUrl = process.env.AGENTHUB_TEST_REDIS_URL;
+const { redisUrl } = resolveRedisIntegrationPolicy();
 const describeWithRedis = redisUrl ? describe : describe.skip;
 
 async function listenHttp(app: FastifyInstance): Promise<string> {

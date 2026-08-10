@@ -24,7 +24,6 @@ import { ApiClient } from './api/api'
 import { runDoctorCommand, runDoctorDaemon } from './ui/doctor'
 import { listDaemonSessions, stopDaemonSessionDetailed } from './daemon/controlClient'
 import { handleAuthCommand } from './commands/auth'
-import { handleConnectCommand } from './commands/connect'
 import { handleSandboxCommand } from './commands/sandbox'
 import { spawnAgentHubCLI } from './utils/spawnAgentHubCLI'
 import { claudeCliPath } from './claude/claudeLocal'
@@ -84,16 +83,8 @@ import { handleUpdateCommand } from './commands/update'
     }
     return;
   } else if (subcommand === 'connect') {
-    // Handle connect subcommands
-    try {
-      await handleConnectCommand(args.slice(1));
-    } catch (error) {
-      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
-      if (process.env.DEBUG) {
-        console.error(error)
-      }
-      process.exit(1)
-    }
+    console.error(chalk.yellow('agenthub connect 已下线；请使用 agenthub auth login 完成受支持的 Claude Code/Codex 认证。'))
+    process.exit(1)
     return;
   } else if (subcommand === 'sandbox') {
     try {
@@ -386,7 +377,6 @@ ${chalk.bold('Usage:')}
   agenthub auth          Manage authentication
   agenthub resume        Resume a previous AgentHub session by AgentHub session ID
   agenthub codex         Start Codex mode
-  agenthub connect       Connect AI vendor API keys
   agenthub sandbox       Configure and manage OS-level sandboxing
   agenthub notify        Send push notification
   agenthub daemon        Manage background service that allows
@@ -398,7 +388,6 @@ ${chalk.bold('Compatibility alias:')}
   agenthub auth              Manage authentication
   agenthub resume            Resume a previous AgentHub session by AgentHub session ID
   agenthub codex             Start Codex mode
-  agenthub connect           Connect AI vendor API keys
   agenthub sandbox           Configure and manage OS-level sandboxing
   agenthub notify            Send push notification
   agenthub daemon            Manage background service that allows
@@ -537,22 +526,23 @@ ${chalk.bold('Examples:')}
     const notificationTitle = title || 'AgentHub'
 
     // Send the push notification
-    api.push().sendToAllDevices(
-      notificationTitle,
-      message,
-      {
-        source: 'cli',
-        timestamp: Date.now()
-      }
+    const delivered = await api.push().sendToAllDevices(
+        notificationTitle,
+        message,
+        {
+            source: 'cli',
+            timestamp: Date.now()
+        }
     )
+
+    if (!delivered) {
+        throw new Error('No push notification was delivered')
+    }
 
     console.log(chalk.green('✓ Push notification sent successfully!'))
     console.log(chalk.gray(`  Title: ${notificationTitle}`))
     console.log(chalk.gray(`  Message: ${message}`))
     console.log(chalk.gray('  Check your mobile device for the notification.'))
-
-    // Give a moment for the async operation to start
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
   } catch (error) {
     console.error(chalk.red('✗ Failed to send push notification'))

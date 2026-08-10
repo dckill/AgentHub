@@ -1,6 +1,7 @@
 import type { Metadata } from '@/sync/storageTypes';
 import { hackModes } from '@/sync/modeHacks';
 import { coerceSupportedClientAgent, isSupportedClientAgent, type SupportedClientAgent } from '@/sync/agentTypes';
+import type { PermissionModeKey } from '@/utils/permissionMode';
 
 export type ModeOption = {
     key: string;
@@ -15,7 +16,7 @@ export type PermissionMode = ModeOption;
 export type ModelMode = ModeOption;
 
 export type EffortLevel = ModeOption;
-export type PermissionModeKey = string;
+export type { PermissionModeKey } from '@/utils/permissionMode';
 export type ModelModeKey = string;
 
 export type AgentFlavor = SupportedClientAgent | string | null | undefined;
@@ -98,14 +99,28 @@ export function getCodexPermissionModes(translate: Translate): PermissionMode[] 
 export function getClaudeModelModes(translate: Translate = fallbackTranslate): ModelMode[] {
     return [
         defaultModel(translate),
-        { key: 'opus', name: 'opus 4.7', description: null },
+        { key: 'claude-opus-5', name: 'opus 5', description: null },
+        { key: 'opus', name: 'opus 4.8', description: null },
+        { key: 'fable', name: 'fable 5', description: null },
         { key: 'sonnet', name: 'sonnet 4.6', description: null },
         { key: 'haiku', name: 'haiku 4.5', description: null },
     ];
 }
 
 export function getCodexModelModes(translate: Translate = fallbackTranslate): ModelMode[] {
-    return [defaultModel(translate)];
+    return [
+        defaultModel(translate),
+        { key: 'gpt-5.6-sol', name: 'gpt-5.6 sol', description: null },
+        { key: 'gpt-5.6-terra', name: 'gpt-5.6 terra', description: null },
+        { key: 'gpt-5.6-luna', name: 'gpt-5.6 luna', description: null },
+        { key: 'gpt-5.5', name: 'gpt-5.5', description: null },
+        { key: 'gpt-5.4', name: 'gpt-5.4', description: null },
+        { key: 'gpt-5.3-codex', name: 'gpt-5.3-codex', description: null },
+        { key: 'gpt-5.2-codex', name: 'gpt-5.2-codex', description: null },
+        { key: 'gpt-5.1-codex-max', name: 'gpt-5.1-codex-max', description: null },
+        { key: 'gpt-5.2', name: 'gpt-5.2', description: null },
+        { key: 'gpt-5.1-codex-mini', name: 'gpt-5.1-codex-mini', description: null },
+    ];
 }
 
 export function getCodexRuntimeModelModes(
@@ -211,6 +226,7 @@ export function getClaudeEffortLevels(translate: Translate = fallbackTranslate):
         { key: 'low', name: translate('agentInput.effort.low') },
         { key: 'medium', name: translate('agentInput.effort.medium') },
         { key: 'high', name: translate('agentInput.effort.high') },
+        { key: 'xhigh', name: 'xhigh' },
         { key: 'max', name: translate('agentInput.effort.max') },
     ];
 }
@@ -243,7 +259,6 @@ export function getEffortLevelsForModel(
     availableModels?: ModelMode[],
 ): EffortLevel[] {
     if (flavor === 'claude') {
-        if (modelKey === 'default') return [];
         return getClaudeEffortLevels(translate);
     }
     if (flavor === 'codex') {

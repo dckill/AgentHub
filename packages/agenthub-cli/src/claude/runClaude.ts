@@ -41,7 +41,7 @@ import { getProjectPath } from './utils/path';
 import { extractUserMessageText } from './utils/extractUserMessageText';
 import { RawJSONLinesSchema, type RawJSONLines } from './types';
 import { createRunnerShutdownCoordinator, type RunnerShutdownCoordinator, type RunnerShutdownRequest } from '@/sessionProtocol/RunnerShutdownCoordinator';
-import { registerRunnerSignalHandlers } from '@/sessionProtocol/processSignalHandlers';
+import { registerRunnerFatalHandlers, registerRunnerSignalHandlers } from '@/sessionProtocol/processSignalHandlers';
 import { takeOfficialMirrorScannerForCleanup } from './officialMirrorTakeover';
 import { resolveBundledToolsDir } from '@/tools/toolsPath';
 
@@ -50,6 +50,7 @@ export type JsRuntime = 'node' | 'bun'
 
 export interface StartOptions {
     model?: string
+    effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
     permissionMode?: PermissionMode
     startingMode?: 'local' | 'remote'
     shouldStartDaemon?: boolean
@@ -59,6 +60,19 @@ export interface StartOptions {
     noSandbox?: boolean
     /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
     jsRuntime?: JsRuntime
+}
+
+export function buildClaudeMessageModeHash(mode: EnhancedMode): string {
+    return hashObject({
+        isPlan: mode.permissionMode === 'plan',
+        model: mode.model,
+        effort: mode.effort,
+        fallbackModel: mode.fallbackModel,
+        customSystemPrompt: mode.customSystemPrompt,
+        appendSystemPrompt: mode.appendSystemPrompt,
+        allowedTools: mode.allowedTools,
+        disallowedTools: mode.disallowedTools,
+    });
 }
 
 type ClaudeGoalCommand = NonNullable<ReturnType<typeof parseClaudeGoalActionParams>>;
@@ -170,6 +184,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
 
     const forkedFromSessionId = process.env.AGENTHUB_FORKED_FROM_SESSION_ID;
     const forkedFromMessageId = process.env.AGENTHUB_FORKED_FROM_MESSAGE_ID;
+    const isSideChat = process.env.AGENTHUB_SIDE_CHAT === '1';
     const mirrorClaudeSessionId = process.env.AGENTHUB_MIRROR_CLAUDE_SESSION_ID || null;
 
     let metadata: Metadata = {
@@ -200,6 +215,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         } : {}),
         ...(forkedFromSessionId ? { parentSessionId: forkedFromSessionId } : {}),
         ...(forkedFromMessageId ? { forkedFromMessageId } : {}),
+        ...(isSideChat ? { isSideChat: true } : {}),
     };
 
     if (mirrorClaudeSessionId) {
@@ -347,13 +363,16 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     }
 
     const forkClaudeSessionId = process.env.AGENTHUB_FORK_CLAUDE_SESSION_ID;
-    if (!reconnectSessionId && forkClaudeSessionId) {
+    if (!reconnectSessionId && forkClaudeSessionId && !isSideChat) {
         await backfillClaudeSessionFromJsonl({
             session,
             workingDirectory,
             claudeSessionId: forkClaudeSessionId,
             logPrefix: 'FORK BACKFILL',
         });
+    }
+    if (!reconnectSessionId && forkClaudeSessionId && isSideChat) {
+        session.updateMetadata((meta) => ({ ...meta, claudeSessionId: forkClaudeSessionId }));
     }
 
     let latestClaudeGoalStatus: AgentGoalStatus | null = null;
@@ -480,20 +499,13 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     }));
 
     // Import MessageQueue2 and create message queue
-    const messageQueue = new MessageQueue2<EnhancedMode>(mode => hashObject({
-        isPlan: mode.permissionMode === 'plan',
-        model: mode.model,
-        fallbackModel: mode.fallbackModel,
-        customSystemPrompt: mode.customSystemPrompt,
-        appendSystemPrompt: mode.appendSystemPrompt,
-        allowedTools: mode.allowedTools,
-        disallowedTools: mode.disallowedTools
-    }));
+    const messageQueue = new MessageQueue2<EnhancedMode>(buildClaudeMessageModeHash);
 
     // Forward messages to the queue
     // Permission modes: Use the unified 7-mode type, mapping happens at SDK boundary in claudeRemote.ts
     let currentPermissionMode: PermissionMode | undefined = initialPermissionMode;
     let currentModel = options.model; // Track current model state
+    let currentEffort = options.effort;
     let currentFallbackModel: string | undefined = undefined; // Track current fallback model
     let currentCustomSystemPrompt: string | undefined = undefined; // Track current custom system prompt
     let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
@@ -503,6 +515,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     const currentEnhancedMode = (): EnhancedMode => ({
         permissionMode: currentPermissionMode || 'default',
         model: currentModel,
+        effort: currentEffort,
         fallbackModel: currentFallbackModel,
         customSystemPrompt: currentCustomSystemPrompt,
         appendSystemPrompt: currentAppendSystemPrompt,
@@ -605,6 +618,16 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             logger.debug(`[loop] User message received with no model override, using current: ${currentModel || 'default'}`);
         }
 
+        let messageEffort = currentEffort;
+        if (message.meta?.hasOwnProperty('effort')) {
+            const requestedEffort = message.meta.effort;
+            messageEffort = requestedEffort === 'low' || requestedEffort === 'medium' || requestedEffort === 'high'
+                || requestedEffort === 'xhigh' || requestedEffort === 'max'
+                ? requestedEffort : undefined;
+            currentEffort = messageEffort;
+            logger.debug(`[loop] Effort updated from user message: ${messageEffort || 'reset to default'}`);
+        }
+
         // Resolve custom system prompt - use message.meta.customSystemPrompt if provided, otherwise use current
         let messageCustomSystemPrompt = currentCustomSystemPrompt;
         if (message.meta?.hasOwnProperty('customSystemPrompt')) {
@@ -663,6 +686,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             const enhancedMode: EnhancedMode = {
                 permissionMode: messagePermissionMode || 'default',
                 model: messageModel,
+                effort: messageEffort,
                 fallbackModel: messageFallbackModel,
                 customSystemPrompt: messageCustomSystemPrompt,
                 appendSystemPrompt: messageAppendSystemPrompt,
@@ -679,6 +703,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             const enhancedMode: EnhancedMode = {
                 permissionMode: messagePermissionMode || 'default',
                 model: messageModel,
+                effort: messageEffort,
                 fallbackModel: messageFallbackModel,
                 customSystemPrompt: messageCustomSystemPrompt,
                 appendSystemPrompt: messageAppendSystemPrompt,
@@ -736,6 +761,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         const enhancedMode: EnhancedMode = {
             permissionMode: messagePermissionMode || 'default',
             model: messageModel,
+            effort: messageEffort,
             fallbackModel: messageFallbackModel,
             customSystemPrompt: messageCustomSystemPrompt,
             appendSystemPrompt: messageAppendSystemPrompt,
@@ -756,7 +782,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Setup one idempotent terminal coordinator for signals, archive, RPC,
     // backend/SDK failures and the normal Claude loop exit.
     let requestShutdown: (request: RunnerShutdownRequest) => Promise<void> = async () => {};
-    let disposeRunnerSignalHandlers = () => {};
+    let disposeRunnerProcessHandlers = () => {};
     const safely = async (label: string, action: () => void | Promise<void>) => {
         try {
             await action();
@@ -789,7 +815,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         flush: () => session.flush(),
         closeSession: () => session.close(),
         cleanupLocalResources: async () => {
-            disposeRunnerSignalHandlers();
+            disposeRunnerProcessHandlers();
             if (officialMirrorScanner) {
                 const scanner = officialMirrorScanner;
                 officialMirrorScanner = null;
@@ -818,21 +844,28 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     };
 
     // Handle termination signals
-    disposeRunnerSignalHandlers = registerRunnerSignalHandlers({
+    const disposeSignalHandlers = registerRunnerSignalHandlers({
         onSigterm: cleanup,
         onSigint: cleanup,
     });
 
-    // Handle uncaught exceptions and rejections
-    process.once('uncaughtException', (error) => {
-        logger.debug('[START] Uncaught exception:', error);
-        cleanup();
+    const fatalCleanup = async (kind: string, error: unknown) => {
+        logger.debug(`[START] ${kind}:`, error);
+        try {
+            await requestShutdown({ reason: `Claude runner ${kind}`, turnStatus: 'failed' });
+        } catch (shutdownError) {
+            logger.debug('[START] Fatal cleanup failed:', shutdownError);
+        }
+        process.exit(1);
+    };
+    const disposeFatalHandlers = registerRunnerFatalHandlers({
+        onUncaughtException: (error) => fatalCleanup('uncaught exception', error),
+        onUnhandledRejection: (reason) => fatalCleanup('unhandled rejection', reason),
     });
-
-    process.once('unhandledRejection', (reason) => {
-        logger.debug('[START] Unhandled rejection:', reason);
-        cleanup();
-    });
+    disposeRunnerProcessHandlers = () => {
+        disposeSignalHandlers();
+        disposeFatalHandlers();
+    };
 
     registerKillSessionHandler(session.rpcHandlerManager, cleanup);
 

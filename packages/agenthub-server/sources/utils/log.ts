@@ -4,8 +4,9 @@ import { join } from 'path';
 
 // Single log file name created once at startup
 let consolidatedLogFile: string | undefined;
+const remoteDebugEnabled = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING === 'true';
 
-if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING) {
+if (remoteDebugEnabled) {
     const logsDir = join(process.cwd(), '.logs');
     try {
         mkdirSync(logsDir, { recursive: true });
@@ -52,7 +53,7 @@ transports.push({
     },
 });
 
-if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile) {
+if (remoteDebugEnabled && consolidatedLogFile) {
     transports.push({
         target: 'pino/file',
         options: {
@@ -82,7 +83,7 @@ export const logger = pino({
 });
 
 // Optional file-only logger for remote logs from CLI/mobile
-export const fileConsolidatedLogger = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile ? 
+export const fileConsolidatedLogger = remoteDebugEnabled && consolidatedLogFile ?
     pino({
         level: 'debug',
         transport: {

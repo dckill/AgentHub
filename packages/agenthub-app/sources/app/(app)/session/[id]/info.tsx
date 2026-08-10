@@ -29,6 +29,8 @@ import { ProjectIcon } from '@/components/ProjectIcon';
 import { getSessionLifecycleVisual } from '@/utils/sessionLifecycleStatus';
 import { getArchiveFeedbackNavigationDelayMs, navigateAfterSessionArchive, navigateAfterSessionDelete } from '@/-session/sessionInfoArchiveNavigation';
 import { ScreenReaderHeading } from '@/components/ScreenReaderHeading';
+import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 // Animated status dot component
 function StatusDot({ color, isPulsing, size = 8 }: { color: string; isPulsing?: boolean; size?: number }) {
@@ -132,6 +134,11 @@ function formatDangerouslySkipPermissionsMetadata(
 function SessionInfoContent({ session }: { session: Session }) {
     const { theme } = useUnistyles();
     const router = useRouter();
+    const generation = React.useRef(sync.getAccountGeneration()).current;
+    const isCurrent = React.useCallback(
+        () => generation !== null && sync.getAccountGeneration() === generation,
+        [generation],
+    );
     const devModeEnabled = __DEV__;
     const sessionName = getSessionName(session);
     const sessionStatus = useSessionStatus(session);
@@ -178,47 +185,64 @@ function SessionInfoContent({ session }: { session: Session }) {
 
     // Use AgentHubAction for archiving - it handles errors automatically
     const [archivingSession, performArchive] = useAgentHubAction(async () => {
+        if (!isCurrent()) return;
         // Prompt for worktree cleanup before killing (needs an active machine connection)
-        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
+        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId, { isCurrent });
+        if (!isCurrent()) return;
 
         // Use the same structured daemon stop and legacy fallback as the
         // session quick-actions menu.
         let stopResult;
         try {
-            stopResult = await requestSessionArchiveStop(session.id, session.metadata?.machineId, {
-                onDaemonState: (daemonState) => {
-                    setArchiveLifecycleState(daemonState.state === 'stopping' ? 'archiveRequested' : daemonState.state);
-                    storage.getState().applySessions([applyArchiveStopObservation(session, daemonState)]);
-                },
+            stopResult = await runSessionActionRequest({
+                isCurrent,
+                request: () => requestSessionArchiveStop(session.id, session.metadata?.machineId, {
+                    onDaemonState: (daemonState) => {
+                        if (!isCurrent()) return;
+                        setArchiveLifecycleState(daemonState.state === 'stopping' ? 'archiveRequested' : daemonState.state);
+                        storage.getState().applySessions([applyArchiveStopObservation(session, daemonState)]);
+                    },
+                }),
             });
         } catch (error) {
             throw new AgentHubError(error instanceof Error ? error.message : t('sessionInfo.failedToArchiveSession'), false);
         }
+        if (!isCurrent() || !stopResult) return;
         storage.getState().applySessions([applyArchiveStopProjection(session, stopResult)]);
-        navigateAfterSessionArchive(router, getArchiveFeedbackNavigationDelayMs(stopResult.state));
+        navigateAfterSessionArchive(router, getArchiveFeedbackNavigationDelayMs(stopResult.state), isCurrent);
     });
 
     const handleArchiveSession = useCallback(() => {
-        performArchive();
-    }, [performArchive]);
+        if (isCurrent()) performArchive();
+    }, [isCurrent, performArchive]);
 
     // Use AgentHubAction for deletion - kills session first if needed, then deletes
     const [deletingSession, performDelete] = useAgentHubAction(async () => {
+        if (!isCurrent()) return;
         // Prompt for worktree cleanup before killing (needs an active machine connection)
-        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
+        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId, { isCurrent });
+        if (!isCurrent()) return;
 
         // Kill session first if it's still active (best-effort)
         if (sessionStatus.isConnected || session.active) {
-            await sessionKill(session.id).catch(() => {});
+            await runSessionActionRequest({
+                isCurrent,
+                request: () => sessionKill(session.id).catch(() => {}),
+            });
+            if (!isCurrent()) return;
         }
 
-        const result = await sessionDelete(session.id);
+        const result = await runSessionActionRequest({
+            isCurrent,
+            request: () => sessionDelete(session.id),
+        });
+        if (!isCurrent() || !result) return;
         if (!result.success) {
             throw new AgentHubError(result.message || t('sessionInfo.failedToDeleteSession'), false);
         }
         navigateAfterSessionDelete(router, () => {
-            storage.getState().deleteSession(session.id);
-        });
+            if (isCurrent()) storage.getState().deleteSession(session.id);
+        }, undefined, isCurrent);
     });
 
     const handleDeleteSession = useCallback(() => {
@@ -230,11 +254,13 @@ function SessionInfoContent({ session }: { session: Session }) {
                 {
                     text: t('sessionInfo.deleteSession'),
                     style: 'destructive',
-                    onPress: performDelete
+                    onPress: () => {
+                        if (isCurrent()) performDelete();
+                    }
                 }
             ]
         );
-    }, [performDelete]);
+    }, [isCurrent, performDelete]);
 
     const formatDate = useCallback((timestamp: number) => {
         return new Date(timestamp).toLocaleString();

@@ -179,11 +179,20 @@ options in order of popularity:
   pnpm --filter agenthub-app run ota:production
   ```
 
-OTA scripts require a message — stdin is not readable from Claude Code, so run the
-underlying `eas update` directly with `--message`:
+Production Android OTA must be exported locally and published directly. Never use
+`eas workflow:run` for routine OTA releases because it uploads a compressed copy of
+the whole repository before running the update job. Set `OTA_MESSAGE` when using the
+package script, or run the underlying command directly:
   ```bash
-  cd packages/agenthub-app && APP_ENV=preview NODE_ENV=preview tsx sources/scripts/parseChangelog.ts && pnpm typecheck && eas update --branch preview --message "<message>"
+  cd packages/agenthub-app && EAS_SKIP_AUTO_FINGERPRINT=1 APP_ENV=production NODE_ENV=production \
+    EXPO_PUBLIC_AGENTHUB_SERVER_URL=https://agenthub.yzsd.asia:8443 \
+    npx eas-cli@latest update --channel production --environment production \
+    --platform android --message "<message>" --non-interactive
   ```
+
+Keep Expo SDK 55 bsdiff support enabled in both app config and the checked-in Android
+manifest. Existing binaries without the native flag require one native APK upgrade;
+after that, JS and asset-only changes remain OTA updates.
 
 #### Native Builds
 

@@ -208,4 +208,47 @@ describe('sessionScanner', () => {
     //   expect(lastAssistantMsg.message.id).toBe('msg_01KWeuP88pkzRtXmggJRnQmV')
     // }
   })
+
+  it('emits the synthetic assistant error when the provider rejects a turn', async () => {
+    scanner = await createSessionScanner({
+      sessionId: null,
+      workingDirectory: testDir,
+      onMessage: (msg) => collectedMessages.push(msg),
+    })
+    const sessionId = 'c1d0a6cf-1f6c-4bb0-9a5a-2b0c2f5f9d10'
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'user-rate-limit',
+        message: { role: 'user', content: 'continue' },
+      },
+      {
+        type: 'assistant',
+        uuid: 'assistant-rate-limit',
+        error: 'rate_limit',
+        isApiErrorMessage: true,
+        apiErrorStatus: 429,
+        message: {
+          model: '<synthetic>',
+          role: 'assistant',
+          content: [{ type: 'text', text: "You've hit your limit" }],
+          usage: { input_tokens: 0, output_tokens: 0, service_tier: null },
+        },
+      },
+    ]
+    await writeFile(
+      join(projectDir, `${sessionId}.jsonl`),
+      lines.map((line) => JSON.stringify(line)).join('\n') + '\n',
+    )
+
+    scanner.onNewSession(sessionId)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    expect(collectedMessages.map((message) => message.type)).toEqual(['user', 'assistant'])
+    expect(collectedMessages[1]).toMatchObject({
+      type: 'assistant',
+      isApiErrorMessage: true,
+      apiErrorStatus: 429,
+    })
+  })
 })

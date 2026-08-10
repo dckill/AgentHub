@@ -62,6 +62,16 @@ export const en = {
         close: 'Close',
         backAgainToExit: 'Press back again to exit AgentHub',
         unknownError: 'Unknown error',
+        attachmentUploadFailedTitle: 'Attachment upload failed',
+        attachmentUploadFailedMessage: 'The image could not be uploaded securely. Your content was kept; check your connection and try again.',
+        attachmentUploadPartialTitle: 'Some attachments failed',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `${count} image${count === 1 ? '' : 's'} could not be uploaded. The remaining attachments and message were sent.`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `Attachment: ${name}`,
+        sessionControlObserver: 'Read-only: another device controls this session',
+        sessionControlController: 'This device controls the session',
+        sessionControlRelease: 'Release control',
+        sessionControlClaim: 'Take control',
+        sessionControlClaimFailed: 'This session is controlled by another device',
     },
 
     profile: {
@@ -201,6 +211,13 @@ export const en = {
         },
         alwaysShowContextSize: 'Always Show Context Size',
         alwaysShowContextSizeDescription: 'Display context usage even when not near limit',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'Scaling',
         scalingDescription: 'Adjust the size of interface elements',
@@ -476,6 +493,16 @@ export const en = {
         newSessionPlaceholder: 'What would you like to work on?',
         importOfficialTitle: 'Taking over the computer session',
         importOfficialDescription: 'Importing the conversation, restoring context, and syncing the current state. This session is unavailable until the import finishes.',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -586,6 +613,14 @@ export const en = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: 'Ready to code?',
@@ -887,7 +922,22 @@ export const en = {
         }
     },
 
+    sideChat: {
+        panelTitle: 'Side chats',
+        allFiles: 'All files',
+        newChat: 'New side chat',
+        startButton: 'Start side chat',
+        creating: 'Creating…',
+        unavailable: 'This session cannot be forked while its machine is offline or provider metadata is unavailable.',
+        emptyTitle: 'No side chats yet',
+        emptySubtitle: 'Start an isolated conversation that keeps the parent context without writing back into its transcript.',
+        close: 'Close side chat',
+        expand: 'Open side chat full screen',
+        defaultTitle: ({ index }: { index: number }) => `Side chat ${index}`,
+    },
+
     files: {
+        addPanel: 'Add workbench panel',
         changes: 'Changes',
         loadFailed: 'Could not load changes. Check your connection and try again.',
         fileLoadFailed: 'Could not load this file. Check your connection and try again.',
@@ -1204,6 +1254,16 @@ export const en = {
         notFound: 'Machine not found',
         launchNewSessionInDirectory: 'Launch New Session in Directory',
         statusAndProperties: 'Status & Properties',
+        systemResources: 'System resources',
+        memory: 'Memory',
+        network: 'Network',
+        downloadSpeed: 'Download',
+        uploadSpeed: 'Upload',
+        storage: 'Storage',
+        used: 'Used',
+        available: 'Available',
+        metricsUnavailable: 'Live metrics unavailable',
+        metricsStale: 'Showing the last available snapshot',
         actions: 'Actions',
         startSessionOnThisMachine: 'Start Session on This Machine',
         startSessionOnThisMachineSubtitle: 'Open the new session screen with this machine selected.',

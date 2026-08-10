@@ -4,7 +4,8 @@ vi.mock('@/sync/ops', () => ({
     machineExec: vi.fn(),
 }));
 
-import { parseManagedWorktreePath } from './worktree';
+import { machineExec } from '@/sync/ops';
+import { listWorktrees, parseManagedWorktreePath } from './worktree';
 
 describe('parseManagedWorktreePath', () => {
     it('accepts one generated worktree name beneath the managed directory', () => {
@@ -22,5 +23,17 @@ describe('parseManagedWorktreePath', () => {
         '.dev/worktree/name',
     ])('rejects a path outside the managed single-segment boundary: %s', (path) => {
         expect(parseManagedWorktreePath(path)).toBeNull();
+    });
+});
+
+describe('listWorktrees', () => {
+    it('surfaces machine/RPC failures instead of treating them as an empty list', async () => {
+        vi.mocked(machineExec).mockResolvedValueOnce({
+            success: false,
+            exitCode: -1,
+            stderr: 'connection refused',
+        } as never);
+
+        await expect(listWorktrees('machine-1', '/repo')).rejects.toThrow('connection refused');
     });
 });

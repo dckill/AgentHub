@@ -23,7 +23,7 @@ async function authenticateDebugLogRequest(request: any, reply: any) {
 
 export function devRoutes(app: Fastify) {
 
-    if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING) {
+    if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING === 'true') {
         app.post('/logs-combined-from-cli-and-mobile-for-simple-ai-debugging', {
             preHandler: authenticateDebugLogRequest,
             bodyLimit: 64 * 1024,

@@ -7,8 +7,8 @@ vi.mock('@/ui/logger', () => ({
     },
 }));
 
-function createSessionMock() {
-    let state: Record<string, any> = {};
+function createSessionMock(initialState: Record<string, any> = {}) {
+    let state: Record<string, any> = initialState;
 
     return {
         session: {
@@ -25,6 +25,27 @@ function createSessionMock() {
 }
 
 describe('CodexPermissionHandler', () => {
+    it('cancels permission requests orphaned by a previous CLI process with an explicit reason', () => {
+        const { session, getState } = createSessionMock({
+            requests: {
+                stale: {
+                    tool: 'Bash',
+                    arguments: { command: 'pwd' },
+                    createdAt: 1000,
+                },
+            },
+        });
+        const handler = new CodexPermissionHandler(session as any);
+
+        handler.reset('Previous CLI process exited before responding');
+
+        expect(getState().requests).toEqual({});
+        expect(getState().completedRequests.stale).toMatchObject({
+            status: 'canceled',
+            reason: 'Previous CLI process exited before responding',
+        });
+    });
+
     it('auto-approves the safe change_title tool', async () => {
         const { session, getState } = createSessionMock();
         const handler = new CodexPermissionHandler(session as any);

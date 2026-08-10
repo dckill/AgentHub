@@ -7,6 +7,7 @@ import { t } from '@/text';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -86,34 +87,46 @@ export default function NewArtifactScreen() {
     
     const handleSave = React.useCallback(async () => {
         if (isSaving) return;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         
         // At least one field should have content
         if (!title.trim() && !body.trim()) {
-            await Modal.alert(
-                t('common.error'),
-                t('artifacts.emptyFieldsError')
-            );
+            if (isCurrent()) {
+                await Modal.alert(
+                    t('common.error'),
+                    t('artifacts.emptyFieldsError')
+                );
+            }
             return;
         }
         
+        setIsSaving(true);
         try {
-            setIsSaving(true);
-            
             // Create the artifact
-            const artifactId = await sync.createArtifact(
-                title.trim() || null,
-                body.trim() || null
-            );
+            const artifactId = await runSessionActionRequest({
+                isCurrent,
+                request: () => sync.createArtifact(
+                    title.trim() || null,
+                    body.trim() || null
+                ),
+            });
+            if (!isCurrent() || !artifactId) return;
             
             // Navigate to the new artifact
             router.replace(`/artifacts/${artifactId}`);
         } catch (err) {
             console.error('Failed to create artifact:', err);
-            await Modal.alert(
-                t('common.error'),
-                t('artifacts.createError')
-            );
-            setIsSaving(false);
+            if (isCurrent()) {
+                await Modal.alert(
+                    t('common.error'),
+                    t('artifacts.createError')
+                );
+                setIsSaving(false);
+            }
+        } finally {
+            if (isCurrent()) setIsSaving(false);
         }
     }, [title, body, isSaving, router]);
     

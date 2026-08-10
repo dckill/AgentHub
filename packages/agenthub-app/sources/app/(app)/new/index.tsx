@@ -33,6 +33,7 @@ import { t } from '@/text';
 import { useAllMachines, useSessions, useSetting, storage } from '@/sync/storage';
 import type { NewSessionAgentType } from '@/sync/persistence';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { machineListCodexModels, machineSpawnNewSession } from '@/sync/ops';
 import { createWorktree, listWorktrees } from '@/utils/worktree';
@@ -43,15 +44,21 @@ import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
 import { Modal } from '@/modal';
 import { useAuth } from '@/auth/AuthContext';
 import { listCredentials, getCredentialEnvVars, type ManagedCredential } from '@/sync/apiCredentials';
+import { runCredentialsLoad } from '../settings/credentialsLifecycle';
 import { isSupportedClientAgent, type SupportedClientAgent } from '@/sync/agentTypes';
 import type { Machine, Session } from '@/sync/storageTypes';
+import { buildProjectKey } from '@/utils/projectIcons';
+import { restoreProjectCustomizationForExplicitSession } from '@/sync/projectVisibility';
 import {
     getAvailableNewSessionAgents,
     getNextNewSessionAgentKey,
+    getInitialMachineId,
     shouldClearSelectedCredential,
     shouldShowCredentialSelectorRow,
     ALL_NEW_SESSION_AGENTS,
     getNewSessionConfigItems,
+    resolveModeSelection,
+    resolveNewSessionAgent,
     type NewSessionConfigItem,
     type NewSessionSetupCopyKey,
 } from '@/utils/newSessionState';
@@ -343,17 +350,31 @@ function NewSessionScreen() {
     // Credential state
     const [credentials, setCredentials] = React.useState<ManagedCredential[]>([]);
     const [credentialLoadFailed, setCredentialLoadFailed] = React.useState(false);
-    const loadCredentials = React.useCallback(async () => {
-        if (!auth.credentials) return;
-        try {
-            setCredentialLoadFailed(false);
-            const list = await listCredentials(auth.credentials);
-            setCredentials(list);
-        } catch {
-            setCredentialLoadFailed(true);
-        }
+    const loadCredentials = React.useCallback(async (signal?: AbortSignal) => {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) return;
+        const isCurrent = () => !signal?.aborted
+            && sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
+        await runCredentialsLoad({
+            fetchCredentials: () => listCredentials(credentials, signal),
+            isCurrent,
+            setCredentials,
+            setLoadState: (state) => setCredentialLoadFailed(state === 'error'),
+            setError: (error) => setCredentialLoadFailed(error !== null),
+            errorMessage: t('credentials.loadFailed'),
+        });
     }, [auth.credentials]);
-    React.useEffect(() => { loadCredentials(); }, [loadCredentials]);
+    React.useEffect(() => {
+        const controller = new AbortController();
+        void loadCredentials(controller.signal);
+        return () => controller.abort();
+    }, [loadCredentials]);
+    React.useEffect(() => {
+        setCredentials([]);
+        setCredentialLoadFailed(false);
+    }, [auth.credentials?.token]);
     const supportedCredentials = React.useMemo(
         () => credentials.filter(
             (credential): credential is ManagedCredential & { agent: SupportedClientAgent } => isSupportedClientAgent(credential.agent),
@@ -382,9 +403,6 @@ function NewSessionScreen() {
     }, [worktreeKey]);
 
     // Local-only UI state (not persisted)
-    const [permissionIndex, setPermissionIndex] = React.useState(0);
-    const [modelIndex, setModelIndex] = React.useState(0);
-    const [effortIndex, setEffortIndex] = React.useState(0);
     const [isSpawning, setIsSpawning] = React.useState(false);
     const [activePicker, setActivePicker] = React.useState<PickerType | null>(null);
     const [showAdvancedSettings, setShowAdvancedSettings] = React.useState(false);
@@ -399,8 +417,9 @@ function NewSessionScreen() {
     // Auto-select first machine when none selected (first-ever use, no draft)
     React.useEffect(() => {
         if (selectedMachineId) return;
-        if (allMachines.length > 0) {
-            setSelectedMachineId(allMachines[0].id);
+        const initialMachineId = getInitialMachineId(allMachines);
+        if (initialMachineId) {
+            setSelectedMachineId(initialMachineId);
         }
     }, [allMachines, selectedMachineId]);
 
@@ -473,26 +492,44 @@ function NewSessionScreen() {
 
     // Fetch existing worktrees from the selected machine/path
     const [worktreeItems, setWorktreeItems] = React.useState<PickerItem[]>([]);
+    const [worktreeLoadFailed, setWorktreeLoadFailed] = React.useState(false);
+    const [worktreeRefreshKey, setWorktreeRefreshKey] = React.useState(0);
     React.useEffect(() => {
         if (!selectedMachineId || !debouncedResolvedSelectedPath) {
             setWorktreeItems([]);
+            setWorktreeLoadFailed(false);
             return;
         }
         if (!selectedMachine || !isMachineOnline(selectedMachine)) {
             setWorktreeItems([]);
+            setWorktreeLoadFailed(false);
             return;
         }
         let cancelled = false;
-        listWorktrees(selectedMachineId, debouncedResolvedSelectedPath).then(worktrees => {
-            if (cancelled) return;
-            setWorktreeItems(worktrees.map(wt => ({
-                key: wt.path,
-                label: wt.branch,
-                subtitle: wt.path,
-            })));
-        });
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled
+            && generation !== null
+            && sync.getAccountGeneration() === generation;
+        setWorktreeItems([]);
+        setWorktreeLoadFailed(false);
+        void runSessionActionRequest({
+            isCurrent,
+            request: () => listWorktrees(selectedMachineId, debouncedResolvedSelectedPath),
+        }).then(result => {
+                if (result === null || !isCurrent()) return;
+                setWorktreeItems(result.map(wt => ({
+                    key: wt.path,
+                    label: wt.branch,
+                    subtitle: wt.path,
+                })));
+            })
+            .catch(() => {
+                if (!isCurrent()) return;
+                setWorktreeItems([]);
+                setWorktreeLoadFailed(true);
+            });
         return () => { cancelled = true; };
-    }, [debouncedResolvedSelectedPath, selectedMachineId, selectedMachine]);
+    }, [debouncedResolvedSelectedPath, selectedMachineId, selectedMachine, worktreeRefreshKey]);
 
     React.useEffect(() => {
         if (worktreeKey === '__none__' || worktreeKey === '__new__') {
@@ -536,34 +573,52 @@ function NewSessionScreen() {
             return;
         }
 
+        const controller = new AbortController();
+        const generation = sync.getAccountGeneration();
+        const credentials = auth.credentials;
+        if (generation === null || !credentials) {
+            setCodexRuntimeModels(null);
+            setCodexModelsLoading(false);
+            setCodexModelsFailed(false);
+            return;
+        }
+
+        const isCurrent = () => !controller.signal.aborted
+            && sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
         let cancelled = false;
         setCodexModelsLoading(true);
         setCodexModelsFailed(false);
         void (async () => {
             let environmentVariables: Record<string, string> | undefined;
-            if (selectedCredentialId && auth.credentials) {
-                environmentVariables = await getCredentialEnvVars(auth.credentials, selectedCredentialId, {
+            if (selectedCredentialId) {
+                environmentVariables = await getCredentialEnvVars(credentials, selectedCredentialId, {
                     machineId: selectedMachineId,
-                });
+                }, controller.signal);
             }
+            if (!isCurrent()) return;
             const catalog = await machineListCodexModels(
                 selectedMachineId,
                 resolvedSelectedPath,
                 environmentVariables,
             );
+            if (!isCurrent()) return;
             if (!cancelled) {
                 setCodexRuntimeModels(getCodexRuntimeModelModes(catalog.models, t));
             }
         })().catch(() => {
-            if (!cancelled) {
+            if (!cancelled && isCurrent()) {
                 setCodexRuntimeModels(null);
                 setCodexModelsFailed(true);
             }
         }).finally(() => {
-            if (!cancelled) setCodexModelsLoading(false);
+            if (!cancelled && isCurrent()) setCodexModelsLoading(false);
         });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
     }, [
         auth.credentials,
         codexModelsRefreshKey,
@@ -586,7 +641,7 @@ function NewSessionScreen() {
         [codexRuntimeModels, selectedAgent],
     );
 
-    const currentModel = modelModes[modelIndex] ?? modelModes[0];
+    const currentModel = resolveModeSelection(modelModes, draft.modelMode, getDefaultModelKey(selectedAgent));
     const currentModelKey = currentModel?.key ?? 'default';
 
     const effortLevels = React.useMemo<EffortLevel[]>(
@@ -601,30 +656,9 @@ function NewSessionScreen() {
     const showCredentialRow = shouldShowCredentialSelectorRow(supportedCredentials, selectedAgent);
     const translateSetupCopy = React.useCallback((key: NewSessionSetupCopyKey) => t(key), []);
 
-    // Reset indices when agent changes — try draft keys first, then defaults
     React.useEffect(() => {
-        const draftPermIdx = permissionModes.findIndex(m => m.key === draft.permissionMode);
-        const defaultPermIdx = permissionModes.findIndex(m => m.key === getInitialPermissionModeKey(selectedAgent));
-        setPermissionIndex(draftPermIdx >= 0 ? draftPermIdx : (defaultPermIdx >= 0 ? defaultPermIdx : 0));
-
-        const draftModelIdx = modelModes.findIndex(m => m.key === draft.modelMode);
-        const defaultModelIdx = modelModes.findIndex(m => m.key === getDefaultModelKey(selectedAgent));
-        setModelIndex(draftModelIdx >= 0 ? draftModelIdx : (defaultModelIdx >= 0 ? defaultModelIdx : 0));
-
         if (!supportsWorktree) setWorktreeKey('__none__');
-    }, [selectedAgent, permissionModes, modelModes, supportsWorktree]);
-
-    // Reset effort when model changes
-    React.useEffect(() => {
-        const defaultEffort = getDefaultEffortKeyForModel(selectedAgent, currentModelKey, modelModes);
-        if (defaultEffort && effortLevels.length > 0) {
-            const draftEffortIdx = effortLevels.findIndex(e => e.key === draft.effortLevel);
-            const defaultEffortIdx = effortLevels.findIndex(e => e.key === defaultEffort);
-            setEffortIndex(draftEffortIdx >= 0 ? draftEffortIdx : (defaultEffortIdx >= 0 ? defaultEffortIdx : 0));
-        } else {
-            setEffortIndex(0);
-        }
-    }, [selectedAgent, currentModelKey, effortLevels, draft.effortLevel]);
+    }, [supportsWorktree]);
 
     const hasText = prompt.trim().length > 0;
 
@@ -659,31 +693,32 @@ function NewSessionScreen() {
     }, []);
 
     const cyclePermission = React.useCallback(() => {
-        setPermissionIndex(i => {
-            const next = (i + 1) % permissionModes.length;
-            draft.setPermissionMode(permissionModes[next]?.key ?? 'default');
-            return next;
-        });
-    }, [permissionModes, draft.setPermissionMode]);
+        if (permissionModes.length === 0) return null;
+        const current = resolveModeSelection(permissionModes, draft.permissionMode, getInitialPermissionModeKey(selectedAgent));
+        const currentIndex = current ? permissionModes.findIndex(mode => mode.key === current.key) : -1;
+        const next = permissionModes[(currentIndex + 1) % permissionModes.length] ?? permissionModes[0];
+        draft.setPermissionMode(next.key);
+        return next;
+    }, [draft.permissionMode, draft.setPermissionMode, permissionModes, selectedAgent]);
 
     const cycleModel = React.useCallback(() => {
-        setModelIndex(i => {
-            const next = (i + 1) % modelModes.length;
-            draft.setModelMode(modelModes[next]?.key ?? 'default');
-            return next;
-        });
-    }, [modelModes, draft.setModelMode]);
+        if (modelModes.length === 0) return null;
+        const current = resolveModeSelection(modelModes, draft.modelMode, getDefaultModelKey(selectedAgent));
+        const currentIndex = current ? modelModes.findIndex(mode => mode.key === current.key) : -1;
+        const next = modelModes[(currentIndex + 1) % modelModes.length] ?? modelModes[0];
+        draft.setModelMode(next.key);
+        return next;
+    }, [draft.modelMode, draft.setModelMode, modelModes, selectedAgent]);
 
     const cycleEffort = React.useCallback(() => {
-        setEffortIndex(i => {
-            const next = (i + 1) % effortLevels.length;
-            const nextKey = effortLevels[next]?.key;
-            if (nextKey) {
-                draft.setEffortLevel(nextKey);
-            }
-            return next;
-        });
-    }, [effortLevels, draft.setEffortLevel]);
+        if (effortLevels.length === 0) return null;
+        const defaultEffortKey = getDefaultEffortKeyForModel(selectedAgent, currentModelKey, modelModes) ?? effortLevels[0]?.key ?? '';
+        const current = resolveModeSelection(effortLevels, draft.effortLevel, defaultEffortKey);
+        const currentIndex = current ? effortLevels.findIndex(level => level.key === current.key) : -1;
+        const next = effortLevels[(currentIndex + 1) % effortLevels.length] ?? effortLevels[0];
+        draft.setEffortLevel(next.key);
+        return next;
+    }, [currentModelKey, draft.effortLevel, draft.setEffortLevel, effortLevels, modelModes, selectedAgent]);
 
     const getNextAgent = React.useCallback(() => {
         const nextKey = getNextNewSessionAgentKey(availableAgents, selectedAgent);
@@ -696,9 +731,10 @@ function NewSessionScreen() {
 
     const isOffline = selectedMachine ? !isMachineOnline(selectedMachine) : false;
     const agent = availableAgents.find(a => a.key === selectedAgent) ?? ALL_AGENTS[0];
-    const currentPermission = permissionModes[permissionIndex] ?? permissionModes[0];
-    const currentEffort = effortLevels[effortIndex] ?? effortLevels[0];
-    const permissionStyle = currentPermission?.key !== 'default' ? getPermissionStyle(currentPermission.key) : null;
+    const currentPermission = resolveModeSelection(permissionModes, draft.permissionMode, getInitialPermissionModeKey(selectedAgent));
+    const defaultEffortKey = getDefaultEffortKeyForModel(selectedAgent, currentModelKey, modelModes) ?? effortLevels[0]?.key ?? '';
+    const currentEffort = resolveModeSelection(effortLevels, draft.effortLevel, defaultEffortKey);
+    const permissionStyle = currentPermission?.key !== 'default' ? getPermissionStyle(currentPermission?.key ?? 'default') : null;
 
     // Display values
     const machineName = selectedMachine ? getMachineName(selectedMachine) : t('newSession.selectMachine');
@@ -726,8 +762,8 @@ function NewSessionScreen() {
         modelName: currentModel?.name,
         effortName: currentEffort?.name,
         permissionName: currentPermission?.name,
-        credentialLabel: credentialLoadFailed ? t('credentials.title') : credentialLabel,
-        worktreeLabel,
+        credentialLabel: credentialLoadFailed ? `${t('common.unknownError')} · ${t('common.retry')}` : credentialLabel,
+        worktreeLabel: worktreeLoadFailed ? `${t('common.unknownError')} · ${t('common.retry')}` : worktreeLabel,
         showModel,
         showEffort,
         showPermission,
@@ -744,6 +780,7 @@ function NewSessionScreen() {
         currentPermission?.name,
         credentialLoadFailed,
         credentialLabel,
+        worktreeLoadFailed,
         worktreeLabel,
         showModel,
         showEffort,
@@ -863,15 +900,67 @@ function NewSessionScreen() {
             return;
         }
 
+        const generation = sync.getAccountGeneration();
+        if (generation === null) return;
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+
         setIsSpawning(true);
         try {
+            // The draft can outlive a machine change. Revalidate the agent and
+            // all dependent options at the launch boundary so a stale Claude
+            // selection cannot spawn on a Codex-only machine (or carry over
+            // incompatible model/permission values).
+            const launchAgent = resolveNewSessionAgent(
+                selectedAgent,
+                selectedMachine.metadata?.cliAvailability,
+            );
+            const agentChanged = launchAgent !== selectedAgent;
+            const launchPermissionModes = agentChanged
+                ? getHardcodedPermissionModes(launchAgent, t)
+                : permissionModes;
+            const launchModelModes = agentChanged
+                ? launchAgent === 'codex' && codexRuntimeModels
+                    ? codexRuntimeModels
+                    : getHardcodedModelModes(launchAgent, t)
+                : modelModes;
+            const launchPermission = resolveModeSelection(
+                launchPermissionModes,
+                agentChanged ? null : draft.permissionMode,
+                getInitialPermissionModeKey(launchAgent),
+            );
+            const launchModel = resolveModeSelection(
+                launchModelModes,
+                agentChanged ? null : draft.modelMode,
+                getDefaultModelKey(launchAgent),
+            );
+            const launchModelKey = launchModel?.key ?? 'default';
+            const launchEffortLevels = getEffortLevelsForModel(
+                launchAgent,
+                launchModelKey,
+                t,
+                launchModelModes,
+            );
+            const launchDefaultEffortKey = getDefaultEffortKeyForModel(
+                launchAgent,
+                launchModelKey,
+                launchModelModes,
+            ) ?? launchEffortLevels[0]?.key ?? '';
+            const launchEffort = resolveModeSelection(
+                launchEffortLevels,
+                agentChanged ? null : draft.effortLevel,
+                launchDefaultEffortKey,
+            );
             const pathToUse = trimPathInput(selectedPath) || '~';
             const absolutePath = resolveAbsolutePath(pathToUse, selectedMachine.metadata?.homeDir);
 
             // Handle worktree selection
             let spawnDirectory = absolutePath;
             if (worktreeKey === '__new__') {
-                const worktreeResult = await createWorktree(selectedMachineId, absolutePath);
+                const worktreeResult = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => createWorktree(selectedMachineId, absolutePath),
+                });
+                if (worktreeResult === null) return;
                 if (!worktreeResult.success) {
                     Modal.alert(t('common.error'), worktreeResult.error || t('newSession.failedToCreateWorktree'));
                     return;
@@ -883,37 +972,66 @@ function NewSessionScreen() {
             }
 
             // Persist last used settings
+            if (!isCurrent()) return;
             sync.applySettings({
-                lastUsedAgent: selectedAgent,
-                lastUsedPermissionMode: currentPermission.key,
-                lastUsedModelMode: currentModelKey,
+                lastUsedAgent: launchAgent,
+                lastUsedPermissionMode: launchPermission?.key ?? 'default',
+                lastUsedModelMode: launchModelKey,
             });
 
             // Resolve credential env vars if selected
             let credentialEnvVars: Record<string, string> | undefined;
-            if (selectedCredentialId && auth.credentials) {
-                credentialEnvVars = await getCredentialEnvVars(auth.credentials, selectedCredentialId, { machineId: selectedMachineId });
+            const launchCredentialId = agentChanged ? null : selectedCredentialId;
+            const credentials = auth.credentials;
+            if (launchCredentialId && credentials) {
+                const resolvedCredentialEnvVars = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => getCredentialEnvVars(credentials, launchCredentialId, { machineId: selectedMachineId }),
+                });
+                if (resolvedCredentialEnvVars === null) return;
+                credentialEnvVars = resolvedCredentialEnvVars;
             }
 
-            const result = await machineSpawnNewSession({
-                machineId: selectedMachineId,
-                directory: spawnDirectory,
-                approvedNewDirectoryCreation,
-                agent: selectedAgent,
-                permissionMode: selectedAgent === 'codex' ? currentPermission.key : undefined,
-                model: selectedAgent === 'codex' && currentModelKey !== 'default' ? currentModelKey : undefined,
-                environmentVariables: credentialEnvVars,
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => machineSpawnNewSession({
+                    machineId: selectedMachineId,
+                    directory: spawnDirectory,
+                    approvedNewDirectoryCreation,
+                    agent: launchAgent,
+                    permissionMode: launchAgent === 'codex' ? (launchPermission?.key ?? 'default') : undefined,
+                    model: launchAgent === 'codex' && launchModelKey !== 'default' ? launchModelKey : undefined,
+                    environmentVariables: credentialEnvVars,
+                }),
             });
+            if (result === null) return;
 
             switch (result.type) {
                 case 'success':
-                    await sync.refreshSessions();
+                    if (!isCurrent()) return;
+                    {
+                        const projectKey = buildProjectKey(selectedMachineId, spawnDirectory);
+                        const currentCustomizations = storage.getState().settings.projectCustomizations;
+                        const restoredCustomizations = restoreProjectCustomizationForExplicitSession(
+                            currentCustomizations,
+                            projectKey,
+                        );
+                        if (restoredCustomizations !== currentCustomizations) {
+                            sync.applySettings({ projectCustomizations: restoredCustomizations });
+                        }
+                    }
+                    const refreshed = await runSessionActionRequest({
+                        isCurrent,
+                        request: () => sync.refreshSessions(),
+                    });
+                    if (refreshed === null) return;
 
                     // Set permission mode and model on the session before sending
-                    storage.getState().updateSessionPermissionMode(result.sessionId, currentPermission.key);
-                    storage.getState().updateSessionModelMode(result.sessionId, currentModelKey);
-                    if (currentEffort?.key) {
-                        storage.getState().updateSessionEffortLevel(result.sessionId, currentEffort.key);
+                    if (!isCurrent()) return;
+                    storage.getState().updateSessionPermissionMode(result.sessionId, launchPermission?.key ?? 'default');
+                    storage.getState().updateSessionModelMode(result.sessionId, launchModelKey);
+                    if (launchEffort?.key) {
+                        storage.getState().updateSessionEffortLevel(result.sessionId, launchEffort.key);
                     }
 
                     // Clear input text so draft doesn't repeat the sent message
@@ -924,6 +1042,7 @@ function NewSessionScreen() {
                         await sync.sendMessage(result.sessionId, prompt.trim(), { source: 'new_session' });
                     }
 
+                    if (!isCurrent()) return;
                     router.back();
                     navigateToSession(result.sessionId);
                     break;
@@ -933,28 +1052,76 @@ function NewSessionScreen() {
                         t('newSession.createDirectoryMessage', { path: result.directory }),
                         { cancelText: t('common.cancel'), confirmText: t('common.create') },
                     );
-                    if (approved) {
+                    if (approved && isCurrent()) {
                         await handleSend(true);
                     }
                     break;
                 }
                 case 'error':
-                    Modal.alert(t('common.error'), result.errorMessage);
+                    if (isCurrent()) Modal.alert(t('common.error'), result.errorMessage);
                     break;
             }
         } catch (error) {
             const errorMessage = error instanceof Error
                 ? error.message
                 : t('newSession.failedToStartSession');
-            Modal.alert(t('common.error'), errorMessage);
+            if (isCurrent()) Modal.alert(t('common.error'), errorMessage);
         } finally {
-            setIsSpawning(false);
+            if (isCurrent()) setIsSpawning(false);
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, prompt, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, worktreeKey, selectedCredentialId, auth.credentials]);
+    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, prompt, router, navigateToSession, permissionModes, modelModes, codexRuntimeModels, draft.permissionMode, draft.modelMode, draft.effortLevel, worktreeKey, selectedCredentialId, auth.credentials]);
 
     const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
 
     const renderConfigItem = React.useCallback((item: NewSessionConfigItem, compact = false) => {
+        if (item.key === 'credential' && credentialLoadFailed) {
+            return (
+                <NewSessionSetupCard
+                    key={item.key}
+                    item={item}
+                    compact={compact}
+                    onPress={() => handleConfigItemPress(item.key)}
+                >
+                    <View style={styles.setupChipRow}>
+                        <Text style={[styles.setupCardValue, { color: theme.colors.status.disconnected, flex: 1 }]} numberOfLines={1}>
+                            {t('common.unknownError')}
+                        </Text>
+                        <Pressable
+                            {...getAccessibleActionProps(t('common.retry'))}
+                            onPress={() => { void loadCredentials(); }}
+                            style={({ pressed }) => [styles.setupChip, pressed && styles.configRowPressed]}
+                        >
+                            <Ionicons name="refresh" size={14} color={theme.colors.accent} />
+                        </Pressable>
+                    </View>
+                </NewSessionSetupCard>
+            );
+        }
+
+        if (item.key === 'worktree' && worktreeLoadFailed) {
+            return (
+                <NewSessionSetupCard
+                    key={item.key}
+                    item={item}
+                    compact={compact}
+                    onPress={() => handleConfigItemPress(item.key)}
+                >
+                    <View style={styles.setupChipRow}>
+                        <Text style={[styles.setupCardValue, { color: theme.colors.status.disconnected, flex: 1 }]} numberOfLines={1}>
+                            {t('common.unknownError')}
+                        </Text>
+                        <Pressable
+                            {...getAccessibleActionProps(t('common.retry'))}
+                            onPress={() => setWorktreeRefreshKey((value) => value + 1)}
+                            style={({ pressed }) => [styles.setupChip, pressed && styles.configRowPressed]}
+                        >
+                            <Ionicons name="refresh" size={14} color={theme.colors.accent} />
+                        </Pressable>
+                    </View>
+                </NewSessionSetupCard>
+            );
+        }
+
         if (item.key === 'agent') {
             return (
                 <NewSessionSetupCard key={item.key} item={item} compact={compact}>
@@ -1047,21 +1214,35 @@ function NewSessionScreen() {
         cycleAgent,
         cycleEffort,
         cycleModel,
+        credentialLoadFailed,
         handleConfigItemPress,
+        loadCredentials,
         showEffort,
         showModel,
         selectedAgent,
         theme.colors.accent,
         theme.colors.text,
+        theme.colors.status.disconnected,
+        setWorktreeRefreshKey,
+        worktreeLoadFailed,
     ]);
 
     const renderAdvancedPill = React.useCallback((item: NewSessionConfigItem) => {
         const iconName = NEW_SESSION_ITEM_ICONS[item.key];
+        const retry = item.key === 'credential' && credentialLoadFailed
+            ? () => { void loadCredentials(); }
+            : item.key === 'worktree' && worktreeLoadFailed
+                ? () => setWorktreeRefreshKey((value) => value + 1)
+                : null;
         return (
             <Pressable
                 key={item.key}
                 {...getAccessibleActionProps(`${item.title}: ${item.value}`)}
                 onPress={() => {
+                    if (retry) {
+                        retry();
+                        return;
+                    }
                     if (!showAdvancedSettings) {
                         setShowAdvancedSettings(true);
                         return;
@@ -1079,7 +1260,7 @@ function NewSessionScreen() {
                 </Text>
             </Pressable>
         );
-    }, [handleConfigItemPress, showAdvancedSettings, theme.colors.accent, theme.colors.text]);
+    }, [credentialLoadFailed, handleConfigItemPress, loadCredentials, setWorktreeRefreshKey, showAdvancedSettings, theme.colors.accent, theme.colors.text, worktreeLoadFailed]);
 
     // Handle Enter/Cmd+Enter to send on web
     const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
@@ -1309,11 +1490,11 @@ function NewSessionScreen() {
                                     {/* Permission */}
                                     {showPermission && (
                                         <Pressable
-                                            onPress={() => { cyclePermission(); showFlash(permissionModes[(permissionIndex + 1) % permissionModes.length]?.name ?? 'default'); }}
+                                            onPress={() => { showFlash(cyclePermission()?.name ?? 'default'); }}
                                             hitSlop={{ top: s(4), bottom: s(4), left: s(4), right: s(4) }}
                                             style={(p) => [styles.collapsedIconButton, { borderRadius: s(8) }, p.pressed && styles.configRowPressed]}
                                             accessibilityRole="button"
-                                            accessibilityLabel={t('newSession.switchPermissionAccessibility', { mode: currentPermission.name })}
+                                            accessibilityLabel={t('newSession.switchPermissionAccessibility', { mode: currentPermission?.name ?? 'default' })}
                                         >
                                             <Ionicons
                                                 name={permissionStyle?.icon ?? 'shield-outline'}
@@ -1407,11 +1588,8 @@ function NewSessionScreen() {
                             styles.creationStatus,
                             {
                                 gap: s(10),
-                                borderRadius: s(14),
                                 paddingHorizontal: s(12),
                                 paddingVertical: s(10),
-                                backgroundColor: theme.dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.82)',
-                                borderColor: theme.dark ? 'rgba(238, 248, 250, 0.12)' : 'rgba(28, 35, 38, 0.08)',
                             },
                         ]}>
                             <ActivityIndicator size="small" color={theme.colors.accent} />
@@ -1870,12 +2048,6 @@ const styles = StyleSheet.create((theme) => ({
     creationStatus: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
     },
     creationStatusText: {
         flex: 1,

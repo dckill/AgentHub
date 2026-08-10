@@ -222,6 +222,9 @@ function PickerContent({
                 key={item.key}
                 style={(p) => [pickerStyles.option, p.pressed && pickerStyles.optionPressed]}
                 onPress={() => onSelect(item.key)}
+                accessibilityRole="radio"
+                accessibilityLabel={item.label}
+                accessibilityState={{ selected: isSelected }}
             >
                 <Octicons
                     name={isSelected ? 'check-circle-fill' : 'circle'}
@@ -247,6 +250,7 @@ function PickerContent({
                     style={[pickerStyles.searchInput, { color: theme.colors.text }]}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    accessibilityLabel={searchPlaceholder ?? 'search...'}
                 />
             </View>
 
@@ -440,6 +444,8 @@ function SessionComposerDemo() {
                                 <Pressable
                                     style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
                                     onPress={() => togglePicker('machine')}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={machineName}
                                 >
                                     <Ionicons name="desktop-outline" size={15} color={theme.colors.textSecondary} />
                                     <Text style={styles.configLabel} numberOfLines={1}>
@@ -451,6 +457,8 @@ function SessionComposerDemo() {
                                 <Pressable
                                     style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
                                     onPress={() => togglePicker('path')}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={pathName}
                                 >
                                     <Ionicons name="folder-outline" size={15} color={theme.colors.textSecondary} />
                                     <Text style={styles.configLabel} numberOfLines={1}>
@@ -463,6 +471,8 @@ function SessionComposerDemo() {
                                     <Pressable
                                         onPress={cycleAgent}
                                         style={(p) => [{ flexDirection: 'row', alignItems: 'center', gap: 8 }, p.pressed && styles.configRowPressed]}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={agent.label}
                                     >
                                         <Image
                                             source={agentIcons[agent.key]}
@@ -478,7 +488,12 @@ function SessionComposerDemo() {
                                     {showModel && (
                                         <>
                                             <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                            <Pressable onPress={cycleModel} style={(p) => [p.pressed && styles.configRowPressed]}>
+                                            <Pressable
+                                                onPress={cycleModel}
+                                                style={(p) => [p.pressed && styles.configRowPressed]}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={currentModel.name}
+                                            >
                                                 <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                                                     {currentModel.name}
                                                 </Text>
@@ -489,7 +504,12 @@ function SessionComposerDemo() {
                                     {showEffort && (
                                         <>
                                             <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                            <Pressable onPress={cycleEffort} style={(p) => [p.pressed && styles.configRowPressed]}>
+                                            <Pressable
+                                                onPress={cycleEffort}
+                                                style={(p) => [p.pressed && styles.configRowPressed]}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={currentEffort?.name ?? ''}
+                                            >
                                                 <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                                                     {currentEffort?.name}
                                                 </Text>
@@ -503,6 +523,8 @@ function SessionComposerDemo() {
                                     <Pressable
                                         style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
                                         onPress={cyclePermission}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={currentPermission?.name ?? ''}
                                     >
                                         <Ionicons
                                             name={permissionStyle?.icon ?? 'shield-outline'}
@@ -520,6 +542,8 @@ function SessionComposerDemo() {
                                     <Pressable
                                         style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
                                         onPress={() => togglePicker('worktree')}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={worktreeLabel}
                                     >
                                         <MaterialCommunityIcons name="tree" size={15} color={theme.colors.textSecondary} />
                                         <Text style={styles.configLabel} numberOfLines={1}>
@@ -533,6 +557,9 @@ function SessionComposerDemo() {
                             <Pressable
                                 style={(p) => [styles.collapsedRow, p.pressed && styles.configRowPressed]}
                                 onPress={toggleConfig}
+                                accessibilityRole="button"
+                                accessibilityLabel={pathName}
+                                accessibilityState={{ expanded: isConfigExpanded }}
                             >
                                 <Ionicons name="folder-outline" size={15} color={theme.colors.textSecondary} />
                                 <Text style={[styles.configLabel, { flex: 1 }]} numberOfLines={1}>
@@ -556,6 +583,7 @@ function SessionComposerDemo() {
                     <Pressable
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
                         onPress={() => setActivePicker(null)}
+                        accessible={false}
                     />
                 )}
 
@@ -591,6 +619,9 @@ function SessionComposerDemo() {
                                     })}
                                     disabled={!hasText}
                                     onPress={() => {}}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={hasText ? 'Send' : 'Send unavailable'}
+                                    accessibilityState={{ disabled: !hasText }}
                                 >
                                     <Octicons
                                         name="arrow-up"

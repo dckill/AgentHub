@@ -23,6 +23,8 @@ interface MachineCacheEntry {
 export class ActivityCache {
     private sessionCache = new Map<string, SessionCacheEntry>();
     private machineCache = new Map<string, MachineCacheEntry>();
+    /** Sessions whose stop/archive/delete window must reject in-flight heartbeats. */
+    private stoppedSessions = new Map<string, number>();
     private batchTimer: ReturnType<typeof setInterval> | null = null;
     
     // Cache TTL (30 seconds)
@@ -33,6 +35,13 @@ export class ActivityCache {
     
     // Batch update interval (5 seconds)
     private readonly BATCH_INTERVAL = 5 * 1000;
+
+    // Longer than CACHE_TTL + BATCH_INTERVAL so queued/in-flight heartbeats
+    // cannot revalidate a session after an explicit stop.
+    private readonly STOPPED_TTL = 60 * 1000;
+
+    /** Prevent a timer tick and graceful shutdown from flushing the same batch concurrently. */
+    private flushPromise: Promise<void> | null = null;
 
     constructor(options: { autoStart?: boolean } = {}) {
         if (options.autoStart ?? true) {
@@ -54,6 +63,10 @@ export class ActivityCache {
 
     async isSessionValid(sessionId: string, userId: string): Promise<boolean> {
         const now = Date.now();
+        if (this.isSessionStopped(sessionId, now)) {
+            sessionCacheCounter.inc({ operation: 'session_validation', result: 'stopped' });
+            return false;
+        }
         const cached = this.sessionCache.get(sessionId);
         
         // Check cache first
@@ -71,6 +84,12 @@ export class ActivityCache {
             });
 
             if (session?.active === true) {
+                // The stop/archive/delete may have started while the DB read was
+                // in flight. Do not repopulate the cache from that stale result.
+                if (this.isSessionStopped(sessionId, Date.now())) {
+                    sessionCacheCounter.inc({ operation: 'session_validation', result: 'stopped' });
+                    return false;
+                }
                 // Cache the result
                 this.sessionCache.set(sessionId, {
                     validUntil: now + this.CACHE_TTL,
@@ -147,7 +166,36 @@ export class ActivityCache {
         return true;
     }
 
+    /**
+     * Stop accepting session heartbeats before an archive/delete write begins.
+     * This closes the race where a heartbeat validation started before the write
+     * finishes and would otherwise re-cache the session or queue active=true.
+     */
+    clearSessionUpdates(sessionId: string): void {
+        this.sessionCache.delete(sessionId);
+        this.stoppedSessions.set(sessionId, Date.now() + this.STOPPED_TTL);
+    }
+
+    /** Allow heartbeats again when an existing session is legitimately restarted. */
+    resumeSessionUpdates(sessionId: string): void {
+        this.stoppedSessions.delete(sessionId);
+    }
+
+    private isSessionStopped(sessionId: string, now: number): boolean {
+        const stoppedUntil = this.stoppedSessions.get(sessionId);
+        if (stoppedUntil === undefined) return false;
+        if (stoppedUntil <= now) {
+            this.stoppedSessions.delete(sessionId);
+            return false;
+        }
+        return true;
+    }
+
     queueSessionUpdate(sessionId: string, timestamp: number, thinking: boolean = false): boolean {
+        if (this.isSessionStopped(sessionId, Date.now())) {
+            databaseUpdatesSkippedCounter.inc({ type: 'session' });
+            return false;
+        }
         const cached = this.sessionCache.get(sessionId);
         if (!cached) {
             return false; // Should validate first
@@ -191,47 +239,58 @@ export class ActivityCache {
     }
 
     async flushPendingUpdates(): Promise<void> {
-        const sessionUpdates: { id: string, timestamp: number, thinking: boolean | null, thinkingAt: number | null }[] = [];
-        const machineUpdates: { id: string, timestamp: number, userId: string }[] = [];
+        if (this.flushPromise) {
+            return this.flushPromise;
+        }
+
+        this.flushPromise = this.flushPendingUpdatesInternal();
+        try {
+            await this.flushPromise;
+        } finally {
+            this.flushPromise = null;
+        }
+    }
+
+    private async flushPendingUpdatesInternal(): Promise<void> {
+        const sessionUpdates: {
+            id: string;
+            timestamp: number;
+            thinking: boolean | null;
+            thinkingAt: number | null;
+            entry: SessionCacheEntry;
+        }[] = [];
+        const machineUpdates: { id: string; timestamp: number; userId: string; entry: MachineCacheEntry }[] = [];
         
         // Collect session updates
         for (const [sessionId, entry] of this.sessionCache.entries()) {
-            if (entry.pendingUpdate) {
+            if (entry.pendingUpdate !== null) {
                 sessionUpdates.push({
                     id: sessionId,
                     timestamp: entry.pendingUpdate,
                     thinking: entry.pendingThinking,
-                    thinkingAt: entry.pendingThinkingAt
+                    thinkingAt: entry.pendingThinkingAt,
+                    entry,
                 });
-                entry.lastUpdateSent = entry.pendingUpdate;
-                if (entry.pendingThinking !== null) {
-                    entry.thinking = entry.pendingThinking;
-                    entry.thinkingAt = entry.pendingThinkingAt;
-                }
-                entry.pendingUpdate = null;
-                entry.pendingThinking = null;
-                entry.pendingThinkingAt = null;
             }
         }
         
         // Collect machine updates
         for (const [machineId, entry] of this.machineCache.entries()) {
-            if (entry.pendingUpdate) {
+            if (entry.pendingUpdate !== null) {
                 machineUpdates.push({ 
                     id: machineId, 
-                    timestamp: entry.pendingUpdate, 
-                    userId: entry.userId 
+                    timestamp: entry.pendingUpdate,
+                    userId: entry.userId,
+                    entry,
                 });
-                entry.lastUpdateSent = entry.pendingUpdate;
-                entry.pendingUpdate = null;
             }
         }
         
         // Batch update sessions
         if (sessionUpdates.length > 0) {
-            try {
-                await Promise.all(sessionUpdates.map(update =>
-                    db.session.updateMany({
+            const flushed = await Promise.all(sessionUpdates.map(async update => {
+                try {
+                    await db.session.updateMany({
                         // A heartbeat must never resurrect a row archived after
                         // it was queued but before this batch flushed.
                         where: { id: update.id, active: true },
@@ -243,20 +302,43 @@ export class ActivityCache {
                                 thinkingAt: update.thinkingAt !== null ? new Date(update.thinkingAt) : null
                             } : {})
                         }
-                    })
-                ));
-                
-                log({ module: 'session-cache' }, `Flushed ${sessionUpdates.length} session updates`);
-            } catch (error) {
-                log({ module: 'session-cache', level: 'error' }, `Error updating sessions: ${error}`);
+                    });
+
+                    // Only acknowledge the entry after the database write succeeds.
+                    // If a newer heartbeat arrived while awaiting the database, leave
+                    // that newer pending value untouched for the next batch.
+                    const current = this.sessionCache.get(update.id);
+                    if (current === update.entry &&
+                        current.pendingUpdate === update.timestamp &&
+                        current.pendingThinking === update.thinking &&
+                        current.pendingThinkingAt === update.thinkingAt) {
+                        current.lastUpdateSent = update.timestamp;
+                        if (update.thinking !== null) {
+                            current.thinking = update.thinking;
+                            current.thinkingAt = update.thinkingAt;
+                        }
+                        current.pendingUpdate = null;
+                        current.pendingThinking = null;
+                        current.pendingThinkingAt = null;
+                    }
+                    return true;
+                } catch (error) {
+                    log({ module: 'session-cache', level: 'error' }, `Error updating session ${update.id}: ${error}`);
+                    return false;
+                }
+            }));
+
+            const successCount = flushed.filter(Boolean).length;
+            if (successCount > 0) {
+                log({ module: 'session-cache' }, `Flushed ${successCount} session updates`);
             }
         }
         
         // Batch update machines
         if (machineUpdates.length > 0) {
-            try {
-                await Promise.all(machineUpdates.map(update =>
-                    db.machine.update({
+            const flushed = await Promise.all(machineUpdates.map(async update => {
+                try {
+                    await db.machine.update({
                         where: {
                             accountId_id: {
                                 accountId: update.userId,
@@ -264,12 +346,23 @@ export class ActivityCache {
                             }
                         },
                         data: { lastActiveAt: new Date(update.timestamp) }
-                    })
-                ));
-                
-                log({ module: 'session-cache' }, `Flushed ${machineUpdates.length} machine updates`);
-            } catch (error) {
-                log({ module: 'session-cache', level: 'error' }, `Error updating machines: ${error}`);
+                    });
+
+                    const current = this.machineCache.get(update.id);
+                    if (current === update.entry && current.pendingUpdate === update.timestamp) {
+                        current.lastUpdateSent = update.timestamp;
+                        current.pendingUpdate = null;
+                    }
+                    return true;
+                } catch (error) {
+                    log({ module: 'session-cache', level: 'error' }, `Error updating machine ${update.id}: ${error}`);
+                    return false;
+                }
+            }));
+
+            const successCount = flushed.filter(Boolean).length;
+            if (successCount > 0) {
+                log({ module: 'session-cache' }, `Flushed ${successCount} machine updates`);
             }
         }
     }
@@ -289,18 +382,25 @@ export class ActivityCache {
                 this.machineCache.delete(machineId);
             }
         }
+
+        for (const [sessionId, stoppedUntil] of this.stoppedSessions.entries()) {
+            if (stoppedUntil <= now) this.stoppedSessions.delete(sessionId);
+        }
     }
 
-    shutdown(): void {
+    async shutdown(): Promise<void> {
         if (this.batchTimer) {
             clearInterval(this.batchTimer);
             this.batchTimer = null;
         }
         
         // Flush any remaining updates
-        this.flushPendingUpdates().catch(error => {
+        try {
+            await this.flushPendingUpdates();
+        } catch (error) {
             log({ module: 'session-cache', level: 'error' }, `Error flushing final updates: ${error}`);
-        });
+        }
+        this.stoppedSessions.clear();
     }
 }
 

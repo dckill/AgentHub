@@ -17,6 +17,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { encodeSessionFileRoutePath } from '@/utils/sessionFileLinks';
 import { useFileListScale } from '@/hooks/useScale';
+import { sync } from '@/sync/sync';
 
 interface FilesSidebarProps {
     sessionId: string;
@@ -153,9 +154,14 @@ export const FilesSidebar = React.memo<FilesSidebarProps>(({ sessionId, selected
 
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled
+            && generation !== null
+            && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         (async () => {
             const result = await getGitStatusFiles(sessionId);
-            if (!cancelled && result) {
+            if (isCurrent() && result) {
                 storage.getState().applyGitStatusFiles(sessionId, result);
             }
         })();
@@ -211,7 +217,14 @@ export const FilesSidebar = React.memo<FilesSidebarProps>(({ sessionId, selected
             <View style={[styles.header, { paddingHorizontal: s(16), paddingTop: s(14), paddingBottom: s(8) }]}>
                 <Text style={[styles.headerTitle, { fontSize: s(14) }]} numberOfLines={1}>{t('files.changes')}</Text>
                 {hasFiles ? (
-                    <Pressable onPress={toggleAll} hitSlop={8} style={styles.headerCountWrap}>
+                    <Pressable
+                        onPress={toggleAll}
+                        hitSlop={8}
+                        style={styles.headerCountWrap}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('files.changes')}
+                        accessibilityState={{ expanded: !allCollapsed }}
+                    >
                         <Text style={[styles.headerCount, { fontSize: s(13) }]}>{totalCount}</Text>
                         <AnimatedChevron collapsed={allCollapsed} color={theme.colors.textSecondary} size={s(14)} />
                     </Pressable>
@@ -230,6 +243,7 @@ export const FilesSidebar = React.memo<FilesSidebarProps>(({ sessionId, selected
                         autoCapitalize="none"
                         autoCorrect={false}
                         spellCheck={false}
+                        accessibilityLabel={t('files.searchPlaceholder')}
                     />
                 </View>
             ) : null}
@@ -291,6 +305,9 @@ const TreeNodeRow = React.memo(function TreeNodeRow({ node, depth, selectedPath,
                 <Pressable
                     onPress={() => onToggleDir(node.path)}
                     style={({ pressed }) => [styles.row, { paddingLeft: leftPad, paddingRight: s(12), paddingVertical: s(6), borderRadius: s(7), gap: s(8), minHeight: s(40) }, pressed && styles.rowPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={node.name}
+                    accessibilityState={{ expanded: !isCollapsed }}
                 >
                     <View style={[styles.chevron, { width: s(14) }]}>
                         <AnimatedChevron collapsed={isCollapsed} color={theme.colors.textSecondary} size={s(13)} />
@@ -328,6 +345,9 @@ const TreeNodeRow = React.memo(function TreeNodeRow({ node, depth, selectedPath,
                 isSelected && !isDeleted && styles.rowSelected,
                 isDeleted && styles.rowDeleted,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={node.name}
+            accessibilityState={{ selected: isSelected, disabled: isDeleted }}
         >
             {/* Gutter where chevron sits for dir rows — keeps file names aligned with folder labels. */}
             <View style={[styles.chevronGutter, { width: s(14) }]} />

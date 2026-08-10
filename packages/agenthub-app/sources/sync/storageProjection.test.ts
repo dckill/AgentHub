@@ -130,6 +130,21 @@ describe('storageProjection', () => {
         expect(items.some(item => item.type === 'session' && item.session.id === 'archived')).toBe(true);
     });
 
+    it('keeps side chats out of the top-level session and project lists', () => {
+        const sessions = {
+            parent: session({ id: 'parent', active: true, metadata: { machineId: 'm1', path: '/repo' } }),
+            side: session({ id: 'side', active: true, metadata: { machineId: 'm1', path: '/repo', parentSessionId: 'parent', isSideChat: true } }),
+        } as any;
+
+        const sessionItems = buildSessionListViewData(sessions, false);
+        expect(JSON.stringify(sessionItems)).toContain('parent');
+        expect(JSON.stringify(sessionItems)).not.toContain('side');
+
+        const projectItems = buildProjectListViewData(sessions, { m1: { metadata: { displayName: 'Laptop' } } } as any, {}, () => null, false);
+        expect(JSON.stringify(projectItems)).toContain('parent');
+        expect(JSON.stringify(projectItems)).not.toContain('side');
+    });
+
     it('hides archived sessions when requested', () => {
         const items = buildSessionListViewData({
             active: session({ id: 'active', active: true }),
@@ -267,7 +282,7 @@ describe('storageProjection', () => {
         expect(items).toEqual([]);
     });
 
-    it('keeps hidden projects visible when a new active AgentHub session appears', () => {
+    it('keeps hidden projects out of the workbench when a session reconnects', () => {
         const items = buildProjectListViewData(
             {
                 active: session({
@@ -283,21 +298,7 @@ describe('storageProjection', () => {
             false,
         );
 
-        expect(items).toEqual([
-            {
-                type: 'machine-separator',
-                machineId: 'm1',
-                machineName: 'Laptop',
-            },
-            {
-                type: 'project-group',
-                project: expect.objectContaining({
-                    key: 'm1:/home/me/repo',
-                    archived: true,
-                    activeSessions: [expect.objectContaining({ id: 'active' })],
-                }),
-            },
-        ]);
+        expect(items).toEqual([]);
     });
 
     it('does not let archived AgentHub Codex mirrors hide active official threads', () => {

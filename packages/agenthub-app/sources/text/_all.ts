@@ -3,30 +3,15 @@
  * This file contains all supported languages, their metadata, and configuration
  * 
  * When adding a new language:
- * 1. Add the language code to the SupportedLanguage type
- * 2. Add the language metadata to SUPPORTED_LANGUAGES
- * 3. Create a new translation file in translations/[code].ts
- * 4. Import and add the translation to the translations object in index.ts
+ * 1. Add the language metadata below (the SupportedLanguage type and code arrays derive from it)
+ * 2. Create a new translation file in translations/[code].ts
+ * 3. Wire the module into the Native map and Web dynamic-import switch
  */
-
-/**
- * Supported language codes
- */
-export type SupportedLanguage = 'en' | 'ru' | 'pl' | 'es' | 'it' | 'pt' | 'ca' | 'zh-Hans' | 'zh-Hant' | 'ja';
-
-/**
- * Language metadata interface
- */
-export interface LanguageInfo {
-    code: SupportedLanguage;
-    nativeName: string;
-    englishName: string;
-}
 
 /**
  * All supported languages with their native and English names
  */
-export const SUPPORTED_LANGUAGES: Record<SupportedLanguage, LanguageInfo> = {
+const LANGUAGE_DEFINITIONS = {
     en: {
         code: 'en',
         nativeName: 'English',
@@ -79,6 +64,18 @@ export const SUPPORTED_LANGUAGES: Record<SupportedLanguage, LanguageInfo> = {
     }
 } as const;
 
+/** Supported language codes, derived from the single metadata registry. */
+export type SupportedLanguage = keyof typeof LANGUAGE_DEFINITIONS;
+
+/** Language metadata interface. */
+export interface LanguageInfo {
+    code: SupportedLanguage;
+    nativeName: string;
+    englishName: string;
+}
+
+export const SUPPORTED_LANGUAGES: Record<SupportedLanguage, LanguageInfo> = LANGUAGE_DEFINITIONS;
+
 /**
  * Helper to get language native name by code
  */
@@ -101,4 +98,11 @@ export const SUPPORTED_LANGUAGE_CODES: SupportedLanguage[] = Object.keys(SUPPORT
 /**
  * Default language code
  */
-export const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
+export const DEFAULT_LANGUAGE = 'en' satisfies SupportedLanguage;
+
+/** Non-default languages that require a translation module. */
+export type TranslationLanguage = Exclude<SupportedLanguage, typeof DEFAULT_LANGUAGE>;
+
+export const SUPPORTED_TRANSLATION_LANGUAGE_CODES: TranslationLanguage[] = SUPPORTED_LANGUAGE_CODES.filter(
+    (code): code is TranslationLanguage => code !== DEFAULT_LANGUAGE,
+);

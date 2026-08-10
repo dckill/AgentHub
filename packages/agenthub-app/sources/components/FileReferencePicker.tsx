@@ -18,6 +18,7 @@ import { t } from '@/text';
 import { FileIcon } from '@/components/FileIcon';
 import { FolderIcon } from '@/components/FolderIcon';
 import { useFileListScale } from '@/hooks/useScale';
+import { sync } from '@/sync/sync';
 
 interface FileReferencePickerProps {
     sessionId: string;
@@ -39,39 +40,67 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
     const [localSelected, setLocalSelected] = React.useState<Set<string>>(() => new Set(selectedPaths));
     const [currentPath, setCurrentPath] = React.useState('');
     const searchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchRequestIdRef = React.useRef(0);
 
     // Load initial file list
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled
+            && generation !== null
+            && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         (async () => {
             try {
                 const allFiles = await loadAllFiles(sessionId);
-                if (!cancelled) {
+                if (isCurrent()) {
                     setResults(allFiles);
                     setLoading(false);
                 }
             } catch {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setLoading(false);
                 }
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            searchRequestIdRef.current += 1;
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+                searchTimeoutRef.current = null;
+            }
+        };
     }, [sessionId]);
 
     // Debounced search
     const handleSearchChange = React.useCallback((text: string) => {
         setSearchQuery(text);
+        const generation = sync.getAccountGeneration();
+        const requestId = ++searchRequestIdRef.current;
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
         }
+        if (generation === null) return;
         searchTimeoutRef.current = setTimeout(async () => {
-            if (text.trim() === '') {
-                const allFiles = await loadAllFiles(sessionId);
-                setResults(allFiles);
-            } else {
-                const searchResults = await searchFiles(sessionId, text, { limit: 200 });
-                setResults(searchResults);
+            const isCurrent = () => generation !== null
+                && sync.getAccountGeneration() === generation
+                && requestId === searchRequestIdRef.current;
+            try {
+                const nextResults = text.trim() === ''
+                    ? await loadAllFiles(sessionId)
+                    : await searchFiles(sessionId, text, { limit: 200 });
+                if (isCurrent()) {
+                    setResults(nextResults);
+                }
+            } catch {
+                // Search is best-effort; stale or failed requests must not
+                // surface an unhandled rejection or mutate the current list.
+            } finally {
+                if (isCurrent()) {
+                    searchTimeoutRef.current = null;
+                }
             }
         }, 200);
     }, [sessionId]);
@@ -163,6 +192,9 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                     isSelected && styles.itemRowSelected,
                     p.pressed && { opacity: 0.7 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={item.fullPath}
+                accessibilityState={{ selected: isSelected }}
             >
                 <View style={[styles.checkbox, { width: s(18), height: s(18), borderRadius: s(5) }, isSelected && styles.checkboxSelected]}>
                     {isSelected && <Ionicons name="checkmark" size={s(13)} color="#fff" />}
@@ -187,6 +219,8 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                         onPress={() => navigateToFolder(item.fullPath)}
                         hitSlop={12}
                         style={(p) => [styles.chevronButton, { width: s(30), height: s(30) }, p.pressed && { opacity: 0.5 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.fullPath}
                     >
                         <Ionicons name="chevron-forward" size={s(18)} color={theme.colors.textSecondary} />
                     </Pressable>
@@ -201,6 +235,8 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
             <Pressable
                 onPress={navigateToParent}
                 style={(p) => [styles.itemRow, { paddingHorizontal: s(16), paddingVertical: s(7), gap: s(8), minHeight: s(42) }, p.pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
             >
                 <View style={[styles.parentIcon, { width: s(18), height: s(18) }]}>
                     <Ionicons name="arrow-back" size={s(16)} color={theme.colors.textSecondary} />
@@ -214,7 +250,13 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
         <View style={styles.root}>
             {/* Header */}
             <View style={[styles.header, { paddingHorizontal: s(16), paddingVertical: s(12) }]}>
-                <Pressable onPress={onDismiss} hitSlop={12} style={(p) => [styles.headerButton, { width: s(36), height: s(36) }, p.pressed && { opacity: 0.7 }]}>
+                <Pressable
+                    onPress={onDismiss}
+                    hitSlop={12}
+                    style={(p) => [styles.headerButton, { width: s(36), height: s(36) }, p.pressed && { opacity: 0.7 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.close')}
+                >
                     <Ionicons name="close" size={s(24)} style={styles.headerIcon} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { fontSize: s(17), lineHeight: s(23) }]}>
@@ -235,6 +277,8 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                         },
                         p.pressed && { opacity: 0.7 },
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('fileReferencePicker.selectedCount', { count: localSelected.size })}
                 >
                     <LinearGradient
                         pointerEvents="none"
@@ -265,6 +309,7 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                     autoFocus
                     returnKeyType="done"
                     clearButtonMode="while-editing"
+                    accessibilityLabel={t('fileReferencePicker.searchPlaceholder')}
                 />
             </View>
 
@@ -275,6 +320,8 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                         onPress={() => navigateToBreadcrumb('')}
                         hitSlop={4}
                         style={(p) => [styles.breadcrumbItem, p.pressed && { opacity: 0.7 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.home')}
                     >
                         <Ionicons name="home" size={s(14)} color={theme.colors.textLink} />
                     </Pressable>
@@ -285,6 +332,8 @@ export const FileReferencePicker = React.memo(function FileReferencePicker(props
                                 onPress={() => navigateToBreadcrumb(seg.path)}
                                 hitSlop={4}
                                 style={(p) => [styles.breadcrumbItem, p.pressed && { opacity: 0.7 }]}
+                                accessibilityRole="button"
+                                accessibilityLabel={seg.name}
                             >
                                 <Text
                                     style={[

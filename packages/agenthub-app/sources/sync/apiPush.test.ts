@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./serverConfig', () => ({ getServerUrl: () => 'https://server.example' }));
 vi.mock('./apiSocket', () => ({ getAgentHubClientId: () => 'web/test' }));
+vi.mock('./deviceIdentity', () => ({ getOrCreateDeviceId: () => 'device-test' }));
 
 import { registerPushToken } from './apiPush';
 

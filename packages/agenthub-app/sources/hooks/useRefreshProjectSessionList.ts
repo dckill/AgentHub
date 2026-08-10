@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useAllMachines, useProjectListViewData } from '@/sync/storage';
 import { refreshProjectSessionList } from '@/sync/sessionListRefresh';
+import { sync } from '@/sync/sync';
 
 export function useRefreshProjectSessionList() {
     const projectItems = useProjectListViewData();
@@ -15,10 +16,15 @@ export function useRefreshProjectSessionList() {
 
         const refreshPromise = (async () => {
             setIsRefreshing(true);
+            const generation = sync.getAccountGeneration();
             try {
+                if (generation === null) {
+                    return;
+                }
                 await refreshProjectSessionList({
                     projectItems,
                     machines,
+                    isCurrent: () => sync.getAccountGeneration() === generation,
                 });
             } finally {
                 setIsRefreshing(false);

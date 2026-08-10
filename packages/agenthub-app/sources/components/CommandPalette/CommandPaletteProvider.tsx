@@ -9,13 +9,24 @@ import { useAuth } from '@/auth/AuthContext';
 import { storage } from '@/sync/storage';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
+import { formatShortcut, getPreferredShortcutModifier } from '@/keyboard/shortcuts';
+import { isTauri } from '@/utils/isTauri';
+import { ShortcutHintsProvider } from '@/components/ShortcutHints';
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
-    const { logout } = useAuth();
+    const { logout, isAuthenticated } = useAuth();
     const sessions = storage(useShallow((state) => state.sessions));
     const commandPaletteEnabled = storage(useShallow((state) => state.localSettings.commandPaletteEnabled));
     const navigateToSession = useNavigateToSession();
+    const preferredModifier = useMemo(() => getPreferredShortcutModifier(
+        typeof navigator === 'undefined' ? undefined : navigator,
+    ), []);
+    const browserSafeShortcuts = useMemo(() => Platform.OS === 'web' && !isTauri(), []);
+    const recentSessions = useMemo(() => Object.values(sessions)
+        .filter((session) => session.active !== false && session.metadata?.lifecycleState !== 'archived' && !session.metadata?.isSideChat)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 9), [sessions]);
 
     // Define available commands
     const commands = useMemo((): Command[] => {
@@ -27,7 +38,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
                 subtitle: 'Start a new chat session',
                 icon: 'add-circle-outline',
                 category: 'Sessions',
-                shortcut: '⌘N',
+                shortcut: formatShortcut(preferredModifier, 'N', browserSafeShortcuts),
                 action: () => {
                     router.navigate('/new');
                 }
@@ -48,7 +59,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
                 subtitle: 'Configure your preferences',
                 icon: 'settings-outline',
                 category: 'Navigation',
-                shortcut: '⌘,',
+                shortcut: formatShortcut(preferredModifier, ',', browserSafeShortcuts),
                 action: () => {
                     router.push('/settings');
                 }
@@ -66,10 +77,6 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         ];
 
         // Add session-specific commands
-        const recentSessions = Object.values(sessions)
-            .sort((a, b) => b.updatedAt - a.updatedAt)
-            .slice(0, 5);
-
         recentSessions.forEach(session => {
             const sessionName = session.metadata?.name || `Session ${session.id.slice(0, 6)}`;
             cmds.push({
@@ -78,6 +85,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
                 subtitle: session.metadata?.path || 'Switch to session',
                 icon: 'time-outline',
                 category: 'Recent Sessions',
+                shortcut: formatShortcut(preferredModifier, String(recentSessions.indexOf(session) + 1), browserSafeShortcuts),
                 action: () => {
                     navigateToSession(session.id);
                 }
@@ -111,10 +119,10 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         }
 
         return cmds;
-    }, [router, logout, sessions]);
+    }, [browserSafeShortcuts, logout, navigateToSession, preferredModifier, recentSessions, router]);
 
     const showCommandPalette = useCallback(() => {
-        if (Platform.OS !== 'web' || !commandPaletteEnabled) return;
+        if (Platform.OS !== 'web' || !isAuthenticated || !commandPaletteEnabled) return;
         
         Modal.show({
             component: CommandPalette,
@@ -122,10 +130,29 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
                 commands,
             }
         } as any);
-    }, [commands, commandPaletteEnabled]);
+    }, [commands, commandPaletteEnabled, isAuthenticated]);
 
-    // Set up global keyboard handler only if feature is enabled
-    useGlobalKeyboard(commandPaletteEnabled ? showCommandPalette : () => {});
+    const openRecentSession = useCallback((index: number) => {
+        const session = recentSessions[index];
+        if (!session) return false;
+        navigateToSession(session.id);
+        return true;
+    }, [navigateToSession, recentSessions]);
 
-    return <>{children}</>;
+    const visibleModifier = useGlobalKeyboard({
+        commandPalette: isAuthenticated && commandPaletteEnabled ? showCommandPalette : undefined,
+        newSession: isAuthenticated ? () => router.navigate('/new') : undefined,
+        settings: isAuthenticated ? () => router.push('/settings') : undefined,
+        recentSession: isAuthenticated ? openRecentSession : undefined,
+    }, browserSafeShortcuts);
+
+    return (
+        <ShortcutHintsProvider
+            modifier={isAuthenticated ? visibleModifier : null}
+            commandPaletteEnabled={isAuthenticated && commandPaletteEnabled}
+            browserSafeShortcuts={browserSafeShortcuts}
+        >
+            {children}
+        </ShortcutHintsProvider>
+    );
 }

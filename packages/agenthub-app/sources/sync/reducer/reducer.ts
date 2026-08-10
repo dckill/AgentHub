@@ -127,6 +127,8 @@ type ReducerMessage = {
     event: AgentEvent | null;
     tool: ToolCall | null;
     meta?: MessageMeta;
+    claudeUuid?: string;
+    codexItemId?: string;
 }
 
 type StoredPermission = {
@@ -573,7 +575,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                             message.tool.permission?.status !== completed.status ||
                             message.tool.permission?.reason !== completed.reason ||
                             message.tool.permission?.mode !== completed.mode ||
-                            message.tool.permission?.allowedTools !== completed.allowedTools ||
+                            message.tool.permission?.allowedTools !== (completed.allowTools ?? completed.allowedTools) ||
                             message.tool.permission?.decision !== completed.decision;
 
                         if (!needsUpdate) {
@@ -588,7 +590,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                                 id: permId,
                                 status: completed.status,
                                 mode: completed.mode || undefined,
-                                allowedTools: completed.allowedTools || undefined,
+                                allowedTools: completed.allowTools ?? completed.allowedTools ?? undefined,
                                 decision: completed.decision || undefined,
                                 reason: completed.reason || undefined
                             };
@@ -597,7 +599,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                             // Update all fields
                             message.tool.permission.status = completed.status;
                             message.tool.permission.mode = completed.mode || undefined;
-                            message.tool.permission.allowedTools = completed.allowedTools || undefined;
+                            message.tool.permission.allowedTools = completed.allowTools ?? completed.allowedTools ?? undefined;
                             message.tool.permission.decision = completed.decision || undefined;
                             if (completed.reason) {
                                 message.tool.permission.reason = completed.reason;
@@ -632,7 +634,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                             status: completed.status,
                             reason: completed.reason || undefined,
                             mode: completed.mode || undefined,
-                            allowedTools: completed.allowedTools || undefined,
+                            allowedTools: completed.allowTools ?? completed.allowedTools ?? undefined,
                             decision: completed.decision || undefined
                         });
 
@@ -681,7 +683,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                             status: completed.status,
                             reason: completed.reason || undefined,
                             mode: completed.mode || undefined,
-                            allowedTools: completed.allowedTools || undefined,
+                            allowedTools: completed.allowTools ?? completed.allowedTools ?? undefined,
                             decision: completed.decision || undefined
                         }
                     };
@@ -707,7 +709,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                         status: completed.status,
                         reason: completed.reason || undefined,
                         mode: completed.mode || undefined,
-                        allowedTools: completed.allowedTools || undefined,
+                        allowedTools: completed.allowTools ?? completed.allowedTools ?? undefined,
                         decision: completed.decision || undefined
                     });
 
@@ -743,6 +745,8 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 tool: null,
                 event: null,
                 meta: msg.meta,
+                claudeUuid: msg.claudeUuid,
+                codexItemId: msg.codexItemId,
             });
 
             // Track both localId and messageId
@@ -1262,6 +1266,8 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             ...(reducerMsg.meta?.displayText && { displayText: reducerMsg.meta.displayText }),
             ...(reducerMsg.meta?.fileReferences && reducerMsg.meta.fileReferences.length > 0 && { fileReferences: reducerMsg.meta.fileReferences }),
             ...(reducerMsg.meta?.images && reducerMsg.meta.images.length > 0 && { images: reducerMsg.meta.images }),
+            ...(reducerMsg.claudeUuid && { claudeUuid: reducerMsg.claudeUuid }),
+            ...(reducerMsg.codexItemId && { codexItemId: reducerMsg.codexItemId }),
             meta: reducerMsg.meta
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.text !== null) {

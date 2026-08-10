@@ -1,10 +1,11 @@
 import { io, Socket } from 'socket.io-client';
-import { Platform } from 'react-native';
+import { Platform, type AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
 import { Encryption } from './encryption/encryption';
 import { storage } from './storage';
 import { parseRpcFailure, parseRpcRequest, parseRpcResponse } from '@artsum/agenthub-wire';
 import type { RpcMethodName, RpcRequestFor, RpcResponseFor } from '@artsum/agenthub-wire';
+import { getOrCreateDeviceId } from './deviceIdentity';
 
 export function getAgentHubClientId(): string {
     let platform: string = Platform.OS; // 'ios' | 'android' | 'web'
@@ -22,6 +23,8 @@ export function getAgentHubClientId(): string {
 export interface SyncSocketConfig {
     endpoint: string;
     token: string;
+    deviceId?: string;
+    appState?: AppStateStatus;
 }
 
 export interface SyncSocketState {
@@ -113,6 +116,7 @@ class ApiSocket {
     private socket: Socket | null = null;
     private config: SyncSocketConfig | null = null;
     private encryption: Encryption | null = null;
+    private appState: AppStateStatus = 'active';
     private messageHandlers: Map<string, (data: any) => void> = new Map();
     private fileTransferChunkHandlers: Map<string, FileTransferChunkHandler> = new Map();
     private reconnectedListeners: Set<() => void> = new Set();
@@ -126,7 +130,17 @@ class ApiSocket {
     initialize(config: SyncSocketConfig, encryption: Encryption) {
         this.config = config;
         this.encryption = encryption;
+        this.appState = config.appState ?? 'active';
         this.connect();
+    }
+
+    /** Publish the UI lifecycle state used by server-side push targeting. */
+    setAppState(state: AppStateStatus) {
+        this.appState = state;
+        if (this.config) {
+            this.config.appState = state;
+        }
+        this.socket?.emit('app-state', { state });
     }
 
     //
@@ -142,11 +156,17 @@ class ApiSocket {
 
         this.socket = io(this.config.endpoint, {
             path: '/v1/updates',
-            auth: {
-                token: this.config.token,
+            // Socket.IO invokes an auth callback for every initial connection
+            // and reconnect. Reading appState here prevents a socket that first
+            // connected in the foreground from continuing to claim `active`
+            // after the app was backgrounded and the transport reconnects.
+            auth: (callback) => callback({
+                token: this.config!.token,
+                deviceId: this.config!.deviceId ?? getOrCreateDeviceId(),
                 clientType: 'user-scoped' as const,
-                agenthubClient: getAgentHubClientId()
-            },
+                appState: this.appState,
+                agenthubClient: getAgentHubClientId(),
+            }),
             transports: ['websocket'],
             reconnection: true,
             reconnectionDelay: 1000,
@@ -428,6 +448,9 @@ class ApiSocket {
                 console.log('🔌 SyncSocket: Socket ID:', this.socket?.id);
             }
             this.updateStatus('connected');
+            // Reassert state after every reconnect so server-side push targeting
+            // cannot rely on stale auth metadata from the previous connection.
+            this.socket?.emit('app-state', { state: this.appState });
             if (!this.socket?.recovered) {
                 this.reconnectedListeners.forEach(listener => listener());
             }

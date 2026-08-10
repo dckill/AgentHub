@@ -773,6 +773,12 @@ importers:
 
   packages/agenthub-wire:
     dependencies:
+      '@noble/ciphers':
+        specifier: ^2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@paralleldrive/cuid2':
         specifier: ^2.2.2
         version: 2.3.1
@@ -3215,6 +3221,10 @@ packages:
   '@msgpack/msgpack@2.8.0':
     resolution: {integrity: sha512-h9u4u/jiIRKbq25PM+zymTyW6bhTzELvOoUd+AvYriWOAKpLGnIamaET3pnHYoI5iYphAHBI4ayx0MehR+VVPQ==}
     engines: {node: '>= 10'}
+
+  '@noble/ciphers@2.2.0':
+    resolution: {integrity: sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==}
+    engines: {node: '>= 20.19.0'}
 
   '@noble/curves@1.5.0':
     resolution: {integrity: sha512-J5EKamIHnKPyClwVrzmaf5wSdQXgdHcPZIZLu3bwnbeCx8/7NPK5q2ZBWF+5FvYGByjiQQsJYX6jfgB2wDPn3A==}
@@ -13252,6 +13262,8 @@ snapshots:
       - supports-color
 
   '@msgpack/msgpack@2.8.0': {}
+
+  '@noble/ciphers@2.2.0': {}
 
   '@noble/curves@1.5.0':
     dependencies:

@@ -1,11 +1,14 @@
 import * as React from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable as InteractivePressable, TextInput, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import Feather from '@expo/vector-icons/Feather';
 import { Typography } from '@/constants/Typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Preview controls are static visual samples, not actionable controls.
+const PreviewPressable = View;
 
 type InputStyle = {
     id: string;
@@ -33,25 +36,25 @@ export default function InputStylesDemo() {
                         paddingTop: 8,
                         paddingBottom: 4,
                     }}>
-                        <Pressable style={{ padding: 6, marginRight: 2 }}>
+                        <PreviewPressable style={{ padding: 6, marginRight: 2 }}>
                             <Ionicons name="at" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 2 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 2 }}>
                             <Ionicons name="sparkles-outline" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 2 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 2 }}>
                             <MaterialIcons name="format-bold" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 2 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 2 }}>
                             <MaterialIcons name="format-italic" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 2 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 2 }}>
                             <MaterialIcons name="link" size={18} color="#666" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{ flex: 1 }} />
-                        <Pressable style={{ padding: 6 }}>
+                        <PreviewPressable style={{ padding: 6 }}>
                             <Ionicons name="code-slash" size={18} color="#666" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -59,9 +62,9 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 12,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{ padding: 8 }}>
+                        <PreviewPressable style={{ padding: 8 }}>
                             <Ionicons name="add" size={20} color="#666" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{
                             flex: 1,
                             flexDirection: 'row',
@@ -81,9 +84,9 @@ export default function InputStylesDemo() {
                                 editable={false}
                             />
                         </View>
-                        <Pressable style={{ padding: 8 }}>
+                        <PreviewPressable style={{ padding: 8 }}>
                             <Ionicons name="send" size={18} color="#007a5a" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -112,7 +115,7 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#8e8e8e"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 width: 40,
                                 height: 40,
                                 borderRadius: 20,
@@ -121,7 +124,7 @@ export default function InputStylesDemo() {
                                 justifyContent: 'center',
                             }}>
                                 <Ionicons name="arrow-up" size={20} color="#fff" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -130,7 +133,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             paddingHorizontal: 14,
                             paddingVertical: 6,
                             borderRadius: 16,
@@ -138,8 +141,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Ionicons name="attach" size={16} color="#666" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 14,
                             paddingVertical: 6,
                             borderRadius: 16,
@@ -147,15 +150,15 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Ionicons name="image" size={16} color="#666" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 14,
                             paddingVertical: 6,
                             borderRadius: 16,
                             backgroundColor: '#f0f0f0',
                         }}>
                             <Text style={{ fontSize: 13, color: '#666' }}>GPT-4</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -175,21 +178,21 @@ export default function InputStylesDemo() {
                             paddingHorizontal: 16,
                             minHeight: 44,
                         }}>
-                            <Pressable style={{ marginRight: 16 }}>
+                            <PreviewPressable style={{ marginRight: 16 }}>
                                 <Ionicons name="add-circle" size={24} color="#b9bbbe" />
-                            </Pressable>
+                            </PreviewPressable>
                             <TextInput
                                 style={{ flex: 1, fontSize: 16, color: '#dcddde' }}
                                 placeholder="Message #general"
                                 placeholderTextColor="#72767d"
                                 editable={false}
                             />
-                            <Pressable style={{ marginLeft: 12 }}>
+                            <PreviewPressable style={{ marginLeft: 12 }}>
                                 <MaterialIcons name="gif" size={24} color="#b9bbbe" />
-                            </Pressable>
-                            <Pressable style={{ marginLeft: 12 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ marginLeft: 12 }}>
                                 <Ionicons name="sparkles" size={24} color="#b9bbbe" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -198,15 +201,15 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{ padding: 4, marginRight: 8 }}>
+                        <PreviewPressable style={{ padding: 4, marginRight: 8 }}>
                             <Feather name="gift" size={18} color="#b9bbbe" />
-                        </Pressable>
-                        <Pressable style={{ padding: 4, marginRight: 8 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 4, marginRight: 8 }}>
                             <MaterialIcons name="sticky-note-2" size={18} color="#b9bbbe" />
-                        </Pressable>
-                        <Pressable style={{ padding: 4 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 4 }}>
                             <Ionicons name="game-controller" size={18} color="#b9bbbe" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -232,23 +235,23 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                             minHeight: 42,
                         }}>
-                            <Pressable style={{ marginRight: 8 }}>
+                            <PreviewPressable style={{ marginRight: 8 }}>
                                 <Ionicons name="sparkles-outline" size={24} color="#51585c" />
-                            </Pressable>
+                            </PreviewPressable>
                             <TextInput
                                 style={{ flex: 1, fontSize: 16, color: '#000' }}
                                 placeholder="Type a message"
                                 placeholderTextColor="#999"
                                 editable={false}
                             />
-                            <Pressable style={{ marginLeft: 8 }}>
+                            <PreviewPressable style={{ marginLeft: 8 }}>
                                 <Ionicons name="attach" size={24} color="#51585c" />
-                            </Pressable>
-                            <Pressable style={{ marginLeft: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ marginLeft: 8 }}>
                                 <Ionicons name="camera" size={24} color="#51585c" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 48,
                             height: 48,
                             borderRadius: 24,
@@ -257,7 +260,7 @@ export default function InputStylesDemo() {
                             justifyContent: 'center',
                         }}>
                             <Ionicons name="mic" size={24} color="#fff" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -265,7 +268,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 12,
                         paddingBottom: 8,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             backgroundColor: 'rgba(0,0,0,0.05)',
@@ -273,8 +276,8 @@ export default function InputStylesDemo() {
                             marginRight: 6,
                         }}>
                             <Text style={{ fontSize: 12, color: '#667781' }}>Photo</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             backgroundColor: 'rgba(0,0,0,0.05)',
@@ -282,15 +285,15 @@ export default function InputStylesDemo() {
                             marginRight: 6,
                         }}>
                             <Text style={{ fontSize: 12, color: '#667781' }}>Video</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             backgroundColor: 'rgba(0,0,0,0.05)',
                             borderRadius: 12,
                         }}>
                             <Text style={{ fontSize: 12, color: '#667781' }}>Document</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -308,9 +311,9 @@ export default function InputStylesDemo() {
                         borderTopWidth: 1,
                         borderTopColor: '#e0e0e0',
                     }}>
-                        <Pressable style={{ padding: 8 }}>
+                        <PreviewPressable style={{ padding: 8 }}>
                             <Ionicons name="attach" size={24} color="#8e8e8e" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{
                             flex: 1,
                             backgroundColor: '#f0f0f0',
@@ -326,16 +329,16 @@ export default function InputStylesDemo() {
                                 editable={false}
                             />
                         </View>
-                        <Pressable style={{ padding: 8 }}>
+                        <PreviewPressable style={{ padding: 8 }}>
                             <Ionicons name="mic" size={24} color="#0088cc" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             padding: 8,
                             backgroundColor: '#0088cc',
                             borderRadius: 20,
                         }}>
                             <Ionicons name="send" size={20} color="#fff" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -343,18 +346,18 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 16,
                         paddingBottom: 8,
                     }}>
-                        <Pressable style={{ padding: 4, marginRight: 12 }}>
+                        <PreviewPressable style={{ padding: 4, marginRight: 12 }}>
                             <Ionicons name="sparkles-outline" size={20} color="#8e8e8e" />
-                        </Pressable>
-                        <Pressable style={{ padding: 4, marginRight: 12 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 4, marginRight: 12 }}>
                             <MaterialIcons name="sticky-note-2" size={20} color="#8e8e8e" />
-                        </Pressable>
-                        <Pressable style={{ padding: 4, marginRight: 12 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 4, marginRight: 12 }}>
                             <Ionicons name="location" size={20} color="#8e8e8e" />
-                        </Pressable>
-                        <Pressable style={{ padding: 4 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 4 }}>
                             <Ionicons name="timer-outline" size={20} color="#8e8e8e" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -383,7 +386,7 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#6a737d"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 paddingHorizontal: 16,
                                 paddingVertical: 6,
                                 backgroundColor: '#5e6ad2',
@@ -392,7 +395,7 @@ export default function InputStylesDemo() {
                                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
                                     Comment
                                 </Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -401,18 +404,18 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{ marginRight: 16 }}>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="at" size={18} color="#6a737d" />
-                        </Pressable>
-                        <Pressable style={{ marginRight: 16 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <MaterialIcons name="tag" size={18} color="#6a737d" />
-                        </Pressable>
-                        <Pressable style={{ marginRight: 16 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="code-slash" size={18} color="#6a737d" />
-                        </Pressable>
-                        <Pressable>
+                        </PreviewPressable>
+                        <PreviewPressable>
                             <Ionicons name="attach" size={18} color="#6a737d" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -445,7 +448,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             paddingHorizontal: 10,
                             paddingVertical: 4,
                             backgroundColor: '#f7f6f3',
@@ -453,8 +456,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ fontSize: 12, color: '#787774' }}>Add icon</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 10,
                             paddingVertical: 4,
                             backgroundColor: '#f7f6f3',
@@ -462,15 +465,15 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ fontSize: 12, color: '#787774' }}>Add cover</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 10,
                             paddingVertical: 4,
                             backgroundColor: '#f7f6f3',
                             borderRadius: 3,
                         }}>
                             <Text style={{ fontSize: 12, color: '#787774' }}>Add comment</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -496,24 +499,24 @@ export default function InputStylesDemo() {
                                 borderBottomWidth: 1,
                                 borderBottomColor: '#e1e4e8',
                             }}>
-                                <Pressable style={{ marginRight: 16 }}>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-bold" size={18} color="#586069" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-italic" size={18} color="#586069" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="code" size={18} color="#586069" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="link" size={18} color="#586069" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-list-bulleted" size={18} color="#586069" />
-                                </Pressable>
-                                <Pressable>
+                                </PreviewPressable>
+                                <PreviewPressable>
                                     <MaterialIcons name="format-list-numbered" size={18} color="#586069" />
-                                </Pressable>
+                                </PreviewPressable>
                             </View>
                             <TextInput
                                 style={{ fontSize: 14, color: '#24292e', minHeight: 60 }}
@@ -535,7 +538,7 @@ export default function InputStylesDemo() {
                             Markdown is supported
                         </Text>
                         <View style={{ flexDirection: 'row' }}>
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 paddingHorizontal: 12,
                                 paddingVertical: 6,
                                 backgroundColor: '#fafbfc',
@@ -545,15 +548,15 @@ export default function InputStylesDemo() {
                                 marginRight: 8,
                             }}>
                                 <Text style={{ fontSize: 14, color: '#24292e' }}>Cancel</Text>
-                            </Pressable>
-                            <Pressable style={{
+                            </PreviewPressable>
+                            <PreviewPressable style={{
                                 paddingHorizontal: 12,
                                 paddingVertical: 6,
                                 backgroundColor: '#2ea44f',
                                 borderRadius: 6,
                             }}>
                                 <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>Comment</Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                 </View>
@@ -570,7 +573,7 @@ export default function InputStylesDemo() {
                         alignItems: 'flex-end',
                         padding: 8,
                     }}>
-                        <Pressable style={{ 
+                        <PreviewPressable style={{
                             width: 34,
                             height: 34,
                             borderRadius: 17,
@@ -580,7 +583,7 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Ionicons name="camera" size={20} color="#fff" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{
                             flex: 1,
                             backgroundColor: '#e5e5ea',
@@ -597,7 +600,7 @@ export default function InputStylesDemo() {
                                 editable={false}
                             />
                         </View>
-                        <Pressable style={{ 
+                        <PreviewPressable style={{
                             width: 34,
                             height: 34,
                             borderRadius: 17,
@@ -606,7 +609,7 @@ export default function InputStylesDemo() {
                             justifyContent: 'center',
                         }}>
                             <Ionicons name="arrow-up" size={20} color="#fff" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -614,18 +617,18 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 12,
                         paddingBottom: 8,
                     }}>
-                        <Pressable style={{ padding: 6, marginRight: 4 }}>
+                        <PreviewPressable style={{ padding: 6, marginRight: 4 }}>
                             <Ionicons name="apps" size={22} color="#8e8e93" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 4 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 4 }}>
                             <Ionicons name="images" size={22} color="#8e8e93" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 4 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 4 }}>
                             <MaterialIcons name="sticky-note-2" size={22} color="#8e8e93" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6 }}>
                             <Ionicons name="musical-notes" size={22} color="#8e8e93" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -659,9 +662,9 @@ export default function InputStylesDemo() {
                                     placeholderTextColor="#999"
                                     editable={false}
                                 />
-                                <Pressable style={{ marginLeft: 8 }}>
+                                <PreviewPressable style={{ marginLeft: 8 }}>
                                     <MaterialIcons name="send" size={24} color="#1976d2" />
-                                </Pressable>
+                                </PreviewPressable>
                             </View>
                         </View>
                     </View>
@@ -671,7 +674,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -681,8 +684,8 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="attach" size={20} color="#757575" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -692,8 +695,8 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="image" size={20} color="#757575" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -703,8 +706,8 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="mic" size={20} color="#757575" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -713,7 +716,7 @@ export default function InputStylesDemo() {
                             justifyContent: 'center',
                         }}>
                             <Ionicons name="location" size={20} color="#757575" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -735,9 +738,9 @@ export default function InputStylesDemo() {
                             minHeight: 56,
                         }}>
                             <TextInput
-                                style={{ 
-                                    flex: 1, 
-                                    fontSize: 18, 
+                                style={{
+                                    flex: 1,
+                                    fontSize: 18,
                                     color: '#000',
                                     fontWeight: 'bold',
                                 }}
@@ -745,20 +748,20 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#666"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 backgroundColor: '#000',
                                 paddingHorizontal: 20,
                                 paddingVertical: 10,
                                 marginLeft: 8,
                             }}>
-                                <Text style={{ 
-                                    color: '#fff', 
-                                    fontSize: 16, 
-                                    fontWeight: 'bold' 
+                                <Text style={{
+                                    color: '#fff',
+                                    fontSize: 16,
+                                    fontWeight: 'bold'
                                 }}>
                                     SEND
                                 </Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -767,7 +770,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             backgroundColor: '#000',
                             borderWidth: 2,
                             borderColor: '#000',
@@ -776,8 +779,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>BOLD</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             backgroundColor: '#fff',
                             borderWidth: 2,
                             borderColor: '#000',
@@ -786,8 +789,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ color: '#000', fontWeight: 'bold' }}>ITALIC</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             backgroundColor: '#f44336',
                             borderWidth: 2,
                             borderColor: '#000',
@@ -795,7 +798,7 @@ export default function InputStylesDemo() {
                             paddingVertical: 8,
                         }}>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>LINK</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -818,16 +821,16 @@ export default function InputStylesDemo() {
                             paddingVertical: 12,
                         }}>
                             <TextInput
-                                style={{ 
-                                    flex: 1, 
-                                    fontSize: 16, 
+                                style={{
+                                    flex: 1,
+                                    fontSize: 16,
                                     color: '#fff',
                                 }}
                                 placeholder="Type a message..."
                                 placeholderTextColor="rgba(255, 255, 255, 0.5)"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 width: 40,
                                 height: 40,
                                 borderRadius: 20,
@@ -837,7 +840,7 @@ export default function InputStylesDemo() {
                                 marginLeft: 12,
                             }}>
                                 <Ionicons name="send" size={20} color="#fff" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -846,7 +849,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 36,
                             height: 36,
                             borderRadius: 18,
@@ -858,8 +861,8 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="attach" size={18} color="rgba(255, 255, 255, 0.8)" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 36,
                             height: 36,
                             borderRadius: 18,
@@ -871,8 +874,8 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="image" size={18} color="rgba(255, 255, 255, 0.8)" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 36,
                             height: 36,
                             borderRadius: 18,
@@ -883,7 +886,7 @@ export default function InputStylesDemo() {
                             justifyContent: 'center',
                         }}>
                             <Ionicons name="sparkles" size={18} color="rgba(255, 255, 255, 0.8)" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -905,9 +908,9 @@ export default function InputStylesDemo() {
                         }}>
                             <Ionicons name="search" size={20} color="#b3b3b3" />
                             <TextInput
-                                style={{ 
-                                    flex: 1, 
-                                    fontSize: 16, 
+                                style={{
+                                    flex: 1,
+                                    fontSize: 16,
                                     color: '#fff',
                                     marginLeft: 12,
                                 }}
@@ -915,9 +918,9 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#535353"
                                 editable={false}
                             />
-                            <Pressable style={{ marginLeft: 12 }}>
+                            <PreviewPressable style={{ marginLeft: 12 }}>
                                 <Ionicons name="mic" size={20} color="#1db954" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -927,13 +930,13 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{ padding: 12 }}>
+                        <PreviewPressable style={{ padding: 12 }}>
                             <Ionicons name="shuffle" size={24} color="#b3b3b3" />
-                        </Pressable>
-                        <Pressable style={{ padding: 12 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 12 }}>
                             <Ionicons name="play-skip-back" size={24} color="#fff" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 56,
                             height: 56,
                             borderRadius: 28,
@@ -943,13 +946,13 @@ export default function InputStylesDemo() {
                             marginHorizontal: 16,
                         }}>
                             <Ionicons name="play" size={28} color="#000" style={{ marginLeft: 2 }} />
-                        </Pressable>
-                        <Pressable style={{ padding: 12 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 12 }}>
                             <Ionicons name="play-skip-forward" size={24} color="#fff" />
-                        </Pressable>
-                        <Pressable style={{ padding: 12 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 12 }}>
                             <Ionicons name="repeat" size={24} color="#1db954" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -975,7 +978,7 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#a0a0a0"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 paddingHorizontal: 16,
                                 paddingVertical: 6,
                                 backgroundColor: '#0d99ff',
@@ -985,7 +988,7 @@ export default function InputStylesDemo() {
                                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
                                     Post
                                 </Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -996,37 +999,37 @@ export default function InputStylesDemo() {
                         paddingBottom: 12,
                     }}>
                         <View style={{ flexDirection: 'row' }}>
-                            <Pressable style={{ 
-                                width: 28, 
-                                height: 28, 
-                                borderRadius: 14, 
+                            <PreviewPressable style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
                                 backgroundColor: '#ff7262',
                                 marginRight: -8,
                                 borderWidth: 2,
                                 borderColor: '#2c2c2c',
                             }} />
-                            <Pressable style={{ 
-                                width: 28, 
-                                height: 28, 
-                                borderRadius: 14, 
+                            <PreviewPressable style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
                                 backgroundColor: '#0d99ff',
                                 marginRight: -8,
                                 borderWidth: 2,
                                 borderColor: '#2c2c2c',
                                 zIndex: -1,
                             }} />
-                            <Pressable style={{ 
-                                width: 28, 
-                                height: 28, 
-                                borderRadius: 14, 
+                            <PreviewPressable style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
                                 backgroundColor: '#1abcfe',
                                 borderWidth: 2,
                                 borderColor: '#2c2c2c',
                                 zIndex: -2,
                             }} />
-                            <Text style={{ 
-                                color: '#a0a0a0', 
-                                fontSize: 12, 
+                            <Text style={{
+                                color: '#a0a0a0',
+                                fontSize: 12,
                                 marginLeft: 12,
                                 alignSelf: 'center',
                             }}>
@@ -1034,12 +1037,12 @@ export default function InputStylesDemo() {
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row' }}>
-                            <Pressable style={{ padding: 4 }}>
+                            <PreviewPressable style={{ padding: 4 }}>
                                 <Ionicons name="sparkles-outline" size={20} color="#a0a0a0" />
-                            </Pressable>
-                            <Pressable style={{ padding: 4, marginLeft: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ padding: 4, marginLeft: 8 }}>
                                 <Ionicons name="at" size={20} color="#a0a0a0" />
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                 </View>
@@ -1059,8 +1062,8 @@ export default function InputStylesDemo() {
                             padding: 12,
                         }}>
                             <TextInput
-                                style={{ 
-                                    fontSize: 18, 
+                                style={{
+                                    fontSize: 18,
                                     color: '#fff',
                                     minHeight: 60,
                                 }}
@@ -1076,24 +1079,24 @@ export default function InputStylesDemo() {
                                 marginTop: 12,
                             }}>
                                 <View style={{ flexDirection: 'row' }}>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <Ionicons name="image-outline" size={20} color="#1d9bf0" />
-                                    </Pressable>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    </PreviewPressable>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <MaterialIcons name="gif" size={20} color="#1d9bf0" />
-                                    </Pressable>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    </PreviewPressable>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <Ionicons name="stats-chart" size={20} color="#1d9bf0" />
-                                    </Pressable>
-                                    <Pressable>
+                                    </PreviewPressable>
+                                    <PreviewPressable>
                                         <Ionicons name="sparkles-outline" size={20} color="#1d9bf0" />
-                                    </Pressable>
+                                    </PreviewPressable>
                                 </View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={{ color: '#71767b', fontSize: 14, marginRight: 12 }}>
                                         0/280
                                     </Text>
-                                    <Pressable style={{
+                                    <PreviewPressable style={{
                                         paddingHorizontal: 16,
                                         paddingVertical: 8,
                                         backgroundColor: '#1d9bf0',
@@ -1102,7 +1105,7 @@ export default function InputStylesDemo() {
                                         <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
                                             Post
                                         </Text>
-                                    </Pressable>
+                                    </PreviewPressable>
                                 </View>
                             </View>
                         </View>
@@ -1113,7 +1116,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             borderRadius: 12,
@@ -1122,8 +1125,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ fontSize: 12, color: '#1d9bf0' }}>Everyone</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             borderRadius: 12,
@@ -1132,8 +1135,8 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ fontSize: 12, color: '#71767b' }}>Location</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 4,
                             borderRadius: 12,
@@ -1141,7 +1144,7 @@ export default function InputStylesDemo() {
                             borderColor: '#333',
                         }}>
                             <Text style={{ fontSize: 12, color: '#71767b' }}>Schedule</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1174,9 +1177,9 @@ export default function InputStylesDemo() {
                         }}>
                             <Ionicons name="search" size={18} color="#999" />
                             <TextInput
-                                style={{ 
-                                    flex: 1, 
-                                    fontSize: 15, 
+                                style={{
+                                    flex: 1,
+                                    fontSize: 15,
                                     color: '#000',
                                     marginLeft: 12,
                                 }}
@@ -1184,14 +1187,14 @@ export default function InputStylesDemo() {
                                 placeholderTextColor="#999"
                                 editable={false}
                             />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 paddingHorizontal: 8,
                                 paddingVertical: 4,
                                 backgroundColor: '#f0f0f0',
                                 borderRadius: 6,
                             }}>
                                 <Text style={{ fontSize: 12, color: '#666' }}>⌘K</Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -1201,7 +1204,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1218,8 +1221,8 @@ export default function InputStylesDemo() {
                                 marginRight: 6,
                             }} />
                             <Text style={{ fontSize: 13, color: '#333' }}>Space 1</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1236,8 +1239,8 @@ export default function InputStylesDemo() {
                                 marginRight: 6,
                             }} />
                             <Text style={{ fontSize: 13, color: '#333' }}>Space 2</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1253,7 +1256,7 @@ export default function InputStylesDemo() {
                                 marginRight: 6,
                             }} />
                             <Text style={{ fontSize: 13, color: '#333' }}>Space 3</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1274,8 +1277,8 @@ export default function InputStylesDemo() {
                             paddingVertical: 12,
                         }}>
                             <TextInput
-                                style={{ 
-                                    fontSize: 16, 
+                                style={{
+                                    fontSize: 16,
                                     color: '#000',
                                     minHeight: 40,
                                 }}
@@ -1291,21 +1294,21 @@ export default function InputStylesDemo() {
                                 marginTop: 8,
                             }}>
                                 <View style={{ flexDirection: 'row' }}>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <Ionicons name="attach" size={20} color="#666" />
-                                    </Pressable>
-                                    <Pressable>
+                                    </PreviewPressable>
+                                    <PreviewPressable>
                                         <Ionicons name="code-slash" size={20} color="#666" />
-                                    </Pressable>
+                                    </PreviewPressable>
                                 </View>
-                                <Pressable style={{
+                                <PreviewPressable style={{
                                     backgroundColor: '#d97706',
                                     paddingHorizontal: 16,
                                     paddingVertical: 8,
                                     borderRadius: 20,
                                 }}>
                                     <Ionicons name="arrow-up" size={18} color="#fff" />
-                                </Pressable>
+                                </PreviewPressable>
                             </View>
                         </View>
                     </View>
@@ -1315,7 +1318,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1334,8 +1337,8 @@ export default function InputStylesDemo() {
                                 marginRight: 6,
                             }} />
                             <Text style={{ fontSize: 13, color: '#666' }}>Claude 3.5</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 6,
                             backgroundColor: '#f4f2ee',
@@ -1343,15 +1346,15 @@ export default function InputStylesDemo() {
                             marginRight: 8,
                         }}>
                             <Text style={{ fontSize: 13, color: '#666' }}>Artifacts</Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 12,
                             paddingVertical: 6,
                             backgroundColor: '#f4f2ee',
                             borderRadius: 20,
                         }}>
                             <Text style={{ fontSize: 13, color: '#666' }}>Projects</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1371,8 +1374,8 @@ export default function InputStylesDemo() {
                             padding: 12,
                         }}>
                             <TextInput
-                                style={{ 
-                                    fontSize: 14, 
+                                style={{
+                                    fontSize: 14,
                                     color: '#d7dadc',
                                     minHeight: 80,
                                 }}
@@ -1390,23 +1393,23 @@ export default function InputStylesDemo() {
                             borderRadius: 4,
                             paddingVertical: 4,
                         }}>
-                            <Pressable style={{ padding: 8 }}>
+                            <PreviewPressable style={{ padding: 8 }}>
                                 <MaterialIcons name="format-bold" size={18} color="#818384" />
-                            </Pressable>
-                            <Pressable style={{ padding: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ padding: 8 }}>
                                 <MaterialIcons name="format-italic" size={18} color="#818384" />
-                            </Pressable>
-                            <Pressable style={{ padding: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ padding: 8 }}>
                                 <MaterialIcons name="link" size={18} color="#818384" />
-                            </Pressable>
-                            <Pressable style={{ padding: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ padding: 8 }}>
                                 <MaterialIcons name="strikethrough-s" size={18} color="#818384" />
-                            </Pressable>
-                            <Pressable style={{ padding: 8 }}>
+                            </PreviewPressable>
+                            <PreviewPressable style={{ padding: 8 }}>
                                 <MaterialIcons name="code" size={18} color="#818384" />
-                            </Pressable>
+                            </PreviewPressable>
                             <View style={{ flex: 1 }} />
-                            <Pressable style={{
+                            <PreviewPressable style={{
                                 paddingHorizontal: 16,
                                 paddingVertical: 6,
                                 backgroundColor: '#ff4500',
@@ -1416,7 +1419,7 @@ export default function InputStylesDemo() {
                                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
                                     Reply
                                 </Text>
-                            </Pressable>
+                            </PreviewPressable>
                         </View>
                     </View>
                     <View style={{
@@ -1425,22 +1428,22 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 16,
                         paddingBottom: 8,
                     }}>
-                        <Pressable style={{ marginRight: 16 }}>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="arrow-up-outline" size={20} color="#818384" />
-                        </Pressable>
+                        </PreviewPressable>
                         <Text style={{ color: '#818384', fontSize: 16, marginRight: 16 }}>0</Text>
-                        <Pressable style={{ marginRight: 16 }}>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="arrow-down-outline" size={20} color="#818384" />
-                        </Pressable>
-                        <Pressable style={{ marginRight: 16 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="chatbox-outline" size={18} color="#818384" />
-                        </Pressable>
-                        <Pressable style={{ marginRight: 16 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ marginRight: 16 }}>
                             <Ionicons name="share-outline" size={18} color="#818384" />
-                        </Pressable>
-                        <Pressable>
+                        </PreviewPressable>
+                        <PreviewPressable>
                             <Ionicons name="bookmark-outline" size={18} color="#818384" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1456,7 +1459,7 @@ export default function InputStylesDemo() {
                         alignItems: 'flex-end',
                         padding: 8,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -1468,7 +1471,7 @@ export default function InputStylesDemo() {
                             borderColor: '#e0e0e0',
                         }}>
                             <Ionicons name="mic-outline" size={24} color="#333" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{
                             flex: 1,
                             backgroundColor: '#fff',
@@ -1486,7 +1489,7 @@ export default function InputStylesDemo() {
                                 editable={false}
                             />
                         </View>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -1498,8 +1501,8 @@ export default function InputStylesDemo() {
                             borderColor: '#e0e0e0',
                         }}>
                             <Ionicons name="sparkles-outline" size={24} color="#333" />
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             width: 40,
                             height: 40,
                             borderRadius: 20,
@@ -1510,7 +1513,7 @@ export default function InputStylesDemo() {
                             borderColor: '#e0e0e0',
                         }}>
                             <Ionicons name="add" size={24} color="#333" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -1521,26 +1524,26 @@ export default function InputStylesDemo() {
                         borderTopWidth: 1,
                         borderTopColor: '#e0e0e0',
                     }}>
-                        <Pressable style={{ alignItems: 'center' }}>
+                        <PreviewPressable style={{ alignItems: 'center' }}>
                             <Ionicons name="camera" size={24} color="#576b95" />
                             <Text style={{ fontSize: 11, color: '#576b95', marginTop: 2 }}>Album</Text>
-                        </Pressable>
-                        <Pressable style={{ alignItems: 'center' }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ alignItems: 'center' }}>
                             <Ionicons name="videocam" size={24} color="#576b95" />
                             <Text style={{ fontSize: 11, color: '#576b95', marginTop: 2 }}>Sight</Text>
-                        </Pressable>
-                        <Pressable style={{ alignItems: 'center' }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ alignItems: 'center' }}>
                             <Ionicons name="call" size={24} color="#576b95" />
                             <Text style={{ fontSize: 11, color: '#576b95', marginTop: 2 }}>Call</Text>
-                        </Pressable>
-                        <Pressable style={{ alignItems: 'center' }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ alignItems: 'center' }}>
                             <Ionicons name="location" size={24} color="#576b95" />
                             <Text style={{ fontSize: 11, color: '#576b95', marginTop: 2 }}>Location</Text>
-                        </Pressable>
-                        <Pressable style={{ alignItems: 'center' }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ alignItems: 'center' }}>
                             <MaterialIcons name="attach-money" size={24} color="#576b95" />
                             <Text style={{ fontSize: 11, color: '#576b95', marginTop: 2 }}>Transfer</Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1560,8 +1563,8 @@ export default function InputStylesDemo() {
                             padding: 12,
                         }}>
                             <TextInput
-                                style={{ 
-                                    fontSize: 15, 
+                                style={{
+                                    fontSize: 15,
                                     color: '#e0e0e0',
                                     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
                                 }}
@@ -1577,23 +1580,23 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 20,
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{ padding: 6, marginRight: 8 }}>
+                        <PreviewPressable style={{ padding: 6, marginRight: 8 }}>
                             <Text style={{ color: '#7f6df2', fontSize: 16 }}>[[</Text>
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 8 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 8 }}>
                             <MaterialIcons name="tag" size={18} color="#7f6df2" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 8 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 8 }}>
                             <MaterialIcons name="format-bold" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 8 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 8 }}>
                             <MaterialIcons name="format-italic" size={18} color="#666" />
-                        </Pressable>
-                        <Pressable style={{ padding: 6, marginRight: 8 }}>
+                        </PreviewPressable>
+                        <PreviewPressable style={{ padding: 6, marginRight: 8 }}>
                             <MaterialIcons name="code" size={18} color="#666" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{ flex: 1 }} />
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 10,
@@ -1605,7 +1608,7 @@ export default function InputStylesDemo() {
                             <Text style={{ color: '#e0e0e0', fontSize: 12, marginLeft: 4 }}>
                                 Markdown
                             </Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1621,7 +1624,7 @@ export default function InputStylesDemo() {
                         alignItems: 'center',
                         padding: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 50,
                             height: 50,
                             borderRadius: 25,
@@ -1631,7 +1634,7 @@ export default function InputStylesDemo() {
                             marginRight: 12,
                         }}>
                             <Ionicons name="camera" size={28} color="#000" />
-                        </Pressable>
+                        </PreviewPressable>
                         <View style={{
                             flex: 1,
                             backgroundColor: '#1a1a1a',
@@ -1647,7 +1650,7 @@ export default function InputStylesDemo() {
                                 editable={false}
                             />
                         </View>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             width: 36,
                             height: 36,
                             borderRadius: 18,
@@ -1656,7 +1659,7 @@ export default function InputStylesDemo() {
                             justifyContent: 'center',
                         }}>
                             <MaterialIcons name="more-horiz" size={24} color="#fff" />
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                     <View style={{
                         flexDirection: 'row',
@@ -1664,7 +1667,7 @@ export default function InputStylesDemo() {
                         justifyContent: 'center',
                         paddingBottom: 12,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             paddingHorizontal: 16,
                             paddingVertical: 8,
                             backgroundColor: '#fffc00',
@@ -1674,8 +1677,8 @@ export default function InputStylesDemo() {
                             <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>
                                 Snap
                             </Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 16,
                             paddingVertical: 8,
                             backgroundColor: '#1a1a1a',
@@ -1685,8 +1688,8 @@ export default function InputStylesDemo() {
                             <Text style={{ color: '#fff', fontSize: 14 }}>
                                 Stickers
                             </Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             paddingHorizontal: 16,
                             paddingVertical: 8,
                             backgroundColor: '#1a1a1a',
@@ -1695,7 +1698,7 @@ export default function InputStylesDemo() {
                             <Text style={{ color: '#fff', fontSize: 14 }}>
                                 Games
                             </Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1721,26 +1724,26 @@ export default function InputStylesDemo() {
                                 paddingHorizontal: 12,
                                 paddingVertical: 8,
                             }}>
-                                <Pressable style={{ marginRight: 16 }}>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-bold" size={20} color="#605e5c" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-italic" size={20} color="#605e5c" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-underlined" size={20} color="#605e5c" />
-                                </Pressable>
-                                <Pressable style={{ marginRight: 16 }}>
+                                </PreviewPressable>
+                                <PreviewPressable style={{ marginRight: 16 }}>
                                     <MaterialIcons name="format-color-text" size={20} color="#605e5c" />
-                                </Pressable>
+                                </PreviewPressable>
                                 <View style={{ flex: 1 }} />
-                                <Pressable>
+                                <PreviewPressable>
                                     <MaterialIcons name="more-horiz" size={20} color="#605e5c" />
-                                </Pressable>
+                                </PreviewPressable>
                             </View>
                             <TextInput
-                                style={{ 
-                                    fontSize: 14, 
+                                style={{
+                                    fontSize: 14,
                                     color: '#201f1e',
                                     paddingHorizontal: 12,
                                     paddingVertical: 8,
@@ -1758,24 +1761,24 @@ export default function InputStylesDemo() {
                                 marginTop: 8,
                             }}>
                                 <View style={{ flexDirection: 'row' }}>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <Ionicons name="attach" size={20} color="#605e5c" />
-                                    </Pressable>
-                                    <Pressable style={{ marginRight: 16 }}>
+                                    </PreviewPressable>
+                                    <PreviewPressable style={{ marginRight: 16 }}>
                                         <Ionicons name="sparkles-outline" size={20} color="#605e5c" />
-                                    </Pressable>
-                                    <Pressable>
+                                    </PreviewPressable>
+                                    <PreviewPressable>
                                         <MaterialIcons name="gif" size={20} color="#605e5c" />
-                                    </Pressable>
+                                    </PreviewPressable>
                                 </View>
-                                <Pressable style={{
+                                <PreviewPressable style={{
                                     backgroundColor: '#6264a7',
                                     paddingHorizontal: 20,
                                     paddingVertical: 8,
                                     borderRadius: 4,
                                 }}>
                                     <Ionicons name="send" size={16} color="#fff" />
-                                </Pressable>
+                                </PreviewPressable>
                             </View>
                         </View>
                     </View>
@@ -1785,7 +1788,7 @@ export default function InputStylesDemo() {
                         paddingHorizontal: 16,
                         paddingBottom: 8,
                     }}>
-                        <Pressable style={{
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1800,8 +1803,8 @@ export default function InputStylesDemo() {
                             <Text style={{ fontSize: 13, color: '#605e5c', marginLeft: 6 }}>
                                 Meet now
                             </Text>
-                        </Pressable>
-                        <Pressable style={{
+                        </PreviewPressable>
+                        <PreviewPressable style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             paddingHorizontal: 12,
@@ -1815,7 +1818,7 @@ export default function InputStylesDemo() {
                             <Text style={{ fontSize: 13, color: '#605e5c', marginLeft: 6 }}>
                                 Schedule
                             </Text>
-                        </Pressable>
+                        </PreviewPressable>
                     </View>
                 </View>
             ),
@@ -1826,7 +1829,7 @@ export default function InputStylesDemo() {
     const renderActiveInput = () => {
         const style = inputStyles.find(s => s.id === selectedStyle);
         if (!style) return null;
-        
+
         return (
             <View style={{
                 position: 'absolute',
@@ -1866,9 +1869,9 @@ export default function InputStylesDemo() {
 
     return (
         <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
-            <ScrollView 
+            <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ 
+                contentContainerStyle={{
                     paddingBottom: 250 + safeArea.bottom,
                     paddingTop: 16,
                 }}
@@ -1893,7 +1896,7 @@ export default function InputStylesDemo() {
                 </Text>
 
                 {inputStyles.map((style) => (
-                    <Pressable
+                    <InteractivePressable
                         key={style.id}
                         onPress={() => setSelectedStyle(style.id)}
                         style={{
@@ -1944,10 +1947,10 @@ export default function InputStylesDemo() {
                         }}>
                             {style.preview}
                         </View>
-                    </Pressable>
+                    </InteractivePressable>
                 ))}
             </ScrollView>
-            
+
             {renderActiveInput()}
         </View>
     );

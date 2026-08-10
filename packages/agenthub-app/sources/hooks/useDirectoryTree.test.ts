@@ -17,6 +17,10 @@ vi.mock('@/utils/directoryTreeSource', () => ({
     getDirectoryBrowserRootPath: vi.fn(() => '/repo'),
 }));
 
+vi.mock('@/sync/sync', () => ({
+    sync: { getAccountGeneration: () => 1 },
+}));
+
 import { useDirectoryTree } from './useDirectoryTree';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;

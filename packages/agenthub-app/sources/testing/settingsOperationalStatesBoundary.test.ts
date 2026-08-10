@@ -33,7 +33,9 @@ describe('settings operational states boundary', () => {
 
         expect(credentials).toContain("useState<'loading' | 'ready' | 'error'>('loading')");
         expect(credentials).toContain('const controller = new AbortController()');
-        expect(credentials).toContain('listCredentials(auth.credentials, signal)');
+        expect(credentials).toContain('runCredentialsLoad({');
+        expect(credentials).toContain('fetchCredentials: () => listCredentials(credentials, signal)');
+        expect(credentials).toContain('sync.getAccountGeneration()');
         expect(credentials).toContain('void loadCredentials(controller.signal)');
         expect(credentials).toContain('controller.abort()');
         expect(credentials).toContain('accessibilityLiveRegion="polite"');
@@ -50,9 +52,12 @@ describe('settings operational states boundary', () => {
 
         expect(edit).toContain("useState<'loading' | 'ready' | 'error'>");
         expect(edit).toContain('const controller = new AbortController()');
-        expect(edit).toContain('getCredential(auth.credentials, id, signal)');
+        expect(edit).toContain('runCredentialEditLoad({');
+        expect(edit).toContain('fetchCredential: () => getCredential(credentials, id, signal)');
+        expect(edit).toContain('sync.getAccountGeneration()');
         expect(edit).toContain('void loadCredential(controller.signal)');
         expect(edit).toContain('controller.abort()');
+        expect(edit).toContain('runCredentialEditSave({');
         expect(edit).toContain('role="radiogroup"');
         expect(edit).toContain('<SelectRow');
         expect(edit).toContain('selected={agent === opt.key}');

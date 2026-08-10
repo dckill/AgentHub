@@ -99,6 +99,17 @@ describe('createSessionMetadata', () => {
         expect(metadata.forkedFromMessageId).toBe('message-42');
     });
 
+    it('marks side chats without changing ordinary fork metadata', () => {
+        const { metadata } = createSessionMetadata({
+            flavor: 'codex',
+            machineId: 'machine-side-chat',
+            parentSessionId: 'parent-session',
+            isSideChat: true,
+        });
+        expect(metadata.parentSessionId).toBe('parent-session');
+        expect(metadata.isSideChat).toBe(true);
+    });
+
     it('finds local skill names from skill roots', () => {
         const root = mkdtempSync(join(tmpdir(), 'agenthub-skills-'));
         try {

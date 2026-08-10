@@ -1,5 +1,6 @@
 import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { ArtifactHeader, ArtifactBody } from '../artifactTypes';
+import { normalizeArtifactHeader } from '../artifactHeader';
 import { AES256Encryption } from './encryptor';
 import * as Random from 'expo-crypto';
 
@@ -35,14 +36,7 @@ export class ArtifactEncryption {
             if (!decrypted[0]) {
                 return null;
             }
-            // Validate structure
-            const header = decrypted[0] as any;
-            if (typeof header !== 'object' || header === null) {
-                return null;
-            }
-            return {
-                title: typeof header.title === 'string' ? header.title : null
-            };
+            return normalizeArtifactHeader(decrypted[0]);
         } catch (error) {
             console.error('Failed to decrypt artifact header:', error);
             return null;

@@ -93,6 +93,7 @@ export interface SpawnSessionOptions {
     officialMirrorCodexThreadId?: string;
     parentSessionId?: string;
     forkedFromMessageId?: string;
+    isSideChat?: boolean;
 }
 
 export type SpawnSessionResult =

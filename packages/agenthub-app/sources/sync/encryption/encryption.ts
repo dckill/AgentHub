@@ -8,6 +8,11 @@ import { encodeBase64, decodeBase64 } from "@/encryption/base64";
 import sodium from '@/encryption/libsodium.lib';
 import { decryptBox, encryptBox } from "@/encryption/libsodium";
 import { randomUUID } from 'expo-crypto';
+import {
+    ANALYTICS_KEY_DERIVATION_USAGE,
+    BLOB_KEY_DERIVATION_USAGE,
+    CONTENT_KEY_DERIVATION_USAGE,
+} from '@artsum/agenthub-wire';
 
 export class Encryption {
 
@@ -15,34 +20,38 @@ export class Encryption {
         await sodium.ready;
 
         // Derive content data key to open session and machine records
-        const contentDataKey = await deriveKey(masterSecret, 'AgentHub EnCoder', ['content']);
+        const contentDataKey = await deriveKey(masterSecret, CONTENT_KEY_DERIVATION_USAGE, ['content']);
 
         // Derive content data key keypair
         const contentKeyPair = sodium.crypto_box_seed_keypair(contentDataKey);
+        const masterBlobKey = await deriveKey(masterSecret, BLOB_KEY_DERIVATION_USAGE, ['master']);
 
         // Derive anonymous ID
-        const anonID = encodeHex((await deriveKey(masterSecret, 'AgentHub', ['analytics', 'id']))).slice(0, 16).toLowerCase();
+        const anonID = encodeHex((await deriveKey(masterSecret, ANALYTICS_KEY_DERIVATION_USAGE, ['analytics', 'id']))).slice(0, 16).toLowerCase();
 
         // Create encryption
-        return new Encryption(anonID, masterSecret, contentKeyPair);
+        return new Encryption(anonID, masterSecret, contentKeyPair, masterBlobKey);
     }
 
     private readonly legacyEncryption: SecretBoxEncryption;
     private readonly contentKeyPair: sodium.KeyPair;
     readonly anonID: string;
     readonly contentDataKey: Uint8Array;
+    private readonly masterBlobKey: Uint8Array;
 
     // Session and machine encryption management
     private sessionEncryptions = new Map<string, SessionEncryption>();
+    private sessionBlobKeys = new Map<string, Uint8Array>();
     private machineEncryptions = new Map<string, MachineEncryption>();
     private cache: EncryptionCache;
 
-    private constructor(anonID: string, masterSecret: Uint8Array, contentKeyPair: sodium.KeyPair) {
+    private constructor(anonID: string, masterSecret: Uint8Array, contentKeyPair: sodium.KeyPair, masterBlobKey: Uint8Array) {
         this.anonID = anonID;
         this.contentKeyPair = contentKeyPair;
         this.legacyEncryption = new SecretBoxEncryption(masterSecret);
         this.cache = new EncryptionCache();
         this.contentDataKey = contentKeyPair.publicKey;
+        this.masterBlobKey = masterBlobKey;
     }
 
     //
@@ -81,6 +90,10 @@ export class Encryption {
                 this.cache
             );
             this.sessionEncryptions.set(sessionId, sessionEnc);
+            this.sessionBlobKeys.set(
+                sessionId,
+                dataKey ? await deriveKey(dataKey, BLOB_KEY_DERIVATION_USAGE, ['session']) : this.masterBlobKey,
+            );
         }
     }
 
@@ -92,11 +105,16 @@ export class Encryption {
         return this.sessionEncryptions.get(sessionId) || null;
     }
 
+    getSessionBlobKey(sessionId: string): Uint8Array | null {
+        return this.sessionBlobKeys.get(sessionId) ?? null;
+    }
+
     /**
      * Remove session encryption from memory when session is deleted
      */
     removeSessionEncryption(sessionId: string): void {
         this.sessionEncryptions.delete(sessionId);
+        this.sessionBlobKeys.delete(sessionId);
         // Also clear any cached data for this session
         this.cache.clearSessionCache(sessionId);
     }

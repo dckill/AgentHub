@@ -11,7 +11,20 @@ describe('localSettings', () => {
             fileListScale: 1,
             deviceScale: 1,
             settingsScale: 1,
+            sidebarPanelsOpen: ['changes'],
+            sidebarPanelActive: 'changes',
         });
+    });
+
+    it('preserves valid persistent sidebar panels and rejects unknown panel ids', () => {
+        expect(localSettingsParse({
+            sidebarPanelsOpen: ['changes', 'sideChat'],
+            sidebarPanelActive: 'sideChat',
+        })).toMatchObject({
+            sidebarPanelsOpen: ['changes', 'sideChat'],
+            sidebarPanelActive: 'sideChat',
+        });
+        expect(localSettingsParse({ sidebarPanelsOpen: ['unknown'] })).toEqual(localSettingsDefaults);
     });
 
     it('rejects invalid scale values by returning defaults', () => {

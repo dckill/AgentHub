@@ -1581,6 +1581,57 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('preserves provider rewind ids on session text envelopes', () => {
+            const normalized = normalizeRawMessage('db-rewind', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-rewind',
+                    time: 1,
+                    role: 'user',
+                    claudeUuid: 'claude-user-uuid',
+                    codexItemId: 'codex-user-item',
+                    ev: { t: 'text', text: '从这里分叉' }
+                }
+            } as any);
+
+            expect(normalized).toMatchObject({
+                claudeUuid: 'claude-user-uuid',
+                codexItemId: 'codex-user-item',
+            });
+        });
+
+        it('drops control-only task notifications from persisted session envelopes', () => {
+            const notification = '<task-notification><status>completed</status></task-notification>';
+            const user = normalizeRawMessage('db-control-user', null, 1, {
+                role: 'session',
+                content: { id: 'env-control-user', time: 1, role: 'user', ev: { t: 'text', text: notification } }
+            } as any);
+            const agent = normalizeRawMessage('db-control-agent', null, 1, {
+                role: 'session',
+                content: { id: 'env-control-agent', time: 1, role: 'agent', turn: 'turn-1', ev: { t: 'text', text: notification } }
+            } as any);
+
+            expect(user).toBeNull();
+            expect(agent).toBeNull();
+        });
+
+        it('preserves visible text after a persisted task notification', () => {
+            const normalized = normalizeRawMessage('db-control-visible', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-control-visible',
+                    time: 1,
+                    role: 'user',
+                    ev: { t: 'text', text: '<task-notification>internal</task-notification>\n继续修复' }
+                }
+            } as any);
+
+            expect(normalized).toMatchObject({
+                role: 'user',
+                content: { type: 'text', text: '继续修复' }
+            });
+        });
+
         it('renders legacy user text messages', () => {
             const normalized = normalizeRawMessage('db-legacy-user-1', null, 1, {
                 role: 'user',
@@ -1759,6 +1810,12 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     },
                     description: 'Attached file: report.pdf'
                 });
+                expect(fileOnly.content[1]).toMatchObject({
+                    type: 'tool-result',
+                    tool_use_id: 'env-file-1',
+                    content: null,
+                    is_error: false,
+                });
             }
 
             const imageFile = normalizeRawMessage('db-file-2', null, 1, {
@@ -1777,8 +1834,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                             size: 4567,
                             image: {
                                 width: 800,
-                                height: 600,
-                                thumbhash: 'abc'
+                                height: 600
                             }
                         }
                     }
@@ -1796,8 +1852,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                         size: 4567,
                         image: {
                             width: 800,
-                            height: 600,
-                            thumbhash: 'abc'
+                            height: 600
                         }
                     },
                     description: 'Attached image: photo.png (800x600)'

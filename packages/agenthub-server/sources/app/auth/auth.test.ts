@@ -28,6 +28,7 @@ const privacyKit = vi.hoisted(() => ({
 const db = vi.hoisted(() => ({
     authToken: {
         create: vi.fn(async ({ data }: any) => data),
+        deleteMany: vi.fn(),
         delete: vi.fn(),
         findUnique: vi.fn<any>(async () => ({
             id: 'token-id', accountId: 'user-1', keyVersion: 1,
@@ -104,5 +105,19 @@ describe('auth module identity', () => {
             userId: 'user-1',
             extras: { keyVersion: 1 },
         });
+    });
+
+    it('stops the expiry cleanup timer during shutdown', async () => {
+        vi.useFakeTimers();
+        try {
+            const { auth } = await import('./auth');
+            await auth.init();
+            await auth.shutdown();
+
+            vi.advanceTimersByTime(60 * 60 * 1000);
+            expect(db.authToken.deleteMany).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

@@ -1,5 +1,5 @@
 import type { Session } from './storageTypes';
-import type { PermissionModeKey } from '@/components/PermissionModeSelector';
+import type { PermissionModeKey } from '@/utils/permissionMode';
 
 function isSandboxEnabled(metadata: Session['metadata'] | null | undefined): boolean {
     const sandbox = metadata?.sandbox;

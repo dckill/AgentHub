@@ -24,6 +24,7 @@ export type HomeOverviewModel = {
     state: HomeOverviewState;
     totalMachineCount: number;
     onlineMachineCount: number;
+    activeSessionCount: number;
     canStartSession: boolean;
     recentWork: HomeOverviewSessionInput[];
 };
@@ -36,6 +37,7 @@ export function buildHomeOverviewModel(input: {
 }): HomeOverviewModel {
     const totalMachineCount = input.machines.length;
     const onlineMachineCount = input.machines.filter((machine) => machine.online).length;
+    const activeSessionCount = input.sessions.filter((session) => session.active).length;
     const recentWork = [...input.sessions]
         .sort((left, right) => right.updatedAt - left.updatedAt)
         .slice(0, 3);
@@ -59,6 +61,7 @@ export function buildHomeOverviewModel(input: {
         state,
         totalMachineCount,
         onlineMachineCount,
+        activeSessionCount,
         canStartSession: state === 'ready',
         recentWork,
     };

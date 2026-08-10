@@ -1,5 +1,10 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import tweetnacl from 'tweetnacl';
+import {
+  DATA_KEY_NONCE_BYTES,
+  decryptDataKeyBundle,
+  encryptDataKeyBundle,
+} from '@artsum/agenthub-wire';
 
 /**
  * Encode a Uint8Array to base64 string
@@ -111,6 +116,26 @@ export function decryptLegacy(data: Uint8Array, secret: Uint8Array): any | null 
   return JSON.parse(new TextDecoder().decode(decrypted));
 }
 
+/** Binary attachment format shared with the App: nonce(24) + secretbox ciphertext. */
+export function encryptBlob(data: Uint8Array, key: Uint8Array): Uint8Array {
+  const nonce = getRandomBytes(tweetnacl.secretbox.nonceLength);
+  const plaintext = data.byteOffset === 0 && data.buffer.byteLength === data.length ? data : data.slice();
+  const standaloneKey = key.byteOffset === 0 && key.buffer.byteLength === key.length ? key : key.slice();
+  const encrypted = tweetnacl.secretbox(plaintext, nonce, standaloneKey);
+  const result = new Uint8Array(nonce.length + encrypted.length);
+  result.set(nonce, 0);
+  result.set(encrypted, nonce.length);
+  return result;
+}
+
+export function decryptBlob(bundle: Uint8Array, key: Uint8Array): Uint8Array | null {
+  if (bundle.length < tweetnacl.secretbox.nonceLength + 16) return null;
+  const nonce = bundle.slice(0, tweetnacl.secretbox.nonceLength);
+  const ciphertext = bundle.slice(tweetnacl.secretbox.nonceLength);
+  const standaloneKey = key.byteOffset === 0 && key.buffer.byteLength === key.length ? key : key.slice();
+  return tweetnacl.secretbox.open(ciphertext, nonce, standaloneKey);
+}
+
 /**
  * Encrypt data using AES-256-GCM with the data encryption key
  * @param data - The data to encrypt
@@ -118,25 +143,9 @@ export function decryptLegacy(data: Uint8Array, secret: Uint8Array): any | null 
  * @returns The encrypted data bundle (nonce + ciphertext + auth tag)
  */
 export function encryptWithDataKey(data: any, dataKey: Uint8Array): Uint8Array {
-  const nonce = getRandomBytes(12); // GCM uses 12-byte nonces
-  const cipher = createCipheriv('aes-256-gcm', dataKey, nonce);
-
+  const nonce = getRandomBytes(DATA_KEY_NONCE_BYTES);
   const plaintext = new TextEncoder().encode(JSON.stringify(data));
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext),
-    cipher.final()
-  ]);
-
-  const authTag = cipher.getAuthTag();
-
-  // Bundle: version(1) + nonce (12) + ciphertext + auth tag (16)
-  const bundle = new Uint8Array(12 + encrypted.length + 16 + 1);
-  bundle.set([0], 0);
-  bundle.set(nonce, 1);
-  bundle.set(new Uint8Array(encrypted), 13);
-  bundle.set(new Uint8Array(authTag), 13 + encrypted.length);
-
-  return bundle;
+  return encryptDataKeyBundle(plaintext, dataKey, nonce);
 }
 
 /**
@@ -146,31 +155,9 @@ export function encryptWithDataKey(data: any, dataKey: Uint8Array): Uint8Array {
  * @returns The decrypted data or null if decryption fails
  */
 export function decryptWithDataKey(bundle: Uint8Array, dataKey: Uint8Array): any | null {
-  if (bundle.length < 1) {
-    return null;
-  }
-  if (bundle[0] !== 0) { // Only verision 0
-    return null;
-  }
-  if (bundle.length < 12 + 16 + 1) { // Minimum: version nonce + auth tag
-    return null;
-  }
-
-
-  const nonce = bundle.slice(1, 13);
-  const authTag = bundle.slice(bundle.length - 16);
-  const ciphertext = bundle.slice(13, bundle.length - 16);
-
   try {
-    const decipher = createDecipheriv('aes-256-gcm', dataKey, nonce);
-    decipher.setAuthTag(authTag);
-
-    const decrypted = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final()
-    ]);
-
-    return JSON.parse(new TextDecoder().decode(decrypted));
+    const decrypted = decryptDataKeyBundle(bundle, dataKey);
+    return decrypted ? JSON.parse(new TextDecoder().decode(decrypted)) : null;
   } catch (error) {
     // Decryption failed
     return null;

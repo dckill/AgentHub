@@ -51,6 +51,7 @@ export class SDKToLogConverter {
     private context: ConversionContext
     private responses?: Map<string, { approved: boolean, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', reason?: string }>
     private sidechainLastUUID = new Map<string, string>();
+    private contextWindowByModel = new Map<string, number>();
 
     constructor(
         context: Omit<ConversionContext, 'parentUuid'>,
@@ -78,6 +79,23 @@ export class SDKToLogConverter {
     resetParentChain(): void {
         this.lastUuid = null
         this.context.parentUuid = null
+    }
+
+    private withContextWindow(message: SDKAssistantMessage['message']): SDKAssistantMessage['message'] {
+        if (!message.usage || typeof message.model !== 'string') {
+            return message
+        }
+        const contextWindow = this.contextWindowByModel.get(message.model)
+        if (!contextWindow) {
+            return message
+        }
+        return {
+            ...message,
+            usage: {
+                ...message.usage,
+                context_window: contextWindow,
+            },
+        } as SDKAssistantMessage['message']
     }
 
     /**
@@ -139,7 +157,7 @@ export class SDKToLogConverter {
                 logMessage = {
                     ...baseFields,
                     type: 'assistant',
-                    message: assistantMsg.message as any,
+                    message: this.withContextWindow(assistantMsg.message) as any,
                     // Assistant messages often have additional fields
                     requestId: (assistantMsg as any).requestId,
                     ...(assistantMsg.parent_tool_use_id ? { parent_tool_use_id: assistantMsg.parent_tool_use_id } : {}),
@@ -179,7 +197,16 @@ export class SDKToLogConverter {
             case 'result': {
                 // Result messages are not converted to log messages
                 // They're SDK-specific messages that indicate session completion
-                // Not part of the actual conversation log
+                // Not part of the actual conversation log. They are the only
+                // SDK messages that report the real context window per model,
+                // so remember it for later assistant usage records.
+                const resultMsg = sdkMessage as SDKResultMessage
+                for (const [model, usage] of Object.entries(resultMsg.modelUsage ?? {})) {
+                    const contextWindow = usage?.contextWindow
+                    if (typeof contextWindow === 'number' && Number.isFinite(contextWindow) && contextWindow > 0) {
+                        this.contextWindowByModel.set(model, contextWindow)
+                    }
+                }
                 break
             }
 

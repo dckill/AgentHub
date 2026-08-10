@@ -64,6 +64,16 @@ export const zhHant: TranslationStructure = {
         close: '關閉',
         backAgainToExit: '再次返回將退出 AgentHub',
         unknownError: '未知錯誤',
+        attachmentUploadFailedTitle: '附件上傳失敗',
+        attachmentUploadFailedMessage: '圖片未能安全上傳，內容已保留，請檢查網路後重試。',
+        attachmentUploadPartialTitle: '部分附件上傳失敗',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `${count} 個圖片未能上傳；其餘附件和訊息已傳送。`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `附件：${name}`,
+        sessionControlObserver: '唯讀：其他裝置正在控制此工作階段',
+        sessionControlController: '目前裝置正在控制此工作階段',
+        sessionControlRelease: '釋放控制權',
+        sessionControlClaim: '接管控制權',
+        sessionControlClaimFailed: '此工作階段由其他裝置控制',
     },
 
     profile: {
@@ -203,6 +213,13 @@ export const zhHant: TranslationStructure = {
         },
         alwaysShowContextSize: '始終顯示上下文大小',
         alwaysShowContextSizeDescription: '即使未接近限制時也顯示上下文使用情況',
+        sessionStatusBar: '工作階段狀態列',
+        sessionStatusBarDescription: '在輸入框附近顯示分支、模型、推理強度、上下文與方案限額',
+        sessionStatusBarHidden: '關閉',
+        sessionStatusBarAbove: '上方',
+        sessionStatusBarBelow: '下方',
+        usageLimitShowRemaining: '顯示剩餘額度',
+        usageLimitShowRemainingDescription: '將方案限額百分比顯示為剩餘量而非已用量',
         // Scaling
         scaling: '縮放',
         scalingDescription: '調整界面元素大小',
@@ -478,6 +495,16 @@ export const zhHant: TranslationStructure = {
         newSessionPlaceholder: '您想做什麼？',
         importOfficialTitle: '正在接管電腦工作階段',
         importOfficialDescription: '正在匯入對話內容、恢復上下文並同步目前狀態，完成前暫時無法操作。',
+        forkSession: '分叉完整會話',
+        duplicateSession: '從訊息處分叉',
+        duplicateMessageHint: '長按可從這則訊息建立獨立分支',
+        duplicateSheetTitle: '建立對話分支',
+        duplicateSheetSubtitle: '選擇新獨立會話應保留到哪一則使用者訊息（包含該訊息）。',
+        duplicateSheetEmpty: '找不到可用的使用者訊息分叉點。',
+        duplicateSheetConfirm: '建立分支',
+        forkErrorMissingMetadata: '此會話缺少分叉所需的裝置或提供者中繼資料。',
+        forkErrorGeneric: '無法建立對話分支。',
+        forkMachineOffline: '來源裝置上線時才能建立對話分支。',
     },
 
     commandPalette: {
@@ -589,6 +616,14 @@ export const zhHant: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `上下文：已用 ${used} / ${total} 個 token（${percent}%）`,
+            limitFiveHour: '5 小時限額',
+            limitSevenDay: '7 天限額',
+            limitRemaining: ({ percent }: { percent: number }) => `剩餘 ${percent}%`,
+            limitResets: ({ time }: { time: string }) => `${time} 重設`,
+            limitAsOf: ({ age }: { age: string }) => `更新於 ${age} 前`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: '準備開始寫程式？',
@@ -890,7 +925,14 @@ export const zhHant: TranslationStructure = {
         }
     },
 
+    sideChat: {
+        panelTitle: '側邊對話', allFiles: '全部檔案', newChat: '新增側邊對話', startButton: '開始側邊對話', creating: '正在建立…',
+        unavailable: '機器離線或缺少 Provider 工作階段中繼資料，目前無法分叉。',
+        emptyTitle: '還沒有側邊對話', emptySubtitle: '建立一條繼承父工作階段上下文、但不會寫回父記錄的隔離對話。',
+        close: '關閉側邊對話', expand: '全螢幕開啟側邊對話', defaultTitle: ({ index }: { index: number }) => `側邊對話 ${index}`,
+    },
     files: {
+        addPanel: '新增工作台面板',
         loadFailed: '無法載入變更，請檢查網路連線後重試。',
         fileLoadFailed: '無法載入此檔案，請檢查網路連線後重試。',
         searchFailed: '無法搜尋檔案，請重試。',
@@ -1207,6 +1249,16 @@ export const zhHant: TranslationStructure = {
         notFound: '找不到裝置',
         launchNewSessionInDirectory: '在目錄中啟動新工作階段',
         statusAndProperties: '狀態與屬性',
+        systemResources: '系統資源',
+        memory: '記憶體',
+        network: '網路',
+        downloadSpeed: '下載',
+        uploadSpeed: '上傳',
+        storage: '磁碟',
+        used: '已用',
+        available: '剩餘',
+        metricsUnavailable: '暫時無法取得即時指標',
+        metricsStale: '正在顯示最後一次可用資料',
         actions: '功能',
         startSessionOnThisMachine: '在這台裝置啟動會話',
         startSessionOnThisMachineSubtitle: '進入新建會話頁面，並預選這台裝置。',

@@ -41,6 +41,7 @@ export interface CreateSessionMetadataOptions {
     parentSessionId?: string;
     /** AgentHub message id used as the fork rewind point. */
     forkedFromMessageId?: string;
+    isSideChat?: boolean;
 }
 
 /**
@@ -147,6 +148,7 @@ export function createSessionMetadata(opts: CreateSessionMetadataOptions): Sessi
         skills: findLocalSkillNames(),
         ...(opts.parentSessionId ? { parentSessionId: opts.parentSessionId } : {}),
         ...(opts.forkedFromMessageId ? { forkedFromMessageId: opts.forkedFromMessageId } : {}),
+        ...(opts.isSideChat ? { isSideChat: true } : {}),
     };
 
     return { state, metadata };

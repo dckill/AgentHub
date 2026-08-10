@@ -3,12 +3,14 @@ import { logger } from '@/ui/logger'
 import { Expo, ExpoPushMessage } from 'expo-server-sdk'
 import type { Metadata } from './types'
 import { configuration } from '@/configuration'
+import { classifyPushTicketChunk } from './pushTicketResult'
 
 export interface PushToken {
     id: string
     token: string
     createdAt: number
     updatedAt: number
+    deviceId?: string | null
 }
 
 export type SessionNotificationKind = 'done' | 'permission' | 'question'
@@ -139,12 +141,12 @@ export class PushNotificationClient {
      * Fetch all push tokens for the authenticated user.
      * Retries up to 3 times with exponential backoff on transient errors.
      */
-    async fetchPushTokens(): Promise<PushToken[]> {
+    async fetchPushTokens(sessionId?: string): Promise<PushToken[]> {
         const maxAttempts = 3
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 const response = await axios.get<{ tokens: PushToken[] }>(
-                    `${this.baseUrl}/v1/push-tokens`,
+                    `${this.baseUrl}/v1/push-tokens${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ''}`,
                     {
                         headers: {
                             'Authorization': `Bearer ${this.token}`,
@@ -178,7 +180,7 @@ export class PushNotificationClient {
      * Send push notification via Expo Push API with retry
      * @param messages - Array of push messages to send
      */
-    async sendPushNotifications(messages: ExpoPushMessage[]): Promise<void> {
+    async sendPushNotifications(messages: ExpoPushMessage[]): Promise<boolean> {
         logger.debug(`Sending ${messages.length} push notifications`)
 
         // Filter out invalid push tokens
@@ -191,12 +193,13 @@ export class PushNotificationClient {
 
         if (validMessages.length === 0) {
             logger.debug('No valid Expo push tokens found')
-            return
+            return false
         }
 
         // Create chunks to respect Expo's rate limits
         const chunks = this.expo.chunkPushNotifications(validMessages)
 
+        let delivered = false
         for (const chunk of chunks) {
             // Retry with exponential backoff for 5 minutes
             const startTime = Date.now()
@@ -214,12 +217,17 @@ export class PushNotificationClient {
                         logger.debug('[PUSH] Some notifications failed:', errorDetails)
                     }
                     
-                    // If all notifications failed, throw to trigger retry
-                    if (errors.length === ticketChunk.length) {
+                    const result = classifyPushTicketChunk(ticketChunk)
+
+                    // If all notifications failed, throw to trigger retry. An empty
+                    // provider response is a terminal fail-closed result instead of
+                    // entering the five-minute retry loop with no evidence of failure.
+                    if (result.shouldRetry) {
                         throw new Error('All push notifications in chunk failed')
                     }
                     
-                    // Success - break out of retry loop
+                    // Success or terminal provider contract failure - break out of retry loop.
+                    delivered = delivered || result.delivered
                     break
                 } catch (error) {
                     const elapsed = Date.now() - startTime
@@ -243,6 +251,7 @@ export class PushNotificationClient {
         }
 
         logger.debug(`Push notifications sent successfully`)
+        return delivered
     }
 
     /**
@@ -251,62 +260,61 @@ export class PushNotificationClient {
      * @param body - Notification body
      * @param data - Additional data to send with the notification
      */
-    sendToAllDevices(title: string, body?: string, data?: Record<string, any>): void {
+    async sendToAllDevices(title: string, body?: string, data?: Record<string, any>): Promise<boolean> {
         logger.debug(`[PUSH] sendToAllDevices called with title: "${title}", body: "${body ?? ''}"`);
-        
-        // Execute async operations without awaiting
-        (async () => {
-            try {
-                // Fetch all push tokens
-                logger.debug('[PUSH] Fetching push tokens...')
-                const tokens = await this.fetchPushTokens()
-                logger.debug(`[PUSH] Fetched ${tokens.length} push tokens`)
-                
-                // Log token details for debugging
-                tokens.forEach((token, index) => {
-                    logger.debug(`[PUSH] Using token ${index + 1}: id=${token.id}`)
-                })
+        try {
+            // Fetch all push tokens
+            logger.debug('[PUSH] Fetching push tokens...')
+            const sessionId = typeof data?.sessionId === 'string' ? data.sessionId : undefined
+            const tokens = await this.fetchPushTokens(sessionId)
+            logger.debug(`[PUSH] Fetched ${tokens.length} push tokens`)
 
-                if (tokens.length === 0) {
-                    logger.debug('No push tokens found for user')
-                    return
-                }
+            // Log token details for debugging
+            tokens.forEach((token, index) => {
+                logger.debug(`[PUSH] Using token ${index + 1}: id=${token.id}`)
+            })
 
-                // Create messages for all tokens
-                const messages: ExpoPushMessage[] = tokens.map((token, index) => {
-                    logger.debug(`[PUSH] Creating message ${index + 1} for token`)
-                    return {
-                        to: token.token,
-                        title,
-                        body: body && body.length > 0 ? body : undefined,
-                        data,
-                        // TODO: For brutalist session artwork, attach rich media via a public HTTPS image URL.
-                        // Bundled app asset paths / require(...) / local file paths will not work in push payloads.
-                        // iOS also needs a Notification Service Extension to render richContent.image reliably.
-                        sound: 'default',
-                        priority: 'high'
-                    }
-                })
-
-                // Send notifications
-                logger.debug(`[PUSH] Sending ${messages.length} push notifications...`)
-                await this.sendPushNotifications(messages)
-                logger.debug('[PUSH] Push notifications sent successfully')
-            } catch (error) {
-                logger.debug('[PUSH] Error sending to all devices:', error)
+            if (tokens.length === 0) {
+                logger.debug('No push tokens found for user')
+                return false
             }
-        })()
+
+            // Create messages for all tokens
+            const messages: ExpoPushMessage[] = tokens.map((token, index) => {
+                logger.debug(`[PUSH] Creating message ${index + 1} for token`)
+                return {
+                    to: token.token,
+                    title,
+                    body: body && body.length > 0 ? body : undefined,
+                    data,
+                    // TODO: For brutalist session artwork, attach rich media via a public HTTPS image URL.
+                    // Bundled app asset paths / require(...) / local file paths will not work in push payloads.
+                    // iOS also needs a Notification Service Extension to render richContent.image reliably.
+                    sound: 'default',
+                    priority: 'high'
+                }
+            })
+
+            // Send notifications and expose the provider result to callers.
+            logger.debug(`[PUSH] Sending ${messages.length} push notifications...`)
+            const delivered = await this.sendPushNotifications(messages)
+            logger.debug(`[PUSH] Push notifications ${delivered ? 'sent successfully' : 'were not delivered'}`)
+            return delivered
+        } catch (error) {
+            logger.debug('[PUSH] Error sending to all devices:', error)
+            return false
+        }
     }
 
     sendSessionNotification(params: {
         kind: SessionNotificationKind
         metadata: Metadata | null | undefined
         data?: Record<string, any>
-    }): void {
+    }): Promise<boolean> {
         const { title, body } = getSessionNotificationCopy(params.kind, params.metadata, params.data)
         const sessionTitle = getSessionTitle(params.metadata)
         const url = getSessionNotificationUrl(params.data)
-        this.sendToAllDevices(title, body, {
+        return this.sendToAllDevices(title, body, {
             ...params.data,
             kind: params.kind,
             sessionTitle,

@@ -176,7 +176,9 @@ export async function updateSettings(
           if (Date.now() - stats.mtimeMs > STALE_LOCK_TIMEOUT_MS) {
             await unlink(lockFile).catch(() => { });
           }
-        } catch { }
+        } catch {
+          // Best effort: a missing or unreadable lock only means stale cleanup can retry later.
+        }
       } else {
         throw err;
       }
@@ -405,7 +407,9 @@ export async function acquireDaemonLock(
 export async function releaseDaemonLock(lockHandle: FileHandle): Promise<void> {
   try {
     await lockHandle.close();
-  } catch { }
+  } catch {
+    // Best effort: the handle is already being released; daemon shutdown must continue.
+  }
 
   try {
     if (existsSync(configuration.daemonLockFile)) {
@@ -414,7 +418,9 @@ export async function releaseDaemonLock(lockHandle: FileHandle): Promise<void> {
       const currentNonce = content.startsWith('{') ? (JSON.parse(content) as DaemonLockOwner).ownerNonce : undefined;
       if (!expectedNonce || expectedNonce === currentNonce) unlinkSync(configuration.daemonLockFile);
     }
-  } catch { }
+  } catch {
+    // Best effort: a missing or malformed lock file is safe to leave for the next owner check.
+  }
   lockOwners.delete(lockHandle);
 }
 

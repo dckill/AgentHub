@@ -51,6 +51,9 @@ export const PermissionModeSelector: React.FC<PermissionModeSelectorProps> = ({
             onPress={handleTap}
             disabled={disabled}
             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+            accessibilityRole="button"
+            accessibilityLabel={hackedMode.name}
+            accessibilityState={{ disabled }}
             style={{
                 flexDirection: 'row',
                 alignItems: 'center',

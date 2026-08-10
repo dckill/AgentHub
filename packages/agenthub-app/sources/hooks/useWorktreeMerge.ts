@@ -19,6 +19,8 @@ import { t } from '@/text';
 import { AgentHubError } from '@/utils/errors';
 import { isWorktreePath, getRepoPath, getWorktreeName, removeWorktree } from '@/utils/worktree';
 import { Session } from '@/sync/storageTypes';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { runWorktreeMergePostSpawnLifecycle } from '@/sync/worktreeMergeLifecycle';
 
 export function useWorktreeMerge(session: Session) {
     const navigateToSession = useNavigateToSession();
@@ -37,17 +39,27 @@ export function useWorktreeMerge(session: Session) {
             throw new AgentHubError(t('sessionInfo.mergeWorktreeFailed'), false);
         }
 
-        const confirmed = await Modal.confirm(
-            t('sessionInfo.mergeWorktreeConfirmTitle'),
-            t('sessionInfo.mergeWorktreeConfirmMessage', { branch: branchName }),
-        );
-        if (!confirmed) return;
-
-        const result = await machineSpawnNewSession({
-            machineId,
-            directory: repoPath,
-            agent: 'claude',
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('sessionInfo.mergeWorktreeConfirmTitle'),
+                t('sessionInfo.mergeWorktreeConfirmMessage', { branch: branchName }),
+            ),
         });
+        if (!isCurrent() || !confirmed) return;
+
+        const result = await runSessionActionRequest({
+            isCurrent,
+            request: () => machineSpawnNewSession({
+                machineId,
+                directory: repoPath,
+                agent: 'claude',
+            }),
+        });
+        if (result === null) return;
 
         if (result.type === 'error') {
             throw new AgentHubError(result.errorMessage || t('sessionInfo.mergeWorktreeFailed'), false);
@@ -57,36 +69,42 @@ export function useWorktreeMerge(session: Session) {
             throw new AgentHubError(t('sessionInfo.mergeWorktreeFailed'), false);
         }
 
-        await sync.refreshSessions();
-        storage.getState().updateSessionPermissionMode(result.sessionId, 'acceptEdits');
-
-        await sync.sendMessage(
-            result.sessionId,
-            `Merge branch '${branchName}' into the current branch. Resolve any merge conflicts that arise.`,
-            { source: 'new_session' },
-        );
-
-        // Ask whether to archive the worktree session and clean up worktree files.
-        // Only archive+cleanup when the user explicitly confirms.
-        const shouldArchive = await Modal.confirm(
-            t('sessionInfo.mergeWorktreeArchiveTitle'),
-            t('sessionInfo.mergeWorktreeArchiveMessage'),
-            {
-                confirmText: t('sessionInfo.mergeWorktreeArchiveConfirm'),
-                cancelText: t('sessionInfo.mergeWorktreeArchiveCancel'),
-                destructive: true,
+        await runWorktreeMergePostSpawnLifecycle({
+            isCurrent,
+            refreshSessions: () => sync.refreshSessions(),
+            applyPermission: () => {
+                storage.getState().updateSessionPermissionMode(result.sessionId, 'acceptEdits');
             },
-        );
-
-        if (shouldArchive) {
-            await removeWorktree(machineId, sessionPath).catch(() => {});
-            const killResult = await sessionKill(session.id);
-            if (!killResult.success) {
-                await sessionArchive(session.id);
-            }
-        }
-
-        navigateToSession(result.sessionId);
+            sendMergeMessage: async () => {
+                await sync.sendMessage(
+                    result.sessionId,
+                    `Merge branch '${branchName}' into the current branch. Resolve any merge conflicts that arise.`,
+                    { source: 'new_session' },
+                );
+            },
+            // Ask whether to archive the worktree session and clean up worktree files.
+            // Only archive+cleanup when the user explicitly confirms.
+            confirmArchive: () => Modal.confirm(
+                t('sessionInfo.mergeWorktreeArchiveTitle'),
+                t('sessionInfo.mergeWorktreeArchiveMessage'),
+                {
+                    confirmText: t('sessionInfo.mergeWorktreeArchiveConfirm'),
+                    cancelText: t('sessionInfo.mergeWorktreeArchiveCancel'),
+                    destructive: true,
+                },
+            ),
+            archiveOriginal: async () => {
+                if (!isCurrent()) return;
+                await removeWorktree(machineId, sessionPath).catch(() => {});
+                if (!isCurrent()) return;
+                const killResult = await sessionKill(session.id);
+                if (!isCurrent()) return;
+                if (!killResult.success) {
+                    await sessionArchive(session.id);
+                }
+            },
+            navigate: () => navigateToSession(result.sessionId),
+        });
     });
 
     return { canMerge, mergingWorktree, mergeWorktreeAction: performMerge };

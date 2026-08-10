@@ -33,6 +33,7 @@ describe('external Claude CLI query transport', () => {
             maxTurns: 4,
             mcpServers: { agenthub: { type: 'http', url: 'http://127.0.0.1:1234' } },
             model: 'opus',
+            effort: 'xhigh',
             permissionMode: 'plan',
             settingsPath: '/tmp/settings.json',
             strictMcpConfig: true,
@@ -40,7 +41,7 @@ describe('external Claude CLI query transport', () => {
         })).toEqual([
             '--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
             '--replay-user-messages', '--permission-prompt-tool', 'stdio',
-            '--continue', '--model', 'opus', '--fallback-model', 'sonnet', '--max-turns', '4',
+            '--continue', '--model', 'opus', '--fallback-model', 'sonnet', '--effort', 'xhigh', '--max-turns', '4',
             '--permission-mode', 'plan', '--allowedTools', 'Read,Bash(git status)',
             '--disallowedTools', 'Write', '--mcp-config', JSON.stringify({ mcpServers: { agenthub: { type: 'http', url: 'http://127.0.0.1:1234' } } }),
             '--strict-mcp-config', '--append-system-prompt', 'AgentHub prompt', '--settings', '/tmp/settings.json',

@@ -11,6 +11,8 @@ import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
+import { fromRateLimitEvent, windowsFromGetUsage, type RateLimitEventInfo, type UnboundRateLimit, type UsageLimitsPatch } from './utils/usageLimits';
+import type { UsageLimitWindow } from '@/api/types';
 
 export async function claudeRemote(opts: {
 
@@ -41,7 +43,8 @@ export async function claudeRemote(opts: {
     onMessage: (message: SDKMessage) => void,
     onCompletionEvent?: (message: string) => void,
     onSessionReset?: () => void,
-    onSDKMetadata?: (metadata: { tools?: string[]; slashCommands?: string[]; mcpServers?: { name: string; status: string }[]; skills?: string[] }) => void
+    onSDKMetadata?: (metadata: { tools?: string[]; slashCommands?: string[]; mcpServers?: { name: string; status: string }[]; skills?: string[] }) => void,
+    onUsageLimits?: (patch: UsageLimitsPatch) => void
 }) {
 
     // Check if session is valid
@@ -121,6 +124,7 @@ export async function claudeRemote(opts: {
         mcpServers: opts.mcpServers,
         permissionMode: mapToClaudeMode(initial.mode.permissionMode),
         model: initial.mode.model,
+        effort: initial.mode.effort,
         fallbackModel: initial.mode.fallbackModel,
         customSystemPrompt: initial.mode.customSystemPrompt ? initial.mode.customSystemPrompt + '\n\n' + systemPrompt : undefined,
         appendSystemPrompt: initial.mode.appendSystemPrompt ? initial.mode.appendSystemPrompt + '\n\n' + systemPrompt : systemPrompt,
@@ -179,6 +183,63 @@ export async function claudeRemote(opts: {
         });
     }
 
+    const pendingUsageWindows = new Map<string, UsageLimitWindow>();
+    let pendingUnbound: UnboundRateLimit | null = null;
+    let usageSeeded = false;
+    let lastUsageSignature: string | null = null;
+    let lastUsageEmittedAt = 0;
+    const usageRefreshIntervalMs = 5 * 60_000;
+    const flushUsageLimits = async () => {
+        if (!opts.onUsageLimits) return;
+        let replace = false;
+        if (!usageSeeded) {
+            usageSeeded = true;
+            const usageFunction = (response as any).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
+            if (typeof usageFunction === 'function') {
+                try {
+                    const usage = await usageFunction.call(response);
+                    if (usage?.rate_limits_available && usage.rate_limits) {
+                        for (const snapshotWindow of windowsFromGetUsage(usage.rate_limits)) {
+                            const pendingWindow = pendingUsageWindows.get(snapshotWindow.id);
+                            if (!pendingWindow) {
+                                pendingUsageWindows.set(snapshotWindow.id, snapshotWindow);
+                            } else if (pendingWindow.utilization == null) {
+                                pendingUsageWindows.set(snapshotWindow.id, {
+                                    ...pendingWindow,
+                                    utilization: snapshotWindow.utilization,
+                                    resetsAt: pendingWindow.resetsAt ?? snapshotWindow.resetsAt,
+                                });
+                            }
+                        }
+                        replace = true;
+                    }
+                } catch (error) {
+                    logger.debug('[claudeRemote] usage seed failed (ignored)', error);
+                }
+            }
+        }
+        if (pendingUsageWindows.size === 0 && !pendingUnbound) return;
+        const patch: UsageLimitsPatch = {
+            capturedAt: Date.now(),
+            windows: [...pendingUsageWindows.values()],
+            unbound: pendingUnbound ?? undefined,
+            replace: replace || undefined,
+        };
+        pendingUsageWindows.clear();
+        pendingUnbound = null;
+        const signature = JSON.stringify([patch.windows, patch.unbound ?? null]);
+        if (signature === lastUsageSignature && Date.now() - lastUsageEmittedAt < usageRefreshIntervalMs) return;
+        lastUsageSignature = signature;
+        lastUsageEmittedAt = Date.now();
+        opts.onUsageLimits(patch);
+    };
+    let usageFlushChain = Promise.resolve();
+    const scheduleUsageFlush = () => {
+        usageFlushChain = usageFlushChain.then(flushUsageLimits).catch((error) => {
+            logger.debug('[claudeRemote] usage flush failed (ignored)', error);
+        });
+    };
+
     updateThinking(true);
     try {
         logger.debug(`[claudeRemote] Starting to iterate over response`);
@@ -220,9 +281,19 @@ export async function claudeRemote(opts: {
             }
 
             // Handle result messages
+            if (message.type === 'rate_limit_event') {
+                const info = (message as { rate_limit_info?: RateLimitEventInfo }).rate_limit_info;
+                if (info) {
+                    const normalized = fromRateLimitEvent(info);
+                    if (normalized.window) pendingUsageWindows.set(normalized.window.id, normalized.window);
+                    if (normalized.unbound) pendingUnbound = normalized.unbound;
+                }
+            }
+
             if (message.type === 'result') {
                 updateThinking(false);
                 logger.debug('[claudeRemote] Result received');
+                scheduleUsageFlush();
 
                 // Send completion messages
                 if (isCompactCommand) {

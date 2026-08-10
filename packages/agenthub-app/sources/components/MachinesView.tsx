@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
-import { useAllMachines, useIsDataReady, useSettingMutable, useSocketStatus } from '@/sync/storage';
+import { useAllMachines, useAllSessions, useIsDataReady, useSettingMutable, useSocketStatus } from '@/sync/storage';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -21,7 +21,7 @@ import {
     NEW_MACHINE_GROUP_KEY,
     UNGROUPED_MACHINE_GROUP_KEY,
 } from '@/utils/machineGroups';
-import { getVisibleDeviceMachines } from '@/utils/machineActions';
+import { getVisibleDeviceMachines, sortMachinesOnlineFirst } from '@/utils/machineActions';
 import { useDeviceScale } from '@/hooks/useScale';
 import { FileTransferBadge } from '@/components/FileTransferBadge';
 import { useFileTransferStore } from '@/sync/fileTransferStore';
@@ -30,6 +30,11 @@ import { getActionMenuAnchorFromEvent } from '@/components/actionMenuPosition';
 import { getAccessibleActionProps } from '@/components/accessibilityProps';
 import { buildMachinesViewModel, MachinesViewState } from '@/components/machinesViewModel';
 import { getMachineCliUpdateView } from '@/utils/cliUpdate';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
+import { buildHomeOverviewModel } from '@/components/homeOverviewModel';
+import { resolveSessionDisplayTitle } from '@/utils/sessionTitle';
+import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 
 const stylesheet = StyleSheet.create((theme) => ({
     groupHeader: {
@@ -170,6 +175,108 @@ const stylesheet = StyleSheet.create((theme) => ({
         overflow: 'hidden',
         opacity: 0,
     },
+    dashboard: {
+        marginHorizontal: 16,
+        marginTop: 14,
+        marginBottom: 8,
+        padding: 16,
+        borderRadius: 18,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surfaceRaised,
+    },
+    dashboardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    dashboardEyebrow: {
+        color: theme.colors.textSecondary,
+        fontSize: 10,
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        ...Typography.default('semiBold'),
+    },
+    dashboardTitle: {
+        color: theme.colors.text,
+        fontSize: 19,
+        lineHeight: 24,
+        marginTop: 3,
+        ...Typography.default('semiBold'),
+    },
+    dashboardAction: {
+        minWidth: 96,
+        minHeight: 44,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.accent,
+        backgroundColor: theme.colors.accentSoft,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dashboardActionPressed: { opacity: 0.78 },
+    dashboardActionDisabled: { opacity: 0.45 },
+    dashboardActionText: {
+        color: theme.colors.accent,
+        fontSize: 13,
+        ...Typography.default('semiBold'),
+    },
+    dashboardStats: { flexDirection: 'row', gap: 8, marginTop: 15 },
+    dashboardStat: {
+        flex: 1,
+        minWidth: 0,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: theme.colors.canvas,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.border,
+    },
+    dashboardStatValue: {
+        color: theme.colors.text,
+        fontSize: 18,
+        lineHeight: 22,
+        ...Typography.default('semiBold'),
+    },
+    dashboardStatLabel: {
+        color: theme.colors.textSecondary,
+        fontSize: 10,
+        marginTop: 2,
+        ...Typography.default(),
+    },
+    recentSection: {
+        marginTop: 14,
+        paddingTop: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.divider,
+    },
+    recentHeading: {
+        color: theme.colors.textSecondary,
+        fontSize: 11,
+        marginBottom: 4,
+        ...Typography.default('semiBold'),
+    },
+    recentRow: {
+        minHeight: 42,
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 9,
+    },
+    recentRowPressed: { backgroundColor: theme.colors.surfaceHighest },
+    recentTitle: { flex: 1, minWidth: 0, color: theme.colors.text, fontSize: 13, ...Typography.default() },
+    deviceListHeading: {
+        paddingHorizontal: 24,
+        paddingTop: 14,
+        paddingBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    deviceListTitle: { color: theme.colors.text, fontSize: 15, ...Typography.default('semiBold') },
 }));
 
 function getOperationalCopy(state: Exclude<MachinesViewState, 'ready'>) {
@@ -204,12 +311,14 @@ function getOperationalCopy(state: Exclude<MachinesViewState, 'ready'>) {
 export const MachinesView = React.memo(function MachinesView() {
     const { theme } = useUnistyles();
     const router = useRouter();
+    const navigateToSession = useNavigateToSession();
     const styles = stylesheet;
     const { scale: listScale, s } = useDeviceScale();
     const { width: viewportWidth } = useWindowDimensions();
     const compactNotice = viewportWidth < 480;
 
     const allMachinesWithOffline = useAllMachines({ includeOffline: true });
+    const allSessions = useAllSessions();
     const isDataReady = useIsDataReady();
     const socketStatus = useSocketStatus();
     const [machineGroups, setMachineGroups] = useSettingMutable('machineGroups');
@@ -228,6 +337,18 @@ export const MachinesView = React.memo(function MachinesView() {
         socketStatus: socketStatus.status,
         visibleMachineCount: visibleMachines.length,
     }), [isDataReady, socketStatus.status, visibleMachines.length]);
+    const dashboardModel = React.useMemo(() => buildHomeOverviewModel({
+        dataReady: isDataReady,
+        socketStatus: socketStatus.status,
+        machines: visibleMachines.map((machine) => ({ id: machine.id, online: isMachineOnline(machine) })),
+        sessions: allSessions.map((session) => ({
+            id: session.id,
+            updatedAt: session.updatedAt,
+            active: session.active,
+            title: resolveSessionDisplayTitle(session.metadata),
+        })),
+    }), [allSessions, isDataReady, socketStatus.status, visibleMachines]);
+    const dashboardConnected = socketStatus.status === 'connected';
 
     const groups = React.useMemo(
         () => buildMachineGroups(visibleMachines.map(m => m.id), machineGroups, machineGroupOrder),
@@ -245,13 +366,18 @@ export const MachinesView = React.memo(function MachinesView() {
     );
 
     const handleRenameGroup = React.useCallback(async (oldName: string) => {
-        const newName = await Modal.prompt(
-            t('machines.renameGroup'),
-            t('machines.enterGroupName'),
-            { placeholder: oldName, confirmText: t('common.save'), defaultValue: oldName }
-        );
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const newName = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('machines.renameGroup'),
+                t('machines.enterGroupName'),
+                { placeholder: oldName, confirmText: t('common.save'), defaultValue: oldName }
+            ),
+        });
         const trimmed = newName?.trim();
-        if (!trimmed || trimmed === oldName) return;
+        if (!isCurrent() || !trimmed || trimmed === oldName) return;
         if (groupNames.includes(trimmed)) {
             Modal.alert(t('common.error'), t('machines.groupAlreadyExists'));
             return;
@@ -268,12 +394,17 @@ export const MachinesView = React.memo(function MachinesView() {
     }, [groupNames, machineGroups, setMachineGroupOrder, setMachineGroups]);
 
     const handleDeleteGroup = React.useCallback(async (groupName: string) => {
-        const confirmed = await Modal.confirm(
-            t('machines.deleteGroup'),
-            t('machines.deleteGroupConfirm', { name: groupName }),
-            { confirmText: t('common.delete'), destructive: true }
-        );
-        if (confirmed) {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('machines.deleteGroup'),
+                t('machines.deleteGroupConfirm', { name: groupName }),
+                { confirmText: t('common.delete'), destructive: true }
+            ),
+        });
+        if (confirmed === true && isCurrent()) {
             const updated = { ...machineGroups };
             for (const key of Object.keys(updated)) {
                 if (updated[key] === groupName) {
@@ -299,13 +430,18 @@ export const MachinesView = React.memo(function MachinesView() {
     }, [groupNames, machineGroups, setMachineGroupOrder, setMachineGroups]);
 
     const handleCreateGroupForMachine = React.useCallback(async (machineId: string) => {
-        const name = await Modal.prompt(
-            t('machines.newGroup'),
-            t('machines.enterGroupName'),
-            { placeholder: t('machines.groupName'), confirmText: t('common.create') }
-        );
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const name = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('machines.newGroup'),
+                t('machines.enterGroupName'),
+                { placeholder: t('machines.groupName'), confirmText: t('common.create') }
+            ),
+        });
         const trimmed = name?.trim();
-        if (!trimmed) return;
+        if (!isCurrent() || !trimmed) return;
         if (groupNames.includes(trimmed)) {
             Modal.alert(t('common.error'), t('machines.groupAlreadyExists'));
             return;
@@ -550,6 +686,64 @@ export const MachinesView = React.memo(function MachinesView() {
         <View role="main" style={styles.pageContainer}>
             <Text role="heading" aria-level={1} style={styles.screenReaderHeading}>{t('tabs.machines')}</Text>
             <ItemList style={{ paddingTop: 0 }} itemScale={listScale}>
+            <View style={styles.dashboard}>
+                <View style={styles.dashboardTop}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.dashboardEyebrow}>{t('homeOverview.eyebrow')}</Text>
+                        <Text accessibilityRole="header" style={styles.dashboardTitle}>{t('homeOverview.title')}</Text>
+                    </View>
+                    <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('newSession.title')}
+                        accessibilityState={{ disabled: !dashboardModel.canStartSession }}
+                        disabled={!dashboardModel.canStartSession}
+                        onPress={() => router.navigate('/new')}
+                        style={({ pressed }) => [
+                            styles.dashboardAction,
+                            pressed && styles.dashboardActionPressed,
+                            !dashboardModel.canStartSession && styles.dashboardActionDisabled,
+                        ]}
+                    >
+                        <Text style={styles.dashboardActionText}>{t('newSession.title')}</Text>
+                    </Pressable>
+                </View>
+                <View style={styles.dashboardStats}>
+                    <View style={styles.dashboardStat}>
+                        <Text style={styles.dashboardStatValue}>{dashboardModel.onlineMachineCount}/{dashboardModel.totalMachineCount}</Text>
+                        <Text style={styles.dashboardStatLabel}>{t('homeOverview.deviceHealth')}</Text>
+                    </View>
+                    <View style={styles.dashboardStat}>
+                        <Text style={styles.dashboardStatValue}>{dashboardModel.activeSessionCount}</Text>
+                        <Text style={styles.dashboardStatLabel}>{t('project.activeSessionCount')}</Text>
+                    </View>
+                    <View style={styles.dashboardStat}>
+                        <Text style={[styles.dashboardStatValue, { color: dashboardConnected ? theme.colors.status.connected : theme.colors.warning }]}>●</Text>
+                        <Text style={styles.dashboardStatLabel}>{t(dashboardConnected ? 'status.online' : 'homeOverview.restoringConnection')}</Text>
+                    </View>
+                </View>
+                {dashboardModel.recentWork.length > 0 ? (
+                    <View style={styles.recentSection}>
+                        <Text style={styles.recentHeading}>{t('homeOverview.recentWork')}</Text>
+                        {dashboardModel.recentWork.map((session) => (
+                            <Pressable
+                                key={session.id}
+                                accessibilityRole="button"
+                                accessibilityLabel={session.title ?? t('homeOverview.sessionFallback')}
+                                onPress={() => navigateToSession(session.id)}
+                                style={({ pressed }) => [styles.recentRow, pressed && styles.recentRowPressed]}
+                            >
+                                <Ionicons name={session.active ? 'radio-button-on-outline' : 'archive-outline'} size={15} color={session.active ? theme.colors.status.connected : theme.colors.textSecondary} />
+                                <Text numberOfLines={1} style={styles.recentTitle}>{session.title ?? t('homeOverview.sessionFallback')}</Text>
+                                <Ionicons name="chevron-forward" size={14} color={theme.colors.textSecondary} />
+                            </Pressable>
+                        ))}
+                    </View>
+                ) : null}
+            </View>
+            <View style={styles.deviceListHeading}>
+                <Ionicons name="desktop-outline" size={17} color={theme.colors.textSecondary} />
+                <Text accessibilityRole="header" style={styles.deviceListTitle}>{t('project.machine')}</Text>
+            </View>
             {connectionCopy ? (
                 <View
                     style={[
@@ -594,7 +788,10 @@ export const MachinesView = React.memo(function MachinesView() {
             {groups.map((group) => {
                 const isUngrouped = group.name === UNGROUPED_MACHINE_GROUP_KEY;
                 const groupTitle = isUngrouped ? t('machines.ungrouped') : group.name;
-                const machinesInGroup = visibleMachines.filter(m => group.machineIds.includes(m.id));
+                const machinesInGroup = sortMachinesOnlineFirst(
+                    visibleMachines.filter(m => group.machineIds.includes(m.id)),
+                    machine => pageModel.state !== 'offline' && isMachineOnline(machine),
+                );
 
                 return (
                     <ItemGroup

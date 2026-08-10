@@ -15,8 +15,10 @@ import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { getAskUserQuestionToolCallIds } from "./utils/questionNotification";
+import { launchFailureMessage } from './utils/launchFailureMessage';
 import { isPermissionMode, mapToClaudeMode } from "./utils/permissionMode";
 import { handleClaudeBackendFailure } from './claudeBackendFailure';
+import { mergeUsageLimits } from './utils/usageLimits';
 
 interface PermissionsField {
     date: number;
@@ -120,6 +122,10 @@ export async function claudeRemoteLauncher(
 
     // Create permission handler
     const permissionHandler = new PermissionHandler(session);
+    // A resumed session can still contain requests owned by a CLI process that
+    // no longer exists. Move them to a terminal canceled state immediately so
+    // the App never presents an approval action that cannot be answered.
+    permissionHandler.reset('Previous CLI process exited before responding');
 
     // Create outgoing message queue
     const messageQueue = new OutgoingMessageQueue(
@@ -376,6 +382,12 @@ export async function claudeRemoteLauncher(
                             skills: metadata.skills,
                         }));
                     },
+                    onUsageLimits: (patch) => {
+                        session.client.updateAgentState((currentAgentState) => ({
+                            ...currentAgentState,
+                            usageLimits: mergeUsageLimits(currentAgentState.usageLimits, patch),
+                        }));
+                    },
                     onQueryReady: (q) => {
                         permissionHandler.setPermissionModeUpdater(async (mode) => {
                             // Map any of the 7 modes to the 4 the SDK understands
@@ -427,7 +439,7 @@ export async function claudeRemoteLauncher(
                     onBackendFatal,
                     notifyUnexpected: (error) => {
                         logger.debug('[remote]: backend shutdown failed', error);
-                        session.client.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
+                    session.client.sendSessionEvent({ type: 'message', message: launchFailureMessage(e) });
                     },
                 });
                 if (action === 'retry') {

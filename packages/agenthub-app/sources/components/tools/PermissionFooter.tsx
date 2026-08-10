@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { sessionAllow, sessionDeny } from '@/sync/ops';
+import { runPermissionAction } from '@/sync/permissionActionLifecycle';
 import { useUnistyles } from 'react-native-unistyles';
 import { storage } from '@/sync/storage';
 import { t } from '@/text';
@@ -36,7 +37,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
 
         setLoadingButton('allow');
         try {
-            await sessionAllow(sessionId, permission.id);
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id));
+            if (result === null) return;
         } catch (error) {
             console.error('Failed to approve permission:', error);
         } finally {
@@ -49,7 +51,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
 
         setLoadingAllEdits(true);
         try {
-            await sessionAllow(sessionId, permission.id, 'acceptEdits');
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id, 'acceptEdits'));
+            if (result === null) return;
             // Update the session permission mode to 'acceptEdits' for future permissions
             storage.getState().updateSessionPermissionMode(sessionId, 'acceptEdits');
         } catch (error) {
@@ -64,7 +67,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
 
         setLoadingBypass(true);
         try {
-            await sessionAllow(sessionId, permission.id, 'bypassPermissions');
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id, 'bypassPermissions'));
+            if (result === null) return;
             storage.getState().updateSessionPermissionMode(sessionId, 'bypassPermissions');
         } catch (error) {
             console.error('Failed to bypass permissions:', error);
@@ -85,7 +89,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                 toolIdentifier = `Bash(${command})`;
             }
             
-            await sessionAllow(sessionId, permission.id, undefined, [toolIdentifier]);
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id, undefined, [toolIdentifier]));
+            if (result === null) return;
         } catch (error) {
             console.error('Failed to approve for session:', error);
         } finally {
@@ -98,7 +103,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
 
         setLoadingButton('deny');
         try {
-            await sessionDeny(sessionId, permission.id);
+            const result = await runPermissionAction(() => sessionDeny(sessionId, permission.id));
+            if (result === null) return;
         } catch (error) {
             console.error('Failed to deny permission:', error);
         } finally {
@@ -112,7 +118,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
         
         setLoadingButton('allow');
         try {
-            await sessionAllow(sessionId, permission.id, undefined, undefined, 'approved');
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id, undefined, undefined, 'approved'));
+            if (result === null) return;
         } catch (error) {
             console.error('Failed to approve permission:', error);
         } finally {
@@ -125,7 +132,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
         
         setLoadingForSession(true);
         try {
-            await sessionAllow(sessionId, permission.id, undefined, undefined, 'approved_for_session');
+            const result = await runPermissionAction(() => sessionAllow(sessionId, permission.id, undefined, undefined, 'approved_for_session'));
+            if (result === null) return;
             storage.getState().updateSessionPermissionMode(sessionId, 'yolo');
         } catch (error) {
             console.error('Failed to approve for session:', error);
@@ -139,7 +147,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
         
         setLoadingButton('abort');
         try {
-            await sessionDeny(sessionId, permission.id, undefined, undefined, 'abort');
+            const result = await runPermissionAction(() => sessionDeny(sessionId, permission.id, undefined, undefined, 'abort'));
+            if (result === null) return;
         } catch (error) {
             console.error('Failed to abort permission:', error);
         } finally {
@@ -290,6 +299,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleCodexApprove}
                         disabled={!isPending || loadingButton !== null || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.yes')}
                     >
                         {loadingButton === 'allow' && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -319,6 +330,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleCodexApproveForSession}
                         disabled={!isPending || loadingButton !== null || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('codex.permissions.yesForSession')}
                     >
                         {loadingForSession && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -348,6 +361,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleCodexAbort}
                         disabled={!isPending || loadingButton !== null || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('codex.permissions.stopAndExplain')}
                     >
                         {loadingButton === 'abort' && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -384,6 +399,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                     onPress={handleApprove}
                     disabled={!isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession}
                     activeOpacity={isPending ? 0.7 : 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.yes')}
                 >
                     {loadingButton === 'allow' && isPending ? (
                         <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -414,6 +431,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleApproveAllEdits}
                         disabled={!isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('claude.permissions.yesAllowAllEdits')}
                     >
                         {loadingAllEdits && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -445,6 +464,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleBypassPermissions}
                         disabled={!isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('claude.permissions.yesAllowEverything')}
                     >
                         {loadingBypass && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -476,6 +497,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         onPress={handleApproveForSession}
                         disabled={!isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession}
                         activeOpacity={isPending ? 0.7 : 1}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('claude.permissions.yesForTool')}
                     >
                         {loadingForSession && isPending ? (
                             <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>
@@ -505,6 +528,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                     onPress={handleDeny}
                     disabled={!isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession}
                     activeOpacity={isPending ? 0.7 : 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('claude.permissions.noTellClaude')}
                 >
                     {loadingButton === 'deny' && isPending ? (
                         <View style={[styles.buttonContent, { width: 40, height: 20, justifyContent: 'center' }]}>

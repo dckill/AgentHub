@@ -11,6 +11,7 @@ import { HorizontalScrollView } from '@/components/HorizontalScrollView';
 import { Typography } from '@/constants/Typography';
 import { sessionExec } from '@/sync/ops';
 import { storage, useSessionFileCache, useSetting } from '@/sync/storage';
+import { sync } from '@/sync/sync';
 import { Modal } from '@/modal';
 import { useUnistyles, StyleSheet } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
@@ -126,11 +127,14 @@ export default React.memo(function FileScreen() {
     // Load file content (fetches in background even if cache exists)
     React.useEffect(() => {
         let isCancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !isCancelled && generation !== null && sync.getAccountGeneration() === generation;
         const cachedAtRequestStart = cachedRef.current;
 
         const loadFile = async () => {
             let fetchedDiff: string | null = null;
             try {
+                if (!isCurrent()) return;
                 // Only show loading spinner if no cache
                 if (!cachedAtRequestStart) {
                     setIsLoading(true);
@@ -147,7 +151,7 @@ export default React.memo(function FileScreen() {
                             timeout: 5000
                         });
 
-                        if (!isCancelled && diffResponse.success && diffResponse.stdout?.trim()) {
+                        if (isCurrent() && diffResponse.success && diffResponse.stdout?.trim()) {
                             fetchedDiff = diffResponse.stdout;
                             setDiffContent(fetchedDiff);
                         }
@@ -157,7 +161,7 @@ export default React.memo(function FileScreen() {
                 }
 
                 if (statusParam === 'deleted' && fetchedDiff) {
-                    if (!isCancelled) {
+                    if (isCurrent()) {
                         setFileContent(null);
                     }
                     return;
@@ -176,7 +180,7 @@ export default React.memo(function FileScreen() {
                         }
                     ),
                 });
-                if (!isCancelled) {
+                if (isCurrent()) {
                     setTruncated(loaded.truncated);
                     setTotalSize(loaded.totalSize);
 
@@ -208,7 +212,7 @@ export default React.memo(function FileScreen() {
                     }
                 }
             } catch {
-                if (!isCancelled) {
+                if (isCurrent()) {
                     if (fetchedDiff) {
                         setFileContent(null);
                     } else if (!cachedAtRequestStart) {
@@ -216,7 +220,7 @@ export default React.memo(function FileScreen() {
                     }
                 }
             } finally {
-                if (!isCancelled) {
+                if (isCurrent()) {
                     setIsLoading(false);
                 }
             }

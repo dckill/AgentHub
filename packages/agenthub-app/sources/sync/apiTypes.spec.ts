@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiEphemeralUpdateSchema, ApiUpdateSchema } from './apiTypes';
+import { ApiEphemeralUpdateSchema, ApiUpdateContainerSchema, ApiUpdateSchema } from './apiTypes';
 
 describe('ApiUpdateSchema', () => {
     it('accepts shared wire update-session payload', () => {
@@ -18,6 +18,31 @@ describe('ApiUpdateSchema', () => {
             updatedAt: 1,
         });
         expect(parsed.success).toBe(true);
+    });
+
+    it('accepts the complete server new-machine payload needed for cold onboarding', () => {
+        const body = {
+            t: 'new-machine',
+            machineId: 'machine-1',
+            seq: 7,
+            metadata: 'encrypted-metadata',
+            metadataVersion: 2,
+            daemonState: null,
+            daemonStateVersion: 0,
+            dataEncryptionKey: 'encrypted-key',
+            active: false,
+            activeAt: 1700000000000,
+            createdAt: 1700000000000,
+            updatedAt: 1700000000001,
+        };
+
+        expect(ApiUpdateSchema.safeParse(body).success).toBe(true);
+        expect(ApiUpdateContainerSchema.safeParse({
+            id: 'update-1',
+            seq: 42,
+            createdAt: 1700000000001,
+            body,
+        }).success).toBe(true);
     });
 });
 

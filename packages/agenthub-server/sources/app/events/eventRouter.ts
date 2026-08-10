@@ -11,12 +11,14 @@ export interface SessionScopedConnection {
     socket: Socket;
     userId: string;
     sessionId: string;
+    deviceId?: string;
 }
 
 export interface UserScopedConnection {
     connectionType: 'user-scoped';
     socket: Socket;
     userId: string;
+    deviceId?: string;
 }
 
 export interface MachineScopedConnection {
@@ -24,6 +26,7 @@ export interface MachineScopedConnection {
     socket: Socket;
     userId: string;
     machineId: string;
+    deviceId?: string;
 }
 
 export type ClientConnection = SessionScopedConnection | UserScopedConnection | MachineScopedConnection;
@@ -172,6 +175,11 @@ export type EphemeralEvent = {
     machineId: string;
     online: boolean;
     timestamp: number;
+} | {
+    type: 'session-control';
+    sessionId: string;
+    activeDeviceId: string | null;
+    activeDeviceAt: number | null;
 };
 
 // === EVENT PAYLOAD TYPES ===
@@ -223,6 +231,21 @@ class EventRouter {
 
     removeConnection(userId: string, connection: ClientConnection): void {
         // Socket.IO automatically removes sockets from all rooms on disconnect
+    }
+
+    /** Return device ids with a live user-scoped socket that proved an active UI state. */
+    async getActiveUiDeviceIds(userId: string): Promise<Set<string>> {
+        if (!this.io) return new Set();
+        const sockets = await this.io.in(`user:${userId}:user-scoped`).fetchSockets();
+        return new Set(
+            sockets
+                .filter((socket) => (
+                    socket.data?.clientType === 'user-scoped'
+                    && socket.data?.appState === 'active'
+                    && typeof socket.data?.deviceId === 'string'
+                ))
+                .map((socket) => socket.data.deviceId as string),
+        );
     }
 
     // === EVENT EMISSION METHODS ===
@@ -383,6 +406,19 @@ export function buildDeleteSessionUpdate(sessionId: string, updateSeq: number, u
             sid: sessionId
         },
         createdAt: Date.now()
+    };
+}
+
+export function buildSessionControlEphemeral(state: {
+    sessionId: string;
+    activeDeviceId: string | null;
+    activeDeviceAt: number | null;
+}): EphemeralPayload {
+    return {
+        type: 'session-control',
+        sessionId: state.sessionId,
+        activeDeviceId: state.activeDeviceId,
+        activeDeviceAt: state.activeDeviceAt,
     };
 }
 

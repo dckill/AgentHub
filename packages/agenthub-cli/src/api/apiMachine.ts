@@ -42,8 +42,24 @@ import type { StopSessionResult } from '@/daemon/sessionStopState';
 import { hashObject } from '@/utils/deterministicJson';
 import type { CliUpdateStatus, RpcCodexModelsResult } from '@artsum/agenthub-wire';
 import { execSync } from 'node:child_process';
+import { collectSystemMetrics } from '@/system/systemMetrics';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SPAWN_ENV_ALLOWLIST = new Set([
+    'TERM', 'COLORTERM', 'LANG', 'LC_ALL', 'LC_CTYPE', 'NO_COLOR', 'FORCE_COLOR',
+]);
+
+function assertAllowedSpawnEnvironment(environmentVariables: unknown): asserts environmentVariables is Record<string, string> | undefined {
+    if (environmentVariables === undefined) return;
+    if (!environmentVariables || typeof environmentVariables !== 'object' || Array.isArray(environmentVariables)) {
+        throw new Error('environmentVariables must be an object');
+    }
+    const invalidKeys = Object.keys(environmentVariables as Record<string, unknown>)
+        .filter((key) => !SPAWN_ENV_ALLOWLIST.has(key));
+    if (invalidKeys.length > 0) {
+        throw new Error(`environmentVariables contains a non-allowlisted key: ${invalidKeys[0]}`);
+    }
+}
 
 type OfficialAgentSession = OfficialCodexThread | OfficialClaudeSession;
 
@@ -365,8 +381,27 @@ export class ApiMachineClient {
                 officialMirrorCodexThreadId,
                 parentSessionId,
                 forkedFromMessageId,
+                isSideChat,
             } = params || {};
-            logger.debug(`[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`);
+            assertAllowedSpawnEnvironment(environmentVariables);
+
+            logger.debug('[API MACHINE] Spawning session', {
+                directory,
+                sessionId,
+                machineId,
+                agent,
+                permissionMode,
+                model,
+                hasToken: typeof token === 'string' && token.length > 0,
+                environmentVariableKeys: environmentVariables ? Object.keys(environmentVariables).sort() : [],
+                resumeClaudeSessionId,
+                resumeCodexThreadId,
+                officialMirrorClaudeSessionId,
+                officialMirrorCodexThreadId,
+                parentSessionId,
+                forkedFromMessageId,
+                isSideChat,
+            });
 
             if (!directory) {
                 throw new Error('Directory is required');
@@ -388,6 +423,7 @@ export class ApiMachineClient {
                 officialMirrorCodexThreadId,
                 parentSessionId,
                 forkedFromMessageId,
+                isSideChat,
             });
 
             switch (result.type) {
@@ -452,8 +488,8 @@ export class ApiMachineClient {
             if (typeof claudeSessionId !== 'string' || !UUID_RE.test(claudeSessionId)) {
                 throw new Error('valid claudeSessionId is required');
             }
-            if (typeof cutAfterUuid !== 'string' || cutAfterUuid.length === 0) {
-                throw new Error('cutAfterUuid is required');
+            if (typeof cutAfterUuid !== 'string' || !UUID_RE.test(cutAfterUuid)) {
+                throw new Error('valid cutAfterUuid is required');
             }
             try {
                 const newClaudeSessionId = await claudeForkAndTruncateSession(
@@ -639,6 +675,7 @@ export class ApiMachineClient {
         this.rpcHandlerManager.registerHandler('check-cli-update', async () => checkCliUpdate());
         this.rpcHandlerManager.registerHandler('update-cli', async (params: { version?: string }) => updateCli(params.version));
         this.rpcHandlerManager.registerHandler('rollback-cli', async () => rollbackCli());
+        this.rpcHandlerManager.registerHandler('get-system-metrics', async () => collectSystemMetrics());
     }
 
     private syncResumeSessionRpcRegistration(): void {

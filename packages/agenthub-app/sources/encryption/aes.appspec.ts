@@ -14,6 +14,7 @@ describe('AES Tests', () => {
         console.log(`Decrypted: ${decrypted}`);
         expect(decrypted).toEqual(JSON.stringify('Hello, World!'));
     });
+
     it('should encrypt and decrypt a Uint8Array', async () => {
         const key = encodeBase64(getRandomBytes(32));
         const encrypted = await encryptAESGCM(new TextEncoder().encode('Hello, World!'), key);

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { NormalizedMessage } from '../typesRaw';
 import { createReducer } from './reducer';
 import { reducer } from './reducer';
-import { AgentState } from '../storageTypes';
+import { AgentState, AgentStateSchema } from '../storageTypes';
 
 describe('reducer', () => {
     // it('should process golden cases', () => {
@@ -90,6 +90,26 @@ describe('reducer', () => {
             if (result.messages[0].kind === 'user-text') {
                 expect(result.messages[0].images).toEqual(messages[0].meta?.images);
             }
+        });
+
+        it('should preserve provider rewind ids for message-level forks', () => {
+            const state = createReducer();
+            const result = reducer(state, [{
+                id: 'msg-rewind',
+                localId: null,
+                createdAt: 1000,
+                role: 'user',
+                content: { type: 'text', text: '从这里分叉' },
+                isSidechain: false,
+                claudeUuid: 'claude-user-uuid',
+                codexItemId: 'codex-user-item',
+            }]);
+
+            expect(result.messages[0]).toMatchObject({
+                kind: 'user-text',
+                claudeUuid: 'claude-user-uuid',
+                codexItemId: 'codex-user-item',
+            });
         });
 
         it('should deduplicate user messages by localId', () => {
@@ -415,6 +435,30 @@ describe('reducer', () => {
     });
 
     describe('AgentState permissions', () => {
+        it('projects CLI allowTools into the App permission model', () => {
+            const state = createReducer();
+            const agentState = AgentStateSchema.parse({
+                completedRequests: {
+                    'tool-allow-list': {
+                        tool: 'Bash',
+                        arguments: { command: 'pwd' },
+                        createdAt: 1000,
+                        completedAt: 2000,
+                        status: 'approved',
+                        allowTools: ['Bash', 'Read'],
+                    },
+                },
+            });
+
+            const result = reducer(state, [], agentState);
+
+            expect(result.messages).toHaveLength(1);
+            expect(result.messages[0].kind).toBe('tool-call');
+            if (result.messages[0].kind === 'tool-call') {
+                expect(result.messages[0].tool.permission?.allowedTools).toEqual(['Bash', 'Read']);
+            }
+        });
+
         it('should create tool messages for pending permission requests', () => {
             const state = createReducer();
             const agentState: AgentState = {

@@ -70,5 +70,6 @@ describe('protocol inventory guardrails', () => {
         const routeSource = readFileSync(join(serverSourceRoot, 'app/api/routes/devRoutes.ts'), 'utf8');
         expect(routeSource).toContain('preHandler: authenticateDebugLogRequest');
         expect(routeSource).toContain('AGENTHUB_DEBUG_LOG_SECRET');
+        expect(routeSource).toContain("DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING === 'true'");
     });
 });

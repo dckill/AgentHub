@@ -21,6 +21,8 @@ import { shareLocalContent } from '@/utils/localContentShare';
 import { useAuth } from '@/auth/AuthContext';
 import { getExternalShareOrigin } from '@/utils/externalShareOrigin';
 import { publishSelectedTextShare } from '@/sync/publishExternalShare';
+import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 export default function TextSelectionScreen() {
     const router = useRouter();
@@ -52,36 +54,44 @@ export default function TextSelectionScreen() {
 
     const createSecureLink = React.useCallback(async (expiresInSeconds: 3_600 | 86_400 | 604_800) => {
         const origin = getExternalShareOrigin();
-        if (!origin || !auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!origin || !credentials || generation === null) {
             Modal.alert(t('externalShares.unavailable'), t('externalShares.unavailableDescription'));
             return;
         }
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         setSharingSecurely(true);
-        let link: string;
         try {
-            const result = await publishSelectedTextShare({
-                credentials: auth.credentials,
-                text: fullText,
-                expiresInSeconds,
-                origin,
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => publishSelectedTextShare({
+                    credentials,
+                    text: fullText,
+                    expiresInSeconds,
+                    origin,
+                }),
             });
-            link = result.link;
-        } catch {
-            Modal.alert(t('common.error'), t('externalShares.createFailed'));
-            setSharingSecurely(false);
-            return;
-        }
-        try {
-            await Share.share({ message: link, title: t('textSelection.shareTitle') });
-        } catch {
+            if (result === null || !isCurrent()) return;
+            const link = result.link;
+            if (!isCurrent()) return;
             try {
-                await Clipboard.setStringAsync(link);
-                Modal.alert(t('common.success'), t('externalShares.linkCopied'));
+                await Share.share({ message: link, title: t('textSelection.shareTitle') });
             } catch {
-                Modal.alert(t('common.error'), t('externalShares.linkReadyCopyFailed'));
+                if (!isCurrent()) return;
+                try {
+                    await Clipboard.setStringAsync(link);
+                    if (isCurrent()) Modal.alert(t('common.success'), t('externalShares.linkCopied'));
+                } catch {
+                    if (isCurrent()) Modal.alert(t('common.error'), t('externalShares.linkReadyCopyFailed'));
+                }
+            }
+        } catch {
+            if (isCurrent()) {
+                Modal.alert(t('common.error'), t('externalShares.createFailed'));
             }
         } finally {
-            setSharingSecurely(false);
+            if (isCurrent()) setSharingSecurely(false);
         }
     }, [auth.credentials, fullText]);
 

@@ -107,6 +107,27 @@ export async function putLocalFile(filePath: string, data: Buffer) {
     fs.writeFileSync(fullPath, data);
 }
 
+/** Delete every encrypted attachment owned by one session. */
+export async function deleteSessionAttachments(sessionId: string): Promise<void> {
+    const prefix = `sessions/${sessionId}/attachments`;
+    if (useLocalStorage) {
+        const attachmentDir = path.join(localFilesDir, prefix);
+        if (fs.existsSync(attachmentDir)) fs.rmSync(attachmentDir, { recursive: true, force: true });
+        return;
+    }
+
+    const stream = s3client.listObjects(s3bucket, `${prefix}/`, true);
+    const keys = await new Promise<string[]>((resolve, reject) => {
+        const collected: string[] = [];
+        stream.on('data', (item: { name?: string }) => {
+            if (item.name) collected.push(item.name);
+        });
+        stream.on('end', () => resolve(collected));
+        stream.on('error', reject);
+    });
+    if (keys.length > 0) await s3client.removeObjects(s3bucket, keys);
+}
+
 export type ImageRef = {
     width: number;
     height: number;

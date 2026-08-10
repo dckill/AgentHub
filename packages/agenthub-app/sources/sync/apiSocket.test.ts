@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { io } from 'socket.io-client';
+
+vi.hoisted(() => {
+    (globalThis as typeof globalThis & { __DEV__?: boolean }).__DEV__ = false;
+});
 
 vi.mock('react-native', () => ({
     Platform: { OS: 'android' },
@@ -19,6 +24,8 @@ vi.mock('./storage', () => ({
         getState: vi.fn(() => ({ localSettings: { verboseLogging: false } })),
     },
 }));
+
+vi.mock('./deviceIdentity', () => ({ getOrCreateDeviceId: () => 'device-test' }));
 
 vi.mock('socket.io-client', () => ({
     io: vi.fn(),
@@ -251,5 +258,79 @@ describe('apiSocket session RPC', () => {
         expect((apiSocket as any).reconnectedListeners.size).toBe(0);
         expect((apiSocket as any).statusListeners.size).toBe(0);
         expect((apiSocket as any).currentStatus).toBe('disconnected');
+    });
+
+    it('publishes the current AppState to the connected user-scoped socket', () => {
+        const emit = vi.fn();
+        (apiSocket as any).socket = { emit, connected: true };
+
+        apiSocket.setAppState('background');
+
+        expect(emit).toHaveBeenCalledWith('app-state', { state: 'background' });
+    });
+
+    it('reasserts the current AppState after an automatic socket reconnect', () => {
+        const emit = vi.fn();
+        const handlers = new Map<string, (...args: any[]) => void>();
+        const socket = {
+            on: vi.fn((event: string, handler: (...args: any[]) => void) => {
+                handlers.set(event, handler);
+            }),
+            onAny: vi.fn(),
+            emit,
+        };
+        vi.mocked(io).mockReturnValue(socket as any);
+        (apiSocket as any).config = {
+            endpoint: 'https://server.example',
+            token: 'token-a',
+            appState: 'background',
+        };
+        (apiSocket as any).appState = 'background';
+
+        (apiSocket as any).connect();
+        handlers.get('connect')?.();
+
+        expect(emit).toHaveBeenCalledWith('app-state', { state: 'background' });
+    });
+
+    it('rebuilds Socket.IO auth from the latest AppState on every reconnect', () => {
+        const socket = {
+            on: vi.fn(),
+            onAny: vi.fn(),
+            emit: vi.fn(),
+        };
+        vi.mocked(io).mockReturnValue(socket as any);
+        (apiSocket as any).config = {
+            endpoint: 'https://server.example',
+            token: 'token-a',
+            appState: 'active',
+        };
+        (apiSocket as any).appState = 'active';
+
+        (apiSocket as any).connect();
+
+        const options = vi.mocked(io).mock.calls[0]?.[1] as { auth?: (callback: (payload: any) => void) => void };
+        expect(typeof options.auth).toBe('function');
+
+        let firstPayload: any;
+        options.auth?.((payload) => {
+            firstPayload = payload;
+        });
+        expect(firstPayload).toMatchObject({
+            token: 'token-a',
+            clientType: 'user-scoped',
+            appState: 'active',
+        });
+
+        (apiSocket as any).appState = 'background';
+        let reconnectPayload: any;
+        options.auth?.((payload) => {
+            reconnectPayload = payload;
+        });
+        expect(reconnectPayload).toMatchObject({
+            token: 'token-a',
+            clientType: 'user-scoped',
+            appState: 'background',
+        });
     });
 });

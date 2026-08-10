@@ -197,12 +197,47 @@ describe('externalSharesRoutes', () => {
         expect(revoked.statusCode).toBe(200);
         const revokedAt = revoked.json().revokedAt;
         expect(revokedAt).toBe(state.now.getTime());
+        expect(state.shares[0].ciphertext).toEqual(Buffer.alloc(0));
+        expect(db.externalShare.update).toHaveBeenCalledWith({
+            where: { id: shareId },
+            data: { revokedAt: state.now, ciphertext: Buffer.alloc(0) },
+        });
         const repeated = await app.inject({ method: 'DELETE', url: `/v1/external-shares/${shareId}` });
         expect(repeated.statusCode).toBe(200);
         expect(repeated.json().revokedAt).toBe(revokedAt);
 
         const hidden = await app.inject({ method: 'DELETE', url: '/v1/external-shares/00000000-0000-4000-8000-000000000002' });
         expect(hidden.statusCode).toBe(404);
+        await app.close();
+    });
+
+    it('clears ciphertext when an expired share is observed publicly', async () => {
+        seed({ expiresAt: state.now });
+        const app = await createApp();
+
+        const response = await app.inject({ method: 'GET', url: `/v1/public-shares/${shareId}` });
+
+        expect(response.statusCode).toBe(404);
+        expect(state.shares[0].ciphertext).toEqual(Buffer.alloc(0));
+        expect(db.externalShare.update).toHaveBeenCalledWith({
+            where: { id: shareId },
+            data: { ciphertext: Buffer.alloc(0) },
+        });
+        await app.close();
+    });
+
+    it('clears ciphertext for an already-revoked share from before the cleanup rule', async () => {
+        seed({ revokedAt: new Date('2026-07-15T00:00:00.000Z') });
+        const app = await createApp();
+
+        const response = await app.inject({ method: 'DELETE', url: `/v1/external-shares/${shareId}` });
+
+        expect(response.statusCode).toBe(200);
+        expect(state.shares[0].ciphertext).toEqual(Buffer.alloc(0));
+        expect(db.externalShare.update).toHaveBeenCalledWith({
+            where: { id: shareId },
+            data: { ciphertext: Buffer.alloc(0) },
+        });
         await app.close();
     });
 

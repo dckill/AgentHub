@@ -58,6 +58,7 @@ describe('buildHomeOverviewModel', () => {
         expect(model.state).toBe('ready');
         expect(model.onlineMachineCount).toBe(1);
         expect(model.totalMachineCount).toBe(2);
+        expect(model.activeSessionCount).toBe(0);
         expect(model.canStartSession).toBe(true);
 
         const unavailable = buildHomeOverviewModel({
@@ -85,5 +86,6 @@ describe('buildHomeOverviewModel', () => {
 
         expect(model.recentWork.map((item) => item.id)).toEqual(['newest', 'second', 'third']);
         expect(model.recentWork[1]).toMatchObject({ active: false });
+        expect(model.activeSessionCount).toBe(3);
     });
 });

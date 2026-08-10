@@ -17,6 +17,8 @@ import { ActionMenu, type ActionMenuAnchor, type ActionMenuItem } from '@/compon
 import { Modal } from '@/modal';
 import * as Clipboard from 'expo-clipboard';
 import { machineDeleteFile } from '@/sync/ops';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 import { useFileTransferStore } from '@/sync/fileTransferStore';
 import { ensureDownloadDirectoryBeforeStart } from '@/utils/downloadDirectoryPrompt';
 import { useRouter } from 'expo-router';
@@ -204,13 +206,22 @@ export const DirectoryTreeDrawer = React.memo<DirectoryTreeDrawerProps>(({
             disabled: !hasMachine,
             onPress: async () => {
                 if (!machineId) return;
-                const confirmed = await Modal.confirm(
-                    t('fileBrowser.deleteTitle'),
-                    t('fileBrowser.deleteMessage', { path: node.path }),
-                    { cancelText: t('common.cancel'), confirmText: t('common.delete'), destructive: true },
-                );
-                if (!confirmed) return;
-                const result = await machineDeleteFile(machineId, node.path);
+                const generation = sync.getAccountGeneration();
+                const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                const confirmed = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => Modal.confirm(
+                        t('fileBrowser.deleteTitle'),
+                        t('fileBrowser.deleteMessage', { path: node.path }),
+                        { cancelText: t('common.cancel'), confirmText: t('common.delete'), destructive: true },
+                    ),
+                });
+                if (confirmed !== true) return;
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => machineDeleteFile(machineId, node.path),
+                });
+                if (result === null || !isCurrent()) return;
                 if (!result.success) {
                     Modal.alert(t('common.error'), result.error || t('fileBrowser.deleteFailed'));
                     return;

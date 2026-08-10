@@ -1,5 +1,5 @@
 import type { TranslationStructure } from './_default';
-import type { SupportedLanguage } from './_all';
+import type { TranslationLanguage } from './_all';
 import { ru } from './translations/ru';
 import { pl } from './translations/pl';
 import { es } from './translations/es';
@@ -10,7 +10,7 @@ import { zhHans } from './translations/zh-Hans';
 import { zhHant } from './translations/zh-Hant';
 import { ja } from './translations/ja';
 
-const translations: Record<Exclude<SupportedLanguage, 'en'>, TranslationStructure> = {
+const translations: Record<TranslationLanguage, TranslationStructure> = {
     ru,
     pl,
     es,
@@ -22,6 +22,6 @@ const translations: Record<Exclude<SupportedLanguage, 'en'>, TranslationStructur
     ja,
 };
 
-export async function loadTranslation(language: Exclude<SupportedLanguage, 'en'>): Promise<TranslationStructure> {
+export async function loadTranslation(language: TranslationLanguage): Promise<TranslationStructure> {
     return translations[language];
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     getMachineHeaderActionDescriptors,
     getVisibleDeviceMachines,
+    sortMachinesOnlineFirst,
 } from './machineActions';
 
 describe('machineActions', () => {
@@ -28,5 +29,22 @@ describe('machineActions', () => {
         ];
 
         expect(getVisibleDeviceMachines(machines).map((machine) => machine.id)).toEqual(['online', 'offline']);
+    });
+
+    it('stably keeps online devices above offline devices inside every group', () => {
+        const machines = [
+            { id: 'offline-a', online: false },
+            { id: 'online-a', online: true },
+            { id: 'offline-b', online: false },
+            { id: 'online-b', online: true },
+        ];
+
+        expect(sortMachinesOnlineFirst(machines, (machine) => machine.online).map((machine) => machine.id)).toEqual([
+            'online-a',
+            'online-b',
+            'offline-a',
+            'offline-b',
+        ]);
+        expect(machines.map((machine) => machine.id)).toEqual(['offline-a', 'online-a', 'offline-b', 'online-b']);
     });
 });

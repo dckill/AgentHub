@@ -33,6 +33,15 @@ OTA 通过 EAS Update 和对应 channel 分发，只应用与当前
 `runtimeVersion` 兼容的资源更新。涉及原生模块、权限或其他原生能力变化时，
 必须重新构建并安装 Native 包，不能用 OTA 替代。
 
+Android production OTA 采用“本地导出、增量直传”：发布机本地运行 `eas update`
+生成 manifest、JS bundle 和资源，然后只上传 OTA 产物。常规发布不得使用
+`eas workflow:run`，避免为了发布 OTA 先压缩并上传整个仓库。
+
+设备端的增量分两层：已经缓存且内容哈希不变的图片、字体等资源不会重复下载；
+SDK 55 正式包同时开启 bsdiff，服务端有更小的有效补丁时只下载 JS bundle 差分，
+否则安全回退到完整 bundle。bsdiff 是原生能力，旧 APK 需要安装一次包含该配置的
+新正式包，此后的纯 JS / 资源更新继续走 OTA。
+
 ## Android 本机 APK
 
 当前本机交付包默认使用 `production` 变体：

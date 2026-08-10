@@ -9,6 +9,8 @@ import { Typography } from '@/constants/Typography';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { getNavigationHeaderVisuals } from '@/components/navigationShellVisuals';
 import { t } from '@/text';
+import { MobileGlassSurface } from '../MobileGlass';
+import { isRunningOnMac } from '@/utils/platform';
 
 interface HeaderProps {
     title?: React.ReactNode;
@@ -46,13 +48,16 @@ export const Header = React.memo((props: HeaderProps) => {
     const insets = useSafeAreaInsets();
     const paddingTop = safeAreaEnabled ? insets.top : 0;
     const headerHeight = useHeaderHeight();
+    const isTablet = useIsTablet();
     const { theme } = useUnistyles();
     const headerVisuals = getNavigationHeaderVisuals(theme);
+    const mobileGlassEnabled = !isTablet && Platform.OS !== 'web' && !isRunningOnMac();
 
     const containerStyle = [
         styles.container,
         headerTransparent && styles.containerTransparent,
         !headerTransparent && styles.containerNormal,
+        mobileGlassEnabled && styles.containerMobileGlass,
         {
             paddingTop,
             borderBottomColor: headerVisuals.borderColor,
@@ -68,11 +73,20 @@ export const Header = React.memo((props: HeaderProps) => {
 
     return (
         <View role="banner" style={[containerStyle]}>
-            {!headerTransparent && <View style={styles.highlight} />}
+            {mobileGlassEnabled && (
+                <MobileGlassSurface
+                    enabled
+                    nativeEffect
+                    material="static"
+                    intensity={48}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!headerTransparent && !mobileGlassEnabled && <View style={styles.highlight} />}
             <View style={styles.contentWrapper}>
                 <View style={[styles.content, { height: headerHeight }]}>
                     <View style={styles.leftContainer}>
-                        {headerLeft && headerLeft()}
+                        {headerLeft?.()}
                     </View>
 
                     <View style={styles.centerContainer}>
@@ -81,7 +95,7 @@ export const Header = React.memo((props: HeaderProps) => {
                     </View>
 
                     <View style={styles.rightContainer}>
-                        {headerRight && headerRight()}
+                        {headerRight?.()}
                     </View>
                 </View>
             </View>
@@ -219,6 +233,10 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     containerNormal: {
         backgroundColor: theme.colors.glass.raised,
         borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    containerMobileGlass: {
+        backgroundColor: 'transparent',
+        borderBottomWidth: 0,
     },
     highlight: {
         position: 'absolute',

@@ -9,6 +9,7 @@ import { layout } from '@/components/layout';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { deleteArtifact } from '@/sync/apiArtifacts';
 import { storage } from '@/sync/storage';
 import { MarkdownView } from '@/components/markdown/MarkdownView';
@@ -115,6 +116,13 @@ export default function ArtifactDetailScreen() {
             return;
         }
         
+        const generation = sync.getAccountGeneration();
+        if (generation === null) {
+            setError(t('artifacts.error'));
+            setIsLoading(false);
+            return;
+        }
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         let cancelled = false;
         
         (async () => {
@@ -129,16 +137,16 @@ export default function ArtifactDetailScreen() {
                 
                 // Fetch full artifact with body
                 const fullArtifact = await sync.fetchArtifactWithBody(id);
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     storage.getState().updateArtifact(fullArtifact);
                 }
             } catch (err) {
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     console.error('Failed to load artifact:', err);
                     setError(t('artifacts.error'));
                 }
             } finally {
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     setIsLoading(false);
                 }
             }
@@ -160,6 +168,9 @@ export default function ArtifactDetailScreen() {
     }, [id, router]);
 
     const handleDelete = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        if (generation === null) return;
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         const confirmed = await Modal.confirm(
             t('artifacts.deleteConfirm'),
             t('artifacts.deleteConfirmDescription'),
@@ -169,7 +180,7 @@ export default function ArtifactDetailScreen() {
             }
         );
 
-        if (!confirmed) return;
+        if (!confirmed || !isCurrent()) return;
 
         try {
             setIsDeleting(true);
@@ -179,19 +190,25 @@ export default function ArtifactDetailScreen() {
                 throw new Error('Not authenticated');
             }
 
-            await deleteArtifact(credentials, id);
+            const deleted = await runSessionActionRequest({
+                isCurrent,
+                request: () => deleteArtifact(credentials, id),
+            });
+            if (deleted === null || !isCurrent()) return;
             storage.getState().deleteArtifact(id);
             
             // Navigate back
-            router.back();
+            if (isCurrent()) router.back();
         } catch (err) {
-            console.error('Failed to delete artifact:', err);
-            Modal.alert(
-                t('common.error'),
-                t('artifacts.deleteError')
-            );
+            if (isCurrent()) {
+                console.error('Failed to delete artifact:', err);
+                Modal.alert(
+                    t('common.error'),
+                    t('artifacts.deleteError')
+                );
+            }
         } finally {
-            setIsDeleting(false);
+            if (isCurrent()) setIsDeleting(false);
         }
     }, [id, router]);
 

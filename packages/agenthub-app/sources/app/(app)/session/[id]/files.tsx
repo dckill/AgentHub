@@ -36,6 +36,7 @@ import {
 } from '@/utils/gitFileListRows';
 import { ScreenReaderHeading } from '@/components/ScreenReaderHeading';
 import { getSpaceKeyActivationProps } from '@/components/keyboardActivation';
+import { sync } from '@/sync/sync';
 
 type GitFilterTab = 'all' | 'staged' | 'unstaged';
 const FILE_PREFETCH_LOOKAHEAD = 4;
@@ -60,6 +61,7 @@ export default React.memo(function FilesScreen() {
     const { scale: fileListScale } = useFileListScale();
     const { width: windowWidth } = useWindowDimensions();
     const [prefetchRange, setPrefetchRange] = React.useState({ start: 0, end: 8, lookahead: FILE_PREFETCH_LOOKAHEAD });
+    const searchRequestIdRef = React.useRef(0);
 
     // Git actions hook
     const gitActions = useGitActions(sessionId!);
@@ -69,29 +71,41 @@ export default React.memo(function FilesScreen() {
 
     // Handle search and file loading
     React.useEffect(() => {
+        const generation = sync.getAccountGeneration();
+        const requestId = ++searchRequestIdRef.current;
+        const isCurrent = () => generation !== null
+            && sync.getAccountGeneration() === generation
+            && requestId === searchRequestIdRef.current;
         const loadFiles = async () => {
-            if (!sessionId) return;
+            if (!sessionId || !isCurrent()) return;
 
             try {
                 setIsSearching(true);
                 setSearchError(false);
                 const results = await searchFiles(sessionId, searchQuery, { limit: 100 });
-                setSearchResults(results);
+                if (isCurrent()) setSearchResults(results);
             } catch (error) {
+                if (!isCurrent()) return;
                 console.error('Failed to search files:', error);
                 setSearchResults([]);
                 setSearchError(true);
             } finally {
-                setIsSearching(false);
+                if (isCurrent()) setIsSearching(false);
             }
         };
+
+        if (!isCurrent()) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
 
         // Load files when searching or when repo is clean
         const shouldShowAllFiles = searchQuery ||
             (gitStatusFiles?.totalStaged === 0 && gitStatusFiles?.totalUnstaged === 0);
 
         if (shouldShowAllFiles && !isLoading) {
-            loadFiles();
+            void loadFiles();
         } else if (!searchQuery) {
             setSearchResults([]);
             setIsSearching(false);

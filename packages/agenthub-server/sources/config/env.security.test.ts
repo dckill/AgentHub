@@ -22,6 +22,14 @@ function productionEnv() {
     };
 }
 
+function validProductionEnv() {
+    productionEnv();
+    process.env.AGENTHUB_DATA_ENCRYPTION_KEYS = JSON.stringify({ 2: 'data-encryption-secret-that-is-at-least-32-chars' });
+    process.env.AGENTHUB_DATA_ENCRYPTION_KEY_VERSION = '2';
+    process.env.AGENTHUB_TOKEN_KEYS = JSON.stringify({ 2: 'token-secret-that-is-at-least-32-characters' });
+    process.env.AGENTHUB_TOKEN_KEY_VERSION = '2';
+}
+
 describe('production secret purpose isolation', () => {
     it('requires dedicated versioned data-encryption and token keys', () => {
         productionEnv();
@@ -38,5 +46,19 @@ describe('production secret purpose isolation', () => {
         process.env.AGENTHUB_TOKEN_KEY_VERSION = '2';
 
         expect(() => validateServerEnv()).toThrow(/must use distinct values/);
+    });
+
+    it('rejects the debug log endpoint in production even when explicitly enabled', () => {
+        validProductionEnv();
+        process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING = 'true';
+
+        expect(() => validateServerEnv()).toThrow(/not allowed in production/);
+    });
+
+    it('treats non-true debug flag values as disabled', () => {
+        validProductionEnv();
+        process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING = 'false';
+
+        expect(() => validateServerEnv()).not.toThrow();
     });
 });

@@ -118,6 +118,8 @@ export interface SpawnSessionOptions {
     parentSessionId?: string;
     /** AgentHub message id used as the rewind point. */
     forkedFromMessageId?: string;
+    /** Marks the spawned fork as a hidden side chat of parentSessionId. */
+    isSideChat?: boolean;
 }
 
 export interface ClaudeForkSessionOptions {
@@ -171,6 +173,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         officialMirrorCodexThreadId,
         parentSessionId,
         forkedFromMessageId,
+        isSideChat,
     } = options;
 
     try {
@@ -189,6 +192,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             officialMirrorCodexThreadId?: string,
             parentSessionId?: string,
             forkedFromMessageId?: string,
+            isSideChat?: boolean,
         }>(
             machineId,
             'spawn-agenthub-session',
@@ -207,6 +211,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
                 officialMirrorCodexThreadId,
                 parentSessionId,
                 forkedFromMessageId,
+                isSideChat,
             }
         );
         return result;
@@ -426,6 +431,13 @@ export async function machineUpdateCli(
 
 export async function machineRollbackCli(machineId: string): Promise<RpcResponseFor<'rollback-cli'>> {
     return apiSocket.machineRPC(machineId, 'rollback-cli', {});
+}
+
+export async function machineGetSystemMetrics(
+    machineId: string,
+    options?: RpcCallOptions,
+): Promise<RpcResponseFor<'get-system-metrics'>> {
+    return apiSocket.machineRPC(machineId, 'get-system-metrics', {}, options);
 }
 
 /**
@@ -1181,6 +1193,7 @@ type ForkOptions = {
     cutAfterUuid?: string;
     cutAfterItemId?: string;
     forkedFromMessageId?: string;
+    isSideChat?: boolean;
 };
 
 export async function forkAndSpawn(
@@ -1213,6 +1226,7 @@ export async function forkAndSpawn(
             resumeCodexThreadId: forkResult.newCodexThreadId,
             parentSessionId: source.sessionId,
             forkedFromMessageId: opts.forkedFromMessageId,
+            isSideChat: opts.isSideChat,
         });
 
         if (spawnResult.type === 'success') {
@@ -1251,6 +1265,7 @@ export async function forkAndSpawn(
         resumeClaudeSessionId: forkResult.newClaudeSessionId,
         parentSessionId: source.sessionId,
         forkedFromMessageId: opts.forkedFromMessageId,
+        isSideChat: opts.isSideChat,
     });
 
     if (spawnResult.type === 'success') {
@@ -1262,6 +1277,10 @@ export async function forkAndSpawn(
     }
 
     return spawnResult;
+}
+
+export async function spawnSideChat(source: ForkSource): Promise<SpawnSessionResult> {
+    return forkAndSpawn(source, { isSideChat: true });
 }
 
 // Export types for external use

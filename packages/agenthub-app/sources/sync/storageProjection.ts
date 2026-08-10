@@ -3,6 +3,7 @@ import { getSessionName, getSessionSubtitle, type SessionState } from '@/utils/s
 import { getDefaultProjectIcon, buildProjectKey, normalizeProjectPath } from '@/utils/projectIcons';
 import type { OfficialCodexThread } from './officialThreads';
 import { isPathInProjectScope } from './sessionWorkbench';
+import { isTopLevelSession } from './sideChatSessions';
 
 export function resolveSessionOnlineState(session: { active: boolean; activeAt: number }): 'online' | number {
     return session.active ? 'online' : session.activeAt;
@@ -167,6 +168,7 @@ export function buildSessionListViewData(
     const inactiveSessions: Session[] = [];
 
     Object.values(sessions).forEach(session => {
+        if (!isTopLevelSession(session)) return;
         if (isSessionActive(session)) {
             activeSessions.push(session);
         } else if (!hideInactiveSessions) {
@@ -299,6 +301,7 @@ export function buildProjectListViewData(
     };
 
     for (const session of Object.values(sessions)) {
+        if (!isTopLevelSession(session)) continue;
         if (hideInactiveSessions && !session.active) continue;
 
         const machineId = session.metadata?.machineId;
@@ -391,7 +394,7 @@ export function buildProjectListViewData(
         archivedSessions.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         officialThreadRows.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-        if (custom?.archived && activeSessions.length === 0) {
+        if (custom?.archived) {
             continue;
         }
 

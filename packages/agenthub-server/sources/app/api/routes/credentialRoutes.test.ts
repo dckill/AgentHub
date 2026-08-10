@@ -3,7 +3,7 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Fastify } from '../types';
 
-const { db, encryptString, decryptString, randomKey } = vi.hoisted(() => ({
+const { db, encryptString, decryptString, randomKey, log } = vi.hoisted(() => ({
     db: {
         managedCredential: {
             create: vi.fn(),
@@ -20,12 +20,13 @@ const { db, encryptString, decryptString, randomKey } = vi.hoisted(() => ({
     encryptString: vi.fn((path: string[], value: string) => Buffer.from(`${path.join('/')}:${value}`)),
     decryptString: vi.fn((path: string[], value: Uint8Array) => Buffer.from(value).toString().slice(`${path.join('/')}:`.length)),
     randomKey: vi.fn(() => 'cred-1'),
+    log: vi.fn(),
 }));
 
 vi.mock('@/storage/db', () => ({ db }));
 vi.mock('@/modules/encrypt', () => ({ encryptString, decryptString }));
 vi.mock('@/utils/randomKey', () => ({ randomKey }));
-vi.mock('@/utils/log', () => ({ log: vi.fn() }));
+vi.mock('@/utils/log', () => ({ log }));
 
 import { credentialRoutes } from './credentialRoutes';
 
@@ -176,6 +177,22 @@ describe('credentialRoutes', () => {
         await app.close();
     });
 
+    it('logs only credential metadata, never decrypted env-var values', async () => {
+        db.managedCredential.findFirst.mockResolvedValue(credential());
+        db.machine.findFirst.mockResolvedValue({ id: 'm1' });
+        db.session.findFirst.mockResolvedValue({ id: 's1' });
+        db.managedCredential.update.mockResolvedValue(credential());
+        const app = await createApp();
+
+        const response = await app.inject({ method: 'GET', url: '/v1/credentials/cred-1/env-vars?machineId=m1&sessionId=s1', headers: { 'x-user-id': 'u1' } });
+
+        expect(response.statusCode).toBe(200);
+        expect(log).toHaveBeenCalledWith(expect.objectContaining({ envKeys: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL'] }), 'Credential env vars issued');
+        expect(JSON.stringify(log.mock.calls)).not.toContain('api-key');
+        expect(JSON.stringify(log.mock.calls)).not.toContain('https://api.example.com');
+        await app.close();
+    });
+
     it('returns 404 when env-var context machine is not owned by user', async () => {
         db.managedCredential.findFirst.mockResolvedValue(credential());
         db.machine.findFirst.mockResolvedValue(null);
@@ -186,6 +203,21 @@ describe('credentialRoutes', () => {
         expect(response.statusCode).toBe(404);
         expect(response.json()).toEqual({ error: 'Machine not found' });
         expect(decryptString).not.toHaveBeenCalled();
+        await app.close();
+    });
+
+    it('returns an error when credential deletion fails instead of reporting success', async () => {
+        db.managedCredential.deleteMany.mockRejectedValueOnce(new Error('database unavailable'));
+        const app = await createApp();
+
+        const response = await app.inject({
+            method: 'DELETE',
+            url: '/v1/credentials/cred-1',
+            headers: { 'x-user-id': 'u1' },
+        });
+
+        expect(response.statusCode).toBe(500);
+        expect(response.json()).toEqual({ error: 'Failed to delete credential' });
         await app.close();
     });
 });

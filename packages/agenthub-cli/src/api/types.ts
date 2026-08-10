@@ -1,6 +1,8 @@
 import { z } from 'zod'
-import { CliUpdateStatusSchema, MessageMetaSchema, type MessageMeta } from '@artsum/agenthub-wire';
+import { MessageMetaSchema, type MessageMeta } from '@artsum/agenthub-wire';
+import { CliUpdateStatusSchema } from '@artsum/agenthub-wire';
 import type { Update, UpdateMachineBody } from '@artsum/agenthub-wire';
+import type { AgentState as SharedAgentState, Metadata as SharedMetadata } from '@artsum/agenthub-wire';
 import { UsageSchema } from '@/claude/types'
 import type { SandboxConfig } from '@/persistence'
 
@@ -244,61 +246,33 @@ export const MessageContentSchema = z.union([UserMessageSchema, AgentMessageSche
 
 export type MessageContent = z.infer<typeof MessageContentSchema>
 
-export type Metadata = {
-  /**
-   * Session config option value normalized for UI metadata consumers.
-   */
-  // `code` = protocol value ID, `value` = human label
-  models?: Array<{
-    code: string;
-    value: string;
-    description?: string | null;
-    supportedReasoningEfforts?: Array<{ code: string; value: string; description?: string | null }>;
-    defaultReasoningEffortCode?: string;
-    isDefault?: boolean;
-  }>,
-  currentModelCode?: string,
-  contextWindow?: number,
-  operatingModes?: Array<{ code: string; value: string; description?: string | null }>,
-  currentOperatingModeCode?: string,
-  thoughtLevels?: Array<{ code: string; value: string; description?: string | null }>,
-  currentThoughtLevelCode?: string,
-  path: string,
-  host: string,
-  version?: string,
-  name?: string,
-  os?: string,
-  summary?: {
-    text: string,
-    updatedAt: number
-  },
-  lastUserMessage?: string,
-  machineId?: string,
-  claudeSessionId?: string, // Claude Code session ID
-  codexThreadId?: string, // Codex app-server thread ID
-  officialMirror?: { provider: 'claude' | 'codex'; id: string },
-  parentSessionId?: string, // AgentHub session this session was forked from
-  forkedFromMessageId?: string, // AgentHub message used as the fork point
-  tools?: string[],
-  slashCommands?: string[],
-  mcpServers?: Array<{ name: string; status: string }>,
-  skills?: string[],
-  homeDir: string,
-  agentHubHomeDir: string,
-  agentHubLibDir: string,
-  agentHubToolsDir: string,
-  startedFromDaemon?: boolean,
-  hostPid?: number,
-  startedBy?: 'daemon' | 'terminal',
-  // Lifecycle state management
-  lifecycleState?: 'running' | 'archiveRequested' | 'archived' | string,
-  lifecycleStateSince?: number,
-  archivedBy?: string,
-  archiveReason?: string,
-  flavor?: string
-  sandbox?: SandboxConfig | null
-  dangerouslySkipPermissions?: boolean | null
+export type Metadata = SharedMetadata & {
+  /** CLI session creation requires these runtime directories. */
+  path: string;
+  host: string;
+  homeDir: string;
+  agentHubHomeDir: string;
+  agentHubLibDir: string;
+  agentHubToolsDir: string;
+  sandbox?: SandboxConfig | null;
 };
+
+export type UsageLimitWindowStatus = 'allowed' | 'allowed_warning' | 'rejected'
+
+export type UsageLimitWindow = {
+  id: string,
+  label?: string,
+  status?: UsageLimitWindowStatus,
+  /** Percent used, from 0 through 100. */
+  utilization?: number | null,
+  /** Epoch milliseconds when the window resets. */
+  resetsAt?: number | null,
+}
+
+export type UsageLimits = {
+  capturedAt: number,
+  windows: UsageLimitWindow[],
+}
 
 export type AgentGoalStatus = {
   source: 'claude' | 'codex',
@@ -334,27 +308,20 @@ export type AgentGoalStatus = {
     }
 );
 
-export type AgentState = {
-  controlledByUser?: boolean | null | undefined
-  requests?: {
-    [id: string]: {
-      tool: string,
-      arguments: any,
-      createdAt: number
-    }
-  }
-  completedRequests?: {
-    [id: string]: {
-      tool: string,
-      arguments: any,
-      createdAt: number,
-      completedAt: number,
-      status: 'canceled' | 'denied' | 'approved',
-      reason?: string,
-      mode?: PermissionMode,
-      decision?: 'approved' | 'approved_for_session' | 'denied' | 'abort',
-      allowTools?: string[]
-    }
-  }
-  agentGoalStatus?: AgentGoalStatus
-}
+type SharedPermissionRequest = NonNullable<SharedAgentState['requests']>[string];
+type SharedCompletedPermissionRequest = NonNullable<SharedAgentState['completedRequests']>[string];
+
+export type AgentState = Omit<SharedAgentState, 'requests' | 'completedRequests' | 'usageLimits' | 'agentGoalStatus'> & {
+  usageLimits?: UsageLimits;
+  requests?: Record<string, Omit<SharedPermissionRequest, 'arguments' | 'createdAt'> & {
+    arguments: any;
+    createdAt: number;
+  }>;
+  completedRequests?: Record<string, Omit<SharedCompletedPermissionRequest, 'arguments' | 'createdAt' | 'completedAt' | 'mode'> & {
+    arguments: any;
+    createdAt: number;
+    completedAt: number;
+    mode?: PermissionMode;
+  }>;
+  agentGoalStatus?: AgentGoalStatus;
+};

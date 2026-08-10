@@ -82,6 +82,33 @@ describe('RPC method registry', () => {
     expect(() => parseRpcResponse('check-cli-update', { ...status, phase: 'invented' })).toThrow();
   });
 
+  it('validates machine system metrics snapshots', () => {
+    const snapshot = {
+      sampledAt: 1_725_000_000_000,
+      system: {
+        platform: 'linux',
+        name: 'Ubuntu 24.04.1 LTS',
+        release: '6.8.0-40-generic',
+        architecture: 'x64',
+        hostname: 'workstation',
+        uptimeSeconds: 7_200,
+      },
+      cpu: { usagePercent: 37.4, logicalCores: 16, model: 'Example CPU' },
+      memory: { totalBytes: 32_000, usedBytes: 20_000, availableBytes: 12_000, usagePercent: 62.5 },
+      network: { receivedBytes: 8_000_000, sentBytes: 2_000_000 },
+      disks: [{ name: '/dev/nvme0n1p2', mountPoint: '/', totalBytes: 100_000, usedBytes: 60_000, availableBytes: 40_000, usagePercent: 60 }],
+    };
+
+    expect(parseRpcRequest('get-system-metrics', {})).toEqual({});
+    expect(parseRpcResponse('get-system-metrics', snapshot)).toEqual(snapshot);
+    const { network: _network, ...legacySnapshot } = snapshot;
+    expect(parseRpcResponse('get-system-metrics', legacySnapshot)).toMatchObject({
+      network: { receivedBytes: 0, sentBytes: 0 },
+    });
+    expect(() => parseRpcResponse('get-system-metrics', { ...snapshot, cpu: { usagePercent: 140 } })).toThrow();
+    expect(() => parseRpcResponse('get-system-metrics', { ...snapshot, network: { receivedBytes: -1, sentBytes: 0 } })).toThrow();
+  });
+
   it('registers every built-in machine lifecycle and official-session RPC', () => {
     const methods = [
       'spawn-agenthub-session',

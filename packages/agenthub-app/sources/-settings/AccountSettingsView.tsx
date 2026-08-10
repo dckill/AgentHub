@@ -30,6 +30,7 @@ import {
     syncCurrentPushToken,
     type PushPermissionInfo,
 } from '@/sync/pushRegistration';
+import { runPushSettingsLoad } from './pushSettingsLoadLifecycle';
 
 function formatPushPermissionLabel(permission: PushPermissionInfo | null): string {
     if (!permission) {
@@ -131,36 +132,47 @@ export const AccountSettingsView = React.memo(() => {
     const displayName = getDisplayName(profile);
 
     const loadPushSettings = useCallback(async (showError = false) => {
-        if (!auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
             setPushTokens([]);
             setPushPermission(null);
             setCurrentPushToken(null);
+            setLoadingPushSettings(false);
             return;
         }
 
-        setLoadingPushSettings(true);
-        try {
-            const [tokens, permission, liveToken] = await Promise.all([
-                fetchPushTokens(auth.credentials),
-                getPushPermissionInfo(),
-                getCurrentExpoPushToken(),
-            ]);
-            setPushTokens(tokens);
-            setPushPermission(permission);
-            setCurrentPushToken(liveToken);
-        } catch (error) {
-            console.error('Failed to load push notification settings:', error);
-            if (showError) {
-                Modal.alert(t('common.error'), t('settingsAccount.pushErrorLoadSettings'));
-            }
-        } finally {
-            setLoadingPushSettings(false);
-        }
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
+        await runPushSettingsLoad({
+            fetchTokens: () => fetchPushTokens(credentials),
+            getPermission: getPushPermissionInfo,
+            getCurrentToken: getCurrentExpoPushToken,
+            isCurrent,
+            apply: ({ tokens, permission, currentToken }) => {
+                setPushTokens(tokens);
+                setPushPermission(permission);
+                setCurrentPushToken(currentToken);
+            },
+            setLoading: setLoadingPushSettings,
+            onError: (error) => {
+                console.error('Failed to load push notification settings:', error);
+                if (showError && isCurrent()) {
+                    Modal.alert(t('common.error'), t('settingsAccount.pushErrorLoadSettings'));
+                }
+            },
+        });
     }, [auth.credentials]);
 
     useEffect(() => {
         void loadPushSettings();
     }, [loadPushSettings]);
+
+    useEffect(() => {
+        setRequestingPushPermission(false);
+        setRefreshingPushToken(false);
+        setDeletingPushToken(null);
+    }, [auth.credentials?.token]);
 
     useFocusEffect(
         useCallback(() => {
@@ -293,23 +305,31 @@ export const AccountSettingsView = React.memo(() => {
     };
 
     const handlePushPermissionRequest = useCallback(async () => {
-        if (!auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
             return;
         }
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
 
         setRequestingPushPermission(true);
         try {
             const result = await requestPushPermissionOrOpenSettings();
+            if (!isCurrent()) return;
             setPushPermission(result.permission);
 
             if (result.granted) {
-                await syncCurrentPushToken(auth.credentials);
+                await syncCurrentPushToken(credentials);
+                if (!isCurrent()) return;
                 await loadPushSettings();
+                if (!isCurrent()) return;
                 Modal.alert(t('common.success'), t('settingsAccount.pushSuccessEnabled'));
                 return;
             }
 
             await loadPushSettings();
+            if (!isCurrent()) return;
 
             if (result.openedSettings) {
                 Modal.alert(t('settingsAccount.pushOpenSettings'), t('settingsAccount.pushOpenedSettingsMsg'));
@@ -318,23 +338,33 @@ export const AccountSettingsView = React.memo(() => {
 
             Modal.alert(t('common.error'), t('settingsAccount.pushPermNotGranted'));
         } catch (error) {
-            console.error('Failed to request push permission:', error);
-            Modal.alert(t('common.error'), t('settingsAccount.pushErrorRequestPerm'));
+            if (isCurrent()) {
+                console.error('Failed to request push permission:', error);
+                Modal.alert(t('common.error'), t('settingsAccount.pushErrorRequestPerm'));
+            }
         } finally {
-            setRequestingPushPermission(false);
+            if (isCurrent()) {
+                setRequestingPushPermission(false);
+            }
         }
     }, [auth.credentials, loadPushSettings]);
 
     const handleRefreshCurrentPushToken = useCallback(async () => {
-        if (!auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
             return;
         }
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
 
         setRefreshingPushToken(true);
         try {
-            const result = await syncCurrentPushToken(auth.credentials);
+            const result = await syncCurrentPushToken(credentials);
+            if (!isCurrent()) return;
             setPushPermission(result.permission);
             await loadPushSettings();
+            if (!isCurrent()) return;
 
             if (!result.permission.granted) {
                 Modal.alert(t('common.error'), t('settingsAccount.pushNotEnabledYet'));
@@ -343,17 +373,25 @@ export const AccountSettingsView = React.memo(() => {
 
             Modal.alert(t('common.success'), t('settingsAccount.pushTokenRefreshed'));
         } catch (error) {
-            console.error('Failed to refresh push token:', error);
-            Modal.alert(t('common.error'), t('settingsAccount.pushErrorRefresh'));
+            if (isCurrent()) {
+                console.error('Failed to refresh push token:', error);
+                Modal.alert(t('common.error'), t('settingsAccount.pushErrorRefresh'));
+            }
         } finally {
-            setRefreshingPushToken(false);
+            if (isCurrent()) {
+                setRefreshingPushToken(false);
+            }
         }
     }, [auth.credentials, loadPushSettings]);
 
     const handleDeletePushToken = useCallback(async (pushToken: PushToken) => {
-        if (!auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
             return;
         }
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
 
         const confirmed = await Modal.confirm(
             t('settingsAccount.pushDeleteToken'),
@@ -364,16 +402,23 @@ export const AccountSettingsView = React.memo(() => {
         if (!confirmed) {
             return;
         }
+        if (!isCurrent()) return;
 
         setDeletingPushToken(pushToken.token);
         try {
-            await removePushToken(auth.credentials, pushToken.token);
+            await removePushToken(credentials, pushToken.token);
+            if (!isCurrent()) return;
             await loadPushSettings();
+            if (!isCurrent()) return;
         } catch (error) {
-            console.error('Failed to delete push token:', error);
-            Modal.alert(t('common.error'), t('settingsAccount.pushErrorDelete'));
+            if (isCurrent()) {
+                console.error('Failed to delete push token:', error);
+                Modal.alert(t('common.error'), t('settingsAccount.pushErrorDelete'));
+            }
         } finally {
-            setDeletingPushToken(null);
+            if (isCurrent()) {
+                setDeletingPushToken(null);
+            }
         }
     }, [auth.credentials, loadPushSettings]);
 
@@ -440,7 +485,11 @@ export const AccountSettingsView = React.memo(() => {
                 {showSecret && (
                     <ItemGroup>
                         <SecretScreenCaptureProtection />
-                        <Pressable onPress={handleCopySecret}>
+                        <Pressable
+                            onPress={handleCopySecret}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('settingsAccount.secretKeyLabel')}
+                        >
                             <View style={{
                                 backgroundColor: theme.colors.surface,
                                 paddingHorizontal: 16,

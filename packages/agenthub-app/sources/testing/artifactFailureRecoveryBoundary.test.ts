@@ -8,6 +8,7 @@ const read = (relativePath: string) => fs.readFileSync(path.join(appSources, rel
 describe('artifact failure recovery boundary', () => {
     it('propagates fetch, authentication, and decryption failures instead of returning an empty artifact', () => {
         const sync = read('sync/sync.ts');
+        const application = read('sync/artifactBodyFetchApplication.ts');
         const start = sync.indexOf('public async fetchArtifactWithBody');
         const end = sync.indexOf('public async createArtifact', start);
         const method = sync.slice(start, end);
@@ -15,8 +16,9 @@ describe('artifact failure recovery boundary', () => {
         expect(start).toBeGreaterThan(-1);
         expect(end).toBeGreaterThan(start);
         expect(method).toContain('Promise<DecryptedArtifact>');
-        expect(method).toContain("throw new Error('Not authenticated')");
-        expect(method).toContain("throw new Error(`Failed to decrypt key for artifact ${artifactId}`)");
+        expect(method).toContain("throw new Error('Not authenticated. Please sign in again and retry.')");
+        expect(application).toContain("throw new Error(`Failed to decrypt key for artifact ${params.artifact.id}`)");
+        expect(application).toContain("throw new Error(`Failed to decrypt header for artifact ${params.artifact.id}`)");
         expect(method).not.toContain('catch (error)');
         expect(method).not.toContain('return null');
     });
@@ -62,6 +64,6 @@ describe('artifact failure recovery boundary', () => {
         expect(edit).toMatch(/catch \(err\) \{[\s\S]{0,280}setIsSaving\(false\);/);
         expect(edit).not.toMatch(/catch \(err\) \{[\s\S]{0,280}setTitle\(''\)/);
         expect(edit).not.toMatch(/catch \(err\) \{[\s\S]{0,280}setBody\(''\)/);
-        expect(detail).toMatch(/await deleteArtifact\(credentials, id\);\s*storage\.getState\(\)\.deleteArtifact\(id\);/);
+        expect(detail).toMatch(/request: \(\) => deleteArtifact\(credentials, id\),[\s\S]{0,260}storage\.getState\(\)\.deleteArtifact\(id\);/);
     });
 });

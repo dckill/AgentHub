@@ -187,6 +187,38 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(mockSocket.connect).toHaveBeenCalledTimes(1);
     });
 
+    it('releases metadata updates when the server acknowledgement times out', async () => {
+        const outcomes: string[] = [];
+        let ackCalls = 0;
+        mockBackoff.mockImplementation(async (callback) => {
+            try {
+                await callback();
+                outcomes.push('resolved');
+            } catch {
+                outcomes.push('rejected');
+            }
+        });
+        mockSocket.timeout = vi.fn(() => ({
+            emitWithAck: vi.fn(async () => {
+                ackCalls += 1;
+                if (ackCalls === 1) {
+                    throw new Error('operation has timed out');
+                }
+                return { result: 'error' };
+            }),
+        }));
+
+        const client = new ApiSessionClient('fake-token', session);
+        client.updateMetadata((metadata) => ({ ...metadata, path: '/first' }));
+        await waitForCheck(() => expect(outcomes).toEqual(['resolved']));
+
+        client.updateMetadata((metadata) => ({ ...metadata, path: '/second' }));
+        await waitForCheck(() => expect(ackCalls).toBe(2));
+
+        expect(mockSocket.timeout).toHaveBeenCalledWith(30_000);
+        expect(outcomes).toEqual(['resolved', 'resolved']);
+    });
+
     it('starts smart reconnect after initial socket connection errors', async () => {
         vi.useFakeTimers();
         mockSocket.connected = false;

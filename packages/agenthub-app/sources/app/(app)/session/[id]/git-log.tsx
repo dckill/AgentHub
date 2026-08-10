@@ -14,6 +14,8 @@ import { useEnsureSessionLoaded } from '@/hooks/useEnsureSessionLoaded';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAmberRaisedButtonVisuals } from '@/components/amberVisuals';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 function getCwd(sessionId: string): string | null {
     const session = storage.getState().sessions[sessionId];
@@ -313,7 +315,15 @@ export default React.memo(function GitLogScreen() {
     const [loading, doFetch] = useAgentHubAction(async () => {
         if (!cwd) return;
 
-        const graphResult = await getGitGraph(sessionId!, cwd, 120);
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const graphResult = await runSessionActionRequest({
+            isCurrent,
+            request: () => getGitGraph(sessionId!, cwd, 120),
+        });
+        if (!graphResult) {
+            return;
+        }
         if (graphResult.success) {
             setGraphRows(buildGitGraphTrackRows(graphResult.entries));
             setGraphLayout(buildGitGraphOverlayLayout(graphResult.entries));

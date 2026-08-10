@@ -7,6 +7,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUnistyles } from 'react-native-unistyles';
 import { getChatCanvasTextureVisuals, getChatShellVisuals } from './chatShellVisuals';
+import { MobileGlassSurface } from './MobileGlass';
 
 interface AgentContentViewProps {
     input?: React.ReactNode | null;
@@ -77,9 +78,12 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(({ i
                     </ScrollView>
                 )}
             </View>
-            <View
+            <MobileGlassSurface
+                nativeEffect
+                material="frosted"
+                intensity={92}
                 style={{
-                    backgroundColor: shellVisuals.inputBackgroundColor,
+                    backgroundColor: Platform.OS === 'web' ? shellVisuals.inputBackgroundColor : undefined,
                     borderTopWidth: 1,
                     borderTopColor: shellVisuals.inputBorderColor,
                     ...Platform.select({
@@ -91,7 +95,7 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(({ i
                 }}
             >
                 {input}
-            </View>
+            </MobileGlassSurface>
         </View>
     );
 });

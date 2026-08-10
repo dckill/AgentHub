@@ -86,14 +86,16 @@ export class MachineEncryption {
             const encryptedData = decodeBase64(encrypted, 'base64');
             const decrypted = await this.encryptor.decrypt([encryptedData]);
             const result = decrypted[0] || null;
-            
-            // Cache the result (including null values)
-            this.cache.setCachedDaemonState(this.machineId, version, result);
+
+            // A null decrypted payload is a recoverable miss (for example while
+            // the key is being refreshed), not a stable daemon state. Avoid
+            // poisoning the versioned cache so a later sync can retry.
+            if (result !== null) {
+                this.cache.setCachedDaemonState(this.machineId, version, result);
+            }
             return result;
         } catch (error) {
             console.error('Failed to decrypt daemon state:', error);
-            // Cache null result to avoid repeated decryption attempts
-            this.cache.setCachedDaemonState(this.machineId, version, null);
             return null;
         }
     }

@@ -6,11 +6,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
-import { useHeaderHeight } from '@/utils/responsive';
+import { useHeaderHeight, useIsTablet } from '@/utils/responsive';
 import { layout } from '@/components/layout';
 import { useUnistyles } from 'react-native-unistyles';
 import { getChatHeaderVisuals } from './chatShellVisuals';
 import type { SessionLifecycleVisual } from '@/utils/sessionLifecycleStatus';
+import { MobileGlassSurface } from './MobileGlass';
+import { isRunningOnMac } from '@/utils/platform';
 
 interface ChatHeaderViewProps {
     title: string;
@@ -44,7 +46,9 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
+    const isTablet = useIsTablet();
     const headerVisuals = getChatHeaderVisuals(theme);
+    const mobileGlassEnabled = !isTablet && Platform.OS !== 'web' && !isRunningOnMac();
 
     const handleBackPress = () => {
         if (onBackPress) {
@@ -60,12 +64,15 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 styles.container,
                 {
                     paddingTop: insets.top,
-                    backgroundColor: headerVisuals.backgroundColor,
+                    backgroundColor: mobileGlassEnabled ? 'transparent' : headerVisuals.backgroundColor,
                     borderBottomColor: headerVisuals.borderColor,
                     shadowColor: headerVisuals.shadowColor,
                 },
             ]}
         >
+            {mobileGlassEnabled && (
+                <MobileGlassSurface enabled nativeEffect material="static" intensity={52} style={StyleSheet.absoluteFill} />
+            )}
             <LinearGradient
                 pointerEvents="none"
                 colors={[
@@ -124,67 +131,69 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                                 {title}
                             </Text>
                         </View>
-                        {!!agentLabel && (
-                            <View style={styles.agentRow}>
-                                <View style={[styles.agentPill, { borderColor: headerVisuals.borderColor, backgroundColor: theme.colors.accentSoft }]}>
+                        {(!!agentLabel || !!lifecycleStatus || (!agentLabel && !!subtitle)) && (
+                            <View style={styles.metadataRow}>
+                                {!!agentLabel && (
+                                    <View style={[styles.agentPill, { borderColor: headerVisuals.borderColor, backgroundColor: theme.colors.accentSoft }]}>
+                                        <Text
+                                            numberOfLines={1}
+                                            style={[
+                                                styles.agentPillText,
+                                                {
+                                                    color: headerVisuals.mutedColor,
+                                                    ...Typography.default('semiBold')
+                                                }
+                                            ]}
+                                        >
+                                            {agentLabel}
+                                        </Text>
+                                    </View>
+                                )}
+                                {!!lifecycleStatus && (
+                                    <View
+                                        accessibilityRole="text"
+                                        accessible={lifecycleStatus.accessible}
+                                        accessibilityLiveRegion={lifecycleStatus.accessibilityLiveRegion}
+                                        accessibilityLabel={lifecycleStatus.label}
+                                        style={[
+                                            styles.lifecyclePill,
+                                            {
+                                                borderColor: headerVisuals.borderColor,
+                                                backgroundColor: lifecycleStatus.tone === 'warning'
+                                                    ? theme.colors.accentSoft
+                                                    : lifecycleStatus.tone === 'success'
+                                                        ? 'rgba(52, 199, 89, 0.12)'
+                                                        : theme.colors.glass.background,
+                                            },
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name={lifecycleStatus.icon}
+                                            size={11}
+                                            color={lifecycleStatus.tone === 'warning' ? theme.colors.warning : lifecycleStatus.tone === 'success' ? theme.colors.success : headerVisuals.mutedColor}
+                                        />
+                                        <Text numberOfLines={1} style={[styles.lifecyclePillText, { color: headerVisuals.mutedColor }]}>
+                                            {lifecycleStatus.label}
+                                        </Text>
+                                    </View>
+                                )}
+                                {!agentLabel && subtitle && (
                                     <Text
                                         numberOfLines={1}
+                                        ellipsizeMode="tail"
                                         style={[
-                                            styles.agentPillText,
+                                            styles.subtitle,
                                             {
-                                                color: headerVisuals.mutedColor,
-                                                ...Typography.default('semiBold')
+                                                color: headerVisuals.tintColor,
+                                                opacity: 0.7,
+                                                ...Typography.default()
                                             }
                                         ]}
                                     >
-                                        {agentLabel}
+                                        {subtitle}
                                     </Text>
-                                </View>
+                                )}
                             </View>
-                        )}
-                        {!!lifecycleStatus && (
-                            <View
-                                accessibilityRole="text"
-                                accessible={lifecycleStatus.accessible}
-                                accessibilityLiveRegion={lifecycleStatus.accessibilityLiveRegion}
-                                accessibilityLabel={lifecycleStatus.label}
-                                style={[
-                                    styles.lifecyclePill,
-                                    {
-                                        borderColor: headerVisuals.borderColor,
-                                        backgroundColor: lifecycleStatus.tone === 'warning'
-                                            ? theme.colors.accentSoft
-                                            : lifecycleStatus.tone === 'success'
-                                                ? 'rgba(52, 199, 89, 0.12)'
-                                                : theme.colors.glass.background,
-                                    },
-                                ]}
-                            >
-                                <Ionicons
-                                    name={lifecycleStatus.icon}
-                                    size={11}
-                                    color={lifecycleStatus.tone === 'warning' ? theme.colors.warning : lifecycleStatus.tone === 'success' ? theme.colors.success : headerVisuals.mutedColor}
-                                />
-                                <Text numberOfLines={1} style={[styles.lifecyclePillText, { color: headerVisuals.mutedColor }]}>
-                                    {lifecycleStatus.label}
-                                </Text>
-                            </View>
-                        )}
-                        {!agentLabel && subtitle && (
-                            <Text
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                                style={[
-                                    styles.subtitle,
-                                    {
-                                        color: headerVisuals.tintColor,
-                                        opacity: 0.7,
-                                        ...Typography.default()
-                                    }
-                                ]}
-                            >
-                                {subtitle}
-                            </Text>
                         )}
                     </View>
 
@@ -321,9 +330,15 @@ const styles = StyleSheet.create({
         gap: 6,
         minWidth: 0,
     },
-    agentRow: {
+    metadataRow: {
+        height: 18,
         marginTop: 2,
-        maxWidth: '100%',
+        width: '100%',
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        overflow: 'hidden',
     },
     agentPill: {
         height: 18,
@@ -340,24 +355,30 @@ const styles = StyleSheet.create({
         letterSpacing: 0,
     },
     lifecyclePill: {
-        minHeight: 18,
+        height: 18,
         borderRadius: 6,
         borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: 6,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        flexShrink: 1,
+        minWidth: 0,
         maxWidth: 180,
     },
     lifecyclePillText: {
         fontSize: 10,
         lineHeight: 12,
+        flexShrink: 1,
+        minWidth: 0,
         ...Typography.default('semiBold'),
     },
     subtitle: {
         fontSize: 12,
         fontWeight: '400',
         lineHeight: 14,
+        flexShrink: 1,
+        minWidth: 0,
     },
     headerIconButton: {
         minWidth: 44,

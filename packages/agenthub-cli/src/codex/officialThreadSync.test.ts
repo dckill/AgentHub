@@ -7,6 +7,44 @@ import {
 } from './officialThreadSync';
 
 describe('createOfficialCodexThreadSync', () => {
+    it('records existing history without publishing it, then forwards later side-chat messages', async () => {
+        const initialTurn = {
+            id: 'turn-existing',
+            startedAt: 100,
+            completedAt: 101,
+            items: [{ type: 'agentMessage', id: 'agent-existing', text: 'existing answer' }],
+        };
+        const client = {
+            readThread: vi.fn()
+                .mockResolvedValueOnce({ thread: { id: 'thread-1', turns: [initialTurn] } })
+                .mockResolvedValueOnce({ thread: { id: 'thread-1', turns: [initialTurn, {
+                    id: 'turn-new',
+                    startedAt: 200,
+                    completedAt: 201,
+                    items: [{ type: 'agentMessage', id: 'agent-new', text: 'new answer' }],
+                }] } }),
+        };
+        const session = {
+            sendSessionProtocolMessage: vi.fn(),
+            updateMetadata: vi.fn(),
+        };
+        const sync = createOfficialCodexThreadSync({
+            client,
+            session,
+            threadId: 'thread-1',
+            skipInitialHistory: true,
+        });
+
+        await sync.poll();
+        expect(session.sendSessionProtocolMessage).not.toHaveBeenCalled();
+
+        await sync.poll();
+        expect(session.sendSessionProtocolMessage.mock.calls
+            .map(([envelope]) => envelope)
+            .some((envelope) => envelope.ev.t === 'text' && envelope.ev.text === 'new answer'))
+            .toBe(true);
+    });
+
     it('does not republish live text when the official thread uses different envelope and turn ids', async () => {
         const client = {
             readThread: vi.fn().mockResolvedValue({

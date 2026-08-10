@@ -15,7 +15,7 @@ const { db, activityCache } = vi.hoisted(() => ({
         },
         $transaction: vi.fn(),
     },
-    activityCache: { invalidateSession: vi.fn() },
+    activityCache: { invalidateSession: vi.fn(), clearSessionUpdates: vi.fn(), resumeSessionUpdates: vi.fn() },
 }));
 
 vi.mock('@/storage/db', () => ({ db }));
@@ -173,6 +173,36 @@ describe('sessionRoutes', () => {
         await app.close();
     });
 
+    it('resumes heartbeat updates when an existing tagged session starts again', async () => {
+        db.session.findFirst.mockResolvedValue({
+            id: 's1',
+            seq: 7,
+            metadata: 'metadata-ciphertext',
+            metadataVersion: 2,
+            agentState: null,
+            agentStateVersion: 0,
+            dataEncryptionKey: null,
+            active: false,
+            lastActiveAt: new Date(3000),
+            thinking: false,
+            thinkingAt: null,
+            createdAt: new Date(1000),
+            updatedAt: new Date(2000),
+        });
+        const app = await createApp();
+
+        const response = await app.inject({
+            method: 'POST',
+            url: '/v1/sessions',
+            headers: { 'x-user-id': 'u1' },
+            payload: { tag: 'existing-tag', metadata: 'metadata-ciphertext' },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(activityCache.resumeSessionUpdates).toHaveBeenCalledWith('s1');
+        await app.close();
+    });
+
     it('invalidates cached heartbeats when explicitly archiving a session', async () => {
         db.session.updateMany.mockResolvedValue({ count: 1 });
         const app = await createApp();
@@ -188,7 +218,7 @@ describe('sessionRoutes', () => {
             where: { id: 's1', accountId: 'u1' },
             data: { active: false, lastActiveAt: expect.any(Date), thinking: false, thinkingAt: expect.any(Date) },
         });
-        expect(activityCache.invalidateSession).toHaveBeenCalledWith('s1', 'u1');
+        expect(activityCache.clearSessionUpdates).toHaveBeenCalledWith('s1');
         await app.close();
     });
 
@@ -218,7 +248,7 @@ describe('sessionRoutes', () => {
                 metadataVersion: 8,
             },
         });
-        expect(activityCache.invalidateSession).toHaveBeenCalledWith('s1', 'u1');
+        expect(activityCache.clearSessionUpdates).toHaveBeenCalledWith('s1');
         await app.close();
     });
 });

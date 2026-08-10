@@ -8,9 +8,27 @@ import { AsyncLock } from "@/utils/lock";
 import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
+import { canControlSession } from "@/app/session/sessionControl";
+import { isUserAppState } from '@/app/presence/appStatePresence';
+
+async function canWriteSession(userId: string, connection: ClientConnection, sessionId: string): Promise<boolean> {
+    // Daemon/session-scoped connections own the agent-side writes. Active Device
+    // only arbitrates user-scoped App control actions.
+    if (connection.connectionType !== 'user-scoped' || !connection.deviceId) {
+        return true;
+    }
+    return canControlSession(userId, sessionId, connection.deviceId);
+}
 
 export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
     const labels = getMetricsLabelsFromSocket(socket);
+    socket.on('app-state', (data: unknown) => {
+        if (connection.connectionType !== 'user-scoped') return;
+        const state = (data as { state?: unknown } | null)?.state;
+        if (!isUserAppState(state)) return;
+        socket.data.appState = state;
+        socket.data.appStateAt = Date.now();
+    });
     socket.on('update-metadata', async (data: any, callback: (response: any) => void) => {
         try {
             const { sid, metadata, expectedVersion } = data;
@@ -28,6 +46,12 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 where: { id: sid, accountId: userId }
             });
             if (!session) {
+                callback({ result: 'error' });
+                return null;
+            }
+
+            if (!await canWriteSession(userId, connection, sid)) {
+                callback({ result: 'control-denied' });
                 return;
             }
 
@@ -97,6 +121,11 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 return null;
             }
 
+            if (!await canWriteSession(userId, connection, sid)) {
+                callback({ result: 'control-denied' });
+                return null;
+            }
+
             // Check version
             if (session.agentStateVersion !== expectedVersion) {
                 callback({ result: 'version-mismatch', version: session.agentStateVersion, agentState: session.agentState });
@@ -152,6 +181,17 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             if (!data || typeof data.time !== 'number' || !data.sid) {
                 return;
             }
+            if (data.thinking !== undefined && typeof data.thinking !== 'boolean') {
+                return;
+            }
+
+            // Heartbeats update the persisted thinking/active projection. An
+            // observer device must remain read-only, otherwise it could
+            // overwrite the controller's runner state without sending a
+            // message or invoking another mutating RPC.
+            if (!await canWriteSession(userId, connection, data.sid)) {
+                return;
+            }
 
             let t = data.time;
             if (t > Date.now()) {
@@ -161,7 +201,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 return;
             }
 
-            const { sid, thinking } = data;
+            const { sid, thinking = false } = data;
 
             // Check session validity using cache
             const isValid = await activityCache.isSessionValid(sid, userId);
@@ -170,10 +210,10 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             }
 
             // Queue database update (will only update if time difference is significant)
-            activityCache.queueSessionUpdate(sid, t, thinking || false);
+            activityCache.queueSessionUpdate(sid, t, thinking);
 
             // Emit session activity update
-            const sessionActivity = buildSessionActivityEphemeral(sid, true, t, thinking || false);
+            const sessionActivity = buildSessionActivityEphemeral(sid, true, t, thinking);
             eventRouter.emitEphemeral({
                 userId,
                 payload: sessionActivity,
@@ -195,6 +235,11 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 }
                 if (connection.connectionType === 'session-scoped' && connection.sessionId !== sid) {
                     log({ module: 'websocket', level: 'warn' }, `Rejected cross-session message from socket ${socket.id}: connectionSessionId=${connection.sessionId}, requestedSessionId=${sid}`);
+                    return;
+                }
+
+                if (!await canWriteSession(userId, connection, sid)) {
+                    socket.emit('session-control-denied', { sessionId: sid });
                     return;
                 }
 
@@ -226,7 +271,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
     socket.on('session-end', async (data: {
         sid: string;
         time: number;
-    }, callback?: (response: { result: 'success' | 'error' }) => void) => {
+    }, callback?: (response: { result: 'success' | 'error' | 'control-denied' }) => void) => {
         try {
             const { sid, time } = data;
             let t = time;
@@ -251,13 +296,20 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 return;
             }
 
+            if (!await canWriteSession(userId, connection, sid)) {
+                callback?.({ result: 'control-denied' });
+                return;
+            }
+
+            // Clear before the deactivating write so an in-flight heartbeat
+            // cannot repopulate the cache during this window.
+            activityCache.clearSessionUpdates(sid);
+
             // Update last active at
             await db.session.update({
                 where: { id: sid },
                 data: { lastActiveAt: new Date(t), active: false, thinking: false, thinkingAt: new Date(t) }
             });
-            activityCache.invalidateSession(sid, userId);
-
             // Emit session activity update
             const sessionActivity = buildSessionActivityEphemeral(sid, false, t, false);
             eventRouter.emitEphemeral({

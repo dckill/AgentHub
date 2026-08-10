@@ -247,6 +247,8 @@ const ChatListInternal = React.memo((props: {
                             pressed ? styles.scrollButtonPressed : styles.scrollButtonDefault
                         ]}
                         onPress={scrollToBottom}
+                        accessibilityRole="button"
+                        accessibilityLabel="Scroll to bottom"
                     >
                         <Octicons name="arrow-down" size={14} color={theme.colors.text} />
                     </Pressable>

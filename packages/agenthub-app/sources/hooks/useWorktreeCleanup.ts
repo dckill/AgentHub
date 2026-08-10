@@ -27,7 +27,10 @@ export async function maybeCleanupWorktree(
     sessionId: string,
     sessionPath: string | undefined,
     machineId: string | undefined,
+    options: { isCurrent?: () => boolean } = {},
 ): Promise<void> {
+    const isCurrent = options.isCurrent ?? (() => true);
+    if (!isCurrent()) return;
     if (!sessionPath || !machineId || !isWorktreePath(sessionPath)) {
         return;
     }
@@ -41,11 +44,13 @@ export async function maybeCleanupWorktree(
         return;
     }
 
+    if (!isCurrent()) return;
     // 2. Check git status for uncommitted changes
     const statusResult = await machineExec(
         machineId,
         { executable: 'git', args: ['status', '--porcelain'], cwd: sessionPath },
     );
+    if (!isCurrent()) return;
     if (!statusResult.success || (statusResult.stdout ?? '').trim().length > 0) {
         // Either git failed (not a repo / machine offline) or there are changes → skip
         return;
@@ -62,7 +67,7 @@ export async function maybeCleanupWorktree(
         },
     );
 
-    if (shouldDelete) {
+    if (isCurrent() && shouldDelete) {
         await removeWorktree(machineId, sessionPath).catch(() => {});
     }
 }

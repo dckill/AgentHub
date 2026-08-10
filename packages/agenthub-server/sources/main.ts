@@ -10,6 +10,7 @@ import { startDatabaseMetricsUpdater } from "@/app/monitoring/metrics2";
 import { initEncrypt } from "./modules/encrypt";
 import { loadFiles } from "./storage/files";
 import { validateServerEnv } from "./config/env";
+import { handleMainError } from "./mainErrorHandling";
 
 async function main() {
 
@@ -17,15 +18,18 @@ async function main() {
 
     // Storage
     await db.$connect();
+    onShutdown('keepAlive:activity-cache', async () => {
+        await activityCache.shutdown();
+    });
     onShutdown('db', async () => {
         await db.$disconnect();
-    });
-    onShutdown('activity-cache', async () => {
-        activityCache.shutdown();
     });
     if (process.env.REDIS_URL) {
         const { Redis } = await import('ioredis');
         const redis = new Redis(process.env.REDIS_URL);
+        onShutdown('redis-probe', async () => {
+            await redis.quit();
+        });
         await redis.ping();
     }
 
@@ -106,9 +110,4 @@ process.on('exit', (code) => {
     }
 });
 
-main().catch((e) => {
-    console.error(e);
-    process.exit(1);
-}).then(() => {
-    process.exit(0);
-});
+main().catch(handleMainError);

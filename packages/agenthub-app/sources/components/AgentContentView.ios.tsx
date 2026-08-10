@@ -1,9 +1,11 @@
 import { useHeaderHeight } from '@/utils/responsive';
 import * as React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MobileGlassSurface } from './MobileGlass';
+import { useUnistyles } from 'react-native-unistyles';
 
 interface AgentContentViewProps {
     input?: React.ReactNode | null;
@@ -12,6 +14,7 @@ interface AgentContentViewProps {
 }
 
 export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(({ input, content, placeholder }) => {
+    const { theme } = useUnistyles();
     const safeArea = useSafeAreaInsets();
     const height = useReanimatedKeyboardAnimation();
     const headerHeight = useHeaderHeight();
@@ -57,7 +60,14 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(({ i
                 )}
             </View>
             <Animated.View style={[animatedInputStyle]}>
-                {input}
+                <MobileGlassSurface
+                    nativeEffect
+                    material="frosted"
+                    intensity={92}
+                    style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.glass.border, overflow: 'hidden' }}
+                >
+                    {input}
+                </MobileGlassSurface>
             </Animated.View>
         </View>
     );

@@ -28,6 +28,8 @@ import { FileTransferBadge } from '@/components/FileTransferBadge';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
 import { ScreenReaderHeading } from '@/components/ScreenReaderHeading';
 import { getMachineCliUpdateView } from '@/utils/cliUpdate';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { MachineSystemOverview } from '@/components/MachineSystemOverview';
 
 export default function MachineDetailScreen() {
     const { theme } = useUnistyles();
@@ -77,30 +79,48 @@ export default function MachineDetailScreen() {
 
     const handleCliUpdateAction = async () => {
         if (!machineId || !cliUpdate || !machineOnline) return;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         setIsUpdatingCli(true);
         try {
             if (cliUpdate.needsUpdate) {
-                const confirmed = await Modal.confirm(
-                    t('updateBanner.updateAvailable'),
-                    `${cliUpdate.currentVersion ?? t('status.unknown')} → ${cliUpdate.latestVersion ?? t('status.unknown')}`,
-                    { cancelText: t('common.cancel'), confirmText: t('common.continue') },
-                );
-                if (!confirmed) return;
-                const result = await machineUpdateCli(machineId, cliUpdate.latestVersion);
+                const confirmed = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => Modal.confirm(
+                        t('updateBanner.updateAvailable'),
+                        `${cliUpdate.currentVersion ?? t('status.unknown')} → ${cliUpdate.latestVersion ?? t('status.unknown')}`,
+                        { cancelText: t('common.cancel'), confirmText: t('common.continue') },
+                    ),
+                });
+                if (!isCurrent() || !confirmed) return;
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => machineUpdateCli(machineId, cliUpdate.latestVersion),
+                });
+                if (!isCurrent() || !result) return;
                 if (!result.accepted) {
                     Modal.alert(t('common.error'), result.message || result.status.error || t('settings.updateCheckFailed'));
                 }
             } else {
-                await machineCheckCliUpdate(machineId);
+                await runSessionActionRequest({
+                    isCurrent,
+                    request: () => machineCheckCliUpdate(machineId),
+                });
             }
         } catch (error) {
-            Modal.alert(t('common.error'), error instanceof Error ? error.message : t('settings.updateCheckFailed'));
+            if (isCurrent()) {
+                Modal.alert(t('common.error'), error instanceof Error ? error.message : t('settings.updateCheckFailed'));
+            }
         } finally {
-            setIsUpdatingCli(false);
+            if (isCurrent()) setIsUpdatingCli(false);
         }
     };
 
     const handleStopDaemon = async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         // Show confirmation modal using alert with buttons
         Modal.alert(
             t('machine.stopDaemonTitle'),
@@ -114,16 +134,24 @@ export default function MachineDetailScreen() {
                     text: t('machine.stopDaemon'),
                     style: 'destructive',
                     onPress: async () => {
+                        if (!isCurrent()) return;
                         setIsStoppingDaemon(true);
                         try {
-                            const result = await machineStopDaemon(machineId!);
+                            const result = await runSessionActionRequest({
+                                isCurrent,
+                                request: () => machineStopDaemon(machineId!),
+                            });
+                            if (!isCurrent() || !result) return;
                             Modal.alert(t('machine.daemonStopped'), result.message);
                             // Refresh to get updated metadata
-                            await sync.refreshMachines();
+                            await runSessionActionRequest({
+                                isCurrent,
+                                request: () => sync.refreshMachines(),
+                            });
                         } catch (error) {
-                            Modal.alert(t('common.error'), t('machine.stopDaemonFailed'));
+                            if (isCurrent()) Modal.alert(t('common.error'), t('machine.stopDaemonFailed'));
                         } finally {
-                            setIsStoppingDaemon(false);
+                            if (isCurrent()) setIsStoppingDaemon(false);
                         }
                     }
                 }
@@ -133,16 +161,26 @@ export default function MachineDetailScreen() {
 
     const handleDeleteMachine = async () => {
         if (!machineId) return;
-        const confirmed = await Modal.confirm(
-            t('machine.deleteConfirmTitle'),
-            t('machine.deleteConfirmMessage'),
-            { cancelText: t('common.cancel'), confirmText: t('common.delete'), destructive: true }
-        );
-        if (!confirmed) return;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('machine.deleteConfirmTitle'),
+                t('machine.deleteConfirmMessage'),
+                { cancelText: t('common.cancel'), confirmText: t('common.delete'), destructive: true }
+            ),
+        });
+        if (!isCurrent() || !confirmed) return;
 
         setIsDeletingMachine(true);
         try {
-            const result = await machineDelete(machineId);
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => machineDelete(machineId),
+            });
+            if (!isCurrent() || !result) return;
             if (result.success) {
                 const nextMachineGroups = removeMachineFromGroups(machineGroups, machineId);
                 if (nextMachineGroups !== machineGroups) {
@@ -153,30 +191,38 @@ export default function MachineDetailScreen() {
                 Modal.alert(t('common.error'), result.message || t('machine.deleteFailed'));
             }
         } catch (error) {
-            Modal.alert(
-                t('common.error'),
-                error instanceof Error ? error.message : t('machine.deleteFailed')
-            );
+            if (isCurrent()) {
+                Modal.alert(
+                    t('common.error'),
+                    error instanceof Error ? error.message : t('machine.deleteFailed')
+                );
+            }
         } finally {
-            setIsDeletingMachine(false);
+            if (isCurrent()) setIsDeletingMachine(false);
         }
     };
 
     const handleRenameMachine = async () => {
         if (!machine || !machineId) return;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
 
-        const newDisplayName = await Modal.prompt(
-            t('machine.renameTitle'),
-            t('machine.renameMessage'),
-            {
-                defaultValue: machine.metadata?.displayName || '',
-                placeholder: machine.metadata?.host || t('machine.renamePlaceholder'),
-                cancelText: t('common.cancel'),
-                confirmText: t('common.rename')
-            }
-        );
+        const newDisplayName = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('machine.renameTitle'),
+                t('machine.renameMessage'),
+                {
+                    defaultValue: machine.metadata?.displayName || '',
+                    placeholder: machine.metadata?.host || t('machine.renamePlaceholder'),
+                    cancelText: t('common.cancel'),
+                    confirmText: t('common.rename')
+                }
+            ),
+        });
 
-        if (newDisplayName !== null) {
+        if (isCurrent() && newDisplayName !== null) {
             setIsRenamingMachine(true);
             try {
                 const updatedMetadata = {
@@ -184,22 +230,33 @@ export default function MachineDetailScreen() {
                     displayName: newDisplayName.trim() || undefined
                 };
 
-                await machineUpdateMetadata(
-                    machineId,
-                    updatedMetadata,
-                    machine.metadataVersion
-                );
+                await runSessionActionRequest({
+                    isCurrent,
+                    request: () => machineUpdateMetadata(
+                        machineId,
+                        updatedMetadata,
+                        machine.metadataVersion
+                    ),
+                });
+                if (!isCurrent()) return;
 
                 Modal.alert(t('common.success'), t('machine.renameSuccess'));
             } catch (error) {
-                Modal.alert(
-                    t('common.error'),
-                    error instanceof Error ? error.message : t('machine.renameFailed')
-                );
+                if (isCurrent()) {
+                    Modal.alert(
+                        t('common.error'),
+                        error instanceof Error ? error.message : t('machine.renameFailed')
+                    );
+                }
                 // Refresh to get latest state
-                await sync.refreshMachines();
+                if (isCurrent()) {
+                    await runSessionActionRequest({
+                        isCurrent,
+                        request: () => sync.refreshMachines(),
+                    });
+                }
             } finally {
-                setIsRenamingMachine(false);
+                if (isCurrent()) setIsRenamingMachine(false);
             }
         }
     };
@@ -303,6 +360,11 @@ export default function MachineDetailScreen() {
             <View role="main" style={styles.page}>
                 <ScreenReaderHeading title={machineName} />
                 <ItemList keyboardShouldPersistTaps="handled">
+                <MachineSystemOverview
+                    machineId={machineId!}
+                    online={machineOnline}
+                    refreshIntervalMs={3_000}
+                />
                 {!machineOnline && (
                     <ItemGroup>
                         <Item

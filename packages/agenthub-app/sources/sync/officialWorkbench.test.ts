@@ -84,4 +84,25 @@ describe('official workbench helpers', () => {
         ]);
         expect(applyThreads).toHaveBeenNthCalledWith(2, 'machine-1', threads);
     });
+
+    it('does not roll a stale-account failure back into the current workbench', async () => {
+        const applyThreads = vi.fn();
+        const threads = [thread({ id: 'codex-1', provider: 'codex' })];
+        const isCurrent = vi.fn()
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(true)
+            .mockReturnValue(false);
+
+        await expect(ignoreOfficialThreadsFromWorkbench({
+            machineId: 'machine-1',
+            officialIds: ['codex-1'],
+            getThreads: () => threads,
+            applyThreads,
+            ignoreThread: vi.fn(async () => { throw new Error('RPC failed'); }),
+            isCurrent,
+        })).rejects.toThrow('RPC failed');
+
+        expect(isCurrent).toHaveBeenCalled();
+        expect(applyThreads).toHaveBeenCalledTimes(1);
+    });
 });

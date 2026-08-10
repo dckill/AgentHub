@@ -12,6 +12,8 @@ import { t } from '@/text';
 import { getServerUrl, validateServerUrl, getServerInfo } from '@/sync/serverConfig';
 import { useAuth } from '@/auth/AuthContext';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 const stylesheet = StyleSheet.create((theme) => ({
     keyboardAvoidingView: {
@@ -88,7 +90,10 @@ export default function ServerConfigScreen() {
     const [error, setError] = useState<string | null>(null);
     const [isValidating, setIsValidating] = useState(false);
 
-    const validateServer = async (url: string): Promise<boolean> => {
+    const validateServer = async (url: string, isCurrent: () => boolean): Promise<boolean> => {
+        if (!isCurrent()) {
+            return false;
+        }
         try {
             setIsValidating(true);
             setError(null);
@@ -100,12 +105,18 @@ export default function ServerConfigScreen() {
                 }
             });
             
+            if (!isCurrent()) {
+                return false;
+            }
             if (!response.ok) {
                 setError(t('server.serverReturnedError'));
                 return false;
             }
             
             const text = await response.text();
+            if (!isCurrent()) {
+                return false;
+            }
             if (!text.includes('Welcome to AgentHub Server!')) {
                 setError(t('server.notValidAgentHubServer'));
                 return false;
@@ -113,14 +124,23 @@ export default function ServerConfigScreen() {
             
             return true;
         } catch (err) {
-            setError(t('server.failedToConnectToServer'));
+            if (isCurrent()) {
+                setError(t('server.failedToConnectToServer'));
+            }
             return false;
         } finally {
-            setIsValidating(false);
+            if (isCurrent()) {
+                setIsValidating(false);
+            }
         }
     };
 
     const handleSave = async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
         if (!inputUrl.trim()) {
             Modal.alert(t('common.error'), t('server.enterServerUrl'));
             return;
@@ -133,37 +153,57 @@ export default function ServerConfigScreen() {
         }
 
         // Validate the server
-        const isValid = await validateServer(inputUrl);
-        if (!isValid) {
+        const isValid = await runSessionActionRequest({
+            isCurrent,
+            request: () => validateServer(inputUrl, isCurrent),
+        });
+        if (isValid === null || !isValid) {
             return;
         }
 
-        const confirmed = await Modal.confirm(
-            t('server.changeServer'),
-            t('server.continueWithServer'),
-            { confirmText: t('common.continue'), destructive: true }
-        );
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('server.changeServer'),
+                t('server.continueWithServer'),
+                { confirmText: t('common.continue'), destructive: true },
+            ),
+        });
 
-        if (confirmed) {
-            try {
-                await auth.switchServer(inputUrl);
-            } catch {
+        if (!confirmed || !isCurrent()) {
+            return;
+        }
+        try {
+            await auth.switchServer(inputUrl);
+        } catch {
+            if (isCurrent()) {
                 setError(t('errors.operationFailed'));
             }
         }
     };
 
     const handleReset = async () => {
-        const confirmed = await Modal.confirm(
-            t('server.resetToDefault'),
-            t('server.resetServerDefault'),
-            { confirmText: t('common.reset'), destructive: true }
-        );
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('server.resetToDefault'),
+                t('server.resetServerDefault'),
+                { confirmText: t('common.reset'), destructive: true },
+            ),
+        });
 
-        if (confirmed) {
-            try {
-                await auth.switchServer(null);
-            } catch {
+        if (!confirmed || !isCurrent()) {
+            return;
+        }
+        try {
+            await auth.switchServer(null);
+        } catch {
+            if (isCurrent()) {
                 setError(t('errors.operationFailed'));
             }
         }

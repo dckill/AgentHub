@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { t } from '@/text';
 import { layout } from '@/components/layout';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { FAB } from '@/components/FAB';
 // Date formatting
 
@@ -130,21 +131,28 @@ export default function ArtifactsScreen() {
     // Fetch artifacts on mount
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         
         (async () => {
             try {
                 // Check if credentials are available
                 const credentials = sync.getCredentials();
-                if (!credentials) {
+                if (!credentials || !isCurrent()) {
                     return;
                 }
                 
                 setIsLoading(true);
-                await sync.fetchArtifactsList();
+                await runSessionActionRequest({
+                    isCurrent: () => !cancelled && isCurrent(),
+                    request: () => sync.fetchArtifactsList(),
+                });
             } catch (error) {
-                console.error('📱 ArtifactsScreen: Failed to fetch artifacts:', error);
+                if (!cancelled && isCurrent()) {
+                    console.error('📱 ArtifactsScreen: Failed to fetch artifacts:', error);
+                }
             } finally {
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     setIsLoading(false);
                 }
             }
@@ -159,6 +167,7 @@ export default function ArtifactsScreen() {
         const isFirst = index === 0;
         const isLast = index === artifacts.length - 1;
         const isSingle = artifacts.length === 1;
+        const artifactTitle = item.title || t('artifacts.untitled');
 
         return (
             <Pressable
@@ -169,6 +178,8 @@ export default function ArtifactsScreen() {
                     isLast ? styles.artifactItemLast : {}
                 ]}
                 onPress={() => router.push(`/artifacts/${item.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={artifactTitle}
             >
                 <View style={styles.artifactContent}>
                     <Text 
@@ -178,7 +189,7 @@ export default function ArtifactsScreen() {
                         ]}
                         numberOfLines={1}
                     >
-                        {item.title || 'Untitled'}
+                        {artifactTitle}
                     </Text>
                     <View style={styles.artifactMeta}>
                         <Text style={styles.artifactDate}>
@@ -243,7 +254,7 @@ export default function ArtifactsScreen() {
             />
             
             {/* Floating Action Button */}
-            <FAB onPress={() => router.push('/artifacts/new')} />
+            <FAB accessibilityLabel={t('artifacts.new')} onPress={() => router.push('/artifacts/new')} />
         </View>
     );
 }

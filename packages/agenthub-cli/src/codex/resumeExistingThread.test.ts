@@ -3,6 +3,30 @@ import { describe, expect, it, vi } from 'vitest';
 import { resumeExistingThread } from './resumeExistingThread';
 
 describe('resumeExistingThread', () => {
+    it('can resume a side-chat thread without publishing a synthetic resume message', async () => {
+        const client = {
+            resumeThread: vi.fn().mockResolvedValue({ threadId: 'thread-side', model: 'gpt-5.4' }),
+        };
+        const session = {
+            updateMetadata: vi.fn(),
+            sendSessionEvent: vi.fn(),
+        };
+        const messageBuffer = { addMessage: vi.fn() };
+
+        await resumeExistingThread({
+            client,
+            session,
+            messageBuffer,
+            threadId: 'thread-side',
+            cwd: '/tmp/project',
+            mcpServers: {},
+            announce: false,
+        });
+
+        expect(messageBuffer.addMessage).not.toHaveBeenCalled();
+        expect(session.sendSessionEvent).not.toHaveBeenCalled();
+    });
+
     it('resumes the thread and updates session metadata', async () => {
         const client = {
             resumeThread: vi.fn().mockResolvedValue({

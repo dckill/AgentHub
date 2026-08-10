@@ -108,7 +108,7 @@ export interface QueryOptions {
     resume?: string;
     model?: string;
     fallbackModel?: string;
-    effort?: 'low' | 'medium' | 'high' | 'max';
+    effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
     sessionId?: string;
     forkSession?: boolean;
     includePartialMessages?: boolean;

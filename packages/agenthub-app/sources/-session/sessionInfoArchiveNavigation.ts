@@ -35,10 +35,11 @@ export function getArchiveFeedbackNavigationDelayMs(state: string): number {
  *
  * The fix: Delay navigation to allow the Fabric UI thread to complete its batched operations.
  */
-export function navigateAfterSessionArchive(router: SessionInfoArchiveRouter, delayMs: number = DEFAULT_ARCHIVE_NAVIGATION_DELAY_MS) {
+export function navigateAfterSessionArchive(router: SessionInfoArchiveRouter, delayMs: number = DEFAULT_ARCHIVE_NAVIGATION_DELAY_MS, isCurrent: () => boolean = () => true) {
     // Use setTimeout to allow Fabric to complete its batched mount operations
     // This prevents the race condition between navigation and UI rendering
     setTimeout(() => {
+        if (!isCurrent()) return;
         router.replace('/');
     }, delayMs);
 }
@@ -54,14 +55,17 @@ export function navigateAfterSessionDelete(
     router: SessionInfoDeleteRouter,
     deleteLocalSession: () => void,
     delayMs: number = DEFAULT_ARCHIVE_NAVIGATION_DELAY_MS,
+    isCurrent: () => boolean = () => true,
 ) {
     setTimeout(() => {
+        if (!isCurrent()) return;
         if (router.canDismiss?.()) {
             router.dismissAll?.();
         }
         router.replace('/');
 
         setTimeout(() => {
+            if (!isCurrent()) return;
             deleteLocalSession();
         }, delayMs);
     }, delayMs);

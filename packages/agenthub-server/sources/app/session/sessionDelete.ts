@@ -4,6 +4,7 @@ import { eventRouter, buildDeleteSessionUpdate } from "@/app/events/eventRouter"
 import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { log } from "@/utils/log";
+import { deleteSessionAttachments } from "@/storage/files";
 
 /**
  * Delete a session and all its related data.
@@ -101,6 +102,13 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
                 payload: updatePayload,
                 recipientFilter: { type: 'user-scoped-only' }
             });
+
+            try {
+                await deleteSessionAttachments(sessionId);
+                log({ module: 'session-delete', userId: ctx.uid, sessionId }, `Attachment blobs deleted`);
+            } catch (err) {
+                log({ module: 'session-delete', userId: ctx.uid, sessionId, err }, `Failed to delete attachment blobs (non-fatal)`);
+            }
         });
 
         return true;

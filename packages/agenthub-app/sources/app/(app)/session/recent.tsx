@@ -205,6 +205,8 @@ export default function SessionHistory() {
                         isLast ? styles.sessionCardLast : {}
                     ]}
                     onPress={() => navigateToSession(session.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={sessionName}
                 >
                     <ProjectIcon icon={projectIcon} size={48} />
                     <View style={styles.sessionContent}>

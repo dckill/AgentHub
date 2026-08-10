@@ -12,7 +12,7 @@ import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, purchasesDefaults } from "./purchases";
 import { Profile, profileDefaults } from "./profile";
 import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadSessionModelModes, saveSessionModelModes, loadSessionEffortLevels, saveSessionEffortLevels, loadSessionLastViewedAt, saveSessionLastViewedAt, loadSessionUnviewedCompletionAt, saveSessionUnviewedCompletionAt, loadSessionLastViewedState, saveSessionLastViewedState } from "./persistence";
-import type { PermissionModeKey } from '@/components/PermissionModeSelector';
+import type { PermissionModeKey } from '@/utils/permissionMode';
 import { sync } from "./sync";
 import { isMutableTool } from "@/components/tools/knownTools";
 import { projectManager } from "./projectManager";
@@ -25,6 +25,7 @@ import type { OfficialCodexThread } from './officialThreads';
 import { applyBoundedFilePreviewCache, isFilePreviewCacheEntryFresh, touchFilePreviewCache, type FilePreviewCache } from './filePreviewCachePolicy';
 import { countRunningToolsInMessages, mergeMessagesNewestFirst, selectRetainedSessionMessageIds, updateRunningToolCount } from './sessionMessageIndex';
 import type { SessionMessageLoadError } from './sessionMessageLoadState';
+import { isTopLevelSession, selectSideChatSessions } from './sideChatSessions';
 export type { ProjectGroupData, ProjectListViewItem, SessionListItem, SessionListViewItem, SessionRowData } from "./storageProjection";
 
 function useDeepEqual<T>(selector: (state: StorageState) => T): (state: StorageState) => T {
@@ -228,7 +229,7 @@ export const storage = create<StorageState>()((set, get) => {
         return machineMetadataMap;
     };
     const syncProjectManagerSessions = (sessions: Record<string, Session>, machines: Record<string, Machine>) => {
-        projectManager.updateSessions(Object.values(sessions), buildMachineMetadataMap(machines));
+        projectManager.updateSessions(Object.values(sessions).filter(isTopLevelSession), buildMachineMetadataMap(machines));
     };
     const rebuildProjectListViewData = (
         sessions: Record<string, Session>,
@@ -424,6 +425,7 @@ export const storage = create<StorageState>()((set, get) => {
 
             // Process all sessions from merged set
             Object.values(mergedSessions).forEach(session => {
+                if (!isTopLevelSession(session)) return;
                 if (activeSet.has(session.id)) {
                     activeSessions.push(session);
                 } else {
@@ -1459,6 +1461,10 @@ export function useSession(id: string): Session | null {
     return storage(useShallow((state) => state.sessions[id] ?? null));
 }
 
+export function useSideChatSessions(parentSessionId: string | null): Session[] {
+    return storage(useShallow((state) => selectSideChatSessions(Object.values(state.sessions), parentSessionId)));
+}
+
 const emptyArray: unknown[] = [];
 
 export function useSessionMessages(sessionId: string): {
@@ -1542,7 +1548,7 @@ export function useProjectListViewData(): ProjectListViewItem[] | null {
 export function useAllSessions(): Session[] {
     return storage(useShallow((state) => {
         if (!state.isDataReady) return [];
-        return Object.values(state.sessions).sort((a, b) => b.updatedAt - a.updatedAt);
+        return Object.values(state.sessions).filter(isTopLevelSession).sort((a, b) => b.updatedAt - a.updatedAt);
     }));
 }
 

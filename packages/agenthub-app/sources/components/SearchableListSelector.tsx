@@ -476,6 +476,8 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
                             </View>
                             {inputText.trim() && (
                                 <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('common.close')}
                                     onPress={handleClear}
                                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                     style={({ pressed }) => ([
@@ -490,6 +492,9 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
                     </View>
                     {showFavorites && onToggleFavorite && (
                         <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`${config.favoritesSectionTitle}: ${inputText.trim()}`}
+                            accessibilityState={{ disabled: !canAddToFavorites }}
                             onPress={handleAddToFavorites}
                             disabled={!canAddToFavorites}
                             style={({ pressed }) => ([
@@ -516,6 +521,9 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
             {showRecent && filteredRecentItems.length > 0 && (
                 <>
                     <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={config.recentSectionTitle}
+                        accessibilityState={{ expanded: showRecentSection }}
                         style={styles.sectionHeader}
                         onPress={toggleRecentSection}
                     >
@@ -567,6 +575,9 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
             {showFavorites && filteredFavoriteItems.length > 0 && (
                 <>
                     <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={config.favoritesSectionTitle}
+                        accessibilityState={{ expanded: showFavoritesSection }}
                         style={styles.sectionHeader}
                         onPress={toggleFavoritesSection}
                     >
@@ -611,6 +622,8 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
                                                 )}
                                                 {onToggleFavorite && canRemove && (
                                                     <Pressable
+                                                        accessibilityRole="button"
+                                                        accessibilityLabel={`${t('common.delete')} ${title}`}
                                                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                                         onPress={(e) => {
                                                             e.stopPropagation();
@@ -643,6 +656,9 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
             {items.length > 0 && (
                 <>
                     <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={config.recentSectionTitle.replace('Recent ', 'All ')}
+                        accessibilityState={{ expanded: showAllItemsSection }}
                         style={styles.sectionHeader}
                         onPress={toggleAllItemsSection}
                     >

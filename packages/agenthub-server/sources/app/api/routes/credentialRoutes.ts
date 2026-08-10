@@ -311,6 +311,7 @@ export function credentialRoutes(app: Fastify) {
             params: z.object({ id: z.string() }),
             response: {
                 200: z.object({ success: z.literal(true) }),
+                500: ErrorResponseSchema,
             },
         },
     }, async (request, reply) => {
@@ -319,7 +320,9 @@ export function credentialRoutes(app: Fastify) {
             await db.managedCredential.deleteMany({
                 where: { id: request.params.id, accountId: userId },
             });
-        } catch {
+        } catch (error) {
+            log({ module: 'credentials', level: 'error', credentialId: request.params.id, userId, error }, 'Failed to delete credential');
+            return reply.code(500).send({ error: 'Failed to delete credential' });
         }
         return reply.send({ success: true });
     });

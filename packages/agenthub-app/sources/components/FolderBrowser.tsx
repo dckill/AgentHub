@@ -9,6 +9,8 @@ import type { DirectoryEntry } from '@/sync/ops';
 import { FolderIcon } from '@/components/FolderIcon';
 import { Modal } from '@/modal';
 import { getParentDirectory } from '@/components/folderBrowserPath';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 export interface FolderBrowserProps {
     machineId: string;
@@ -38,9 +40,16 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
     const [cache] = React.useState(new Map<string, DirectoryEntry[]>());
 
     const loadDirectory = React.useCallback((path: string) => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         setIsLoading(true);
         setError(null);
-        machineListDirectory(machineId, path).then((result) => {
+        void runSessionActionRequest({
+            isCurrent,
+            request: () => machineListDirectory(machineId, path),
+        }).then((result) => {
+            if (result === null || !isCurrent()) return;
             if (result.success && result.entries) {
                 const dirs = result.entries.filter((e) => e.type === 'directory');
                 cache.set(path, dirs);
@@ -50,9 +59,9 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                 setError(result.error || t('newSession.folderNotFound'));
             }
         }).catch(() => {
-            setError(t('newSession.noAccess'));
+            if (isCurrent()) setError(t('newSession.noAccess'));
         }).finally(() => {
-            setIsLoading(false);
+            if (isCurrent()) setIsLoading(false);
         });
     }, [machineId, cache]);
 
@@ -101,14 +110,21 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
     }, [cache, loadDirectory]);
 
     const handleCreateFolder = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         const name = await Modal.prompt(
             t('newSession.newFolder'),
             undefined,
             { placeholder: t('newSession.newFolderName'), cancelText: t('common.cancel'), confirmText: t('common.create') }
         );
-        if (!name?.trim()) return;
+        if (!isCurrent() || !name?.trim()) return;
         const newPath = currentPath === '/' ? `/${name.trim()}` : `${currentPath}/${name.trim()}`;
-        const result = await machineCreateDirectory(machineId, newPath);
+        const result = await runSessionActionRequest({
+            isCurrent,
+            request: () => machineCreateDirectory(machineId, newPath),
+        });
+        if (result === null || !isCurrent()) return;
         if (!result.success) {
             Modal.alert(t('newSession.createFolderError'), result.error || t('common.unknownError'), [{ text: t('common.ok'), style: 'cancel' }]);
             return;
@@ -150,7 +166,13 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                 contentContainerStyle={styles.breadcrumbContent}
             >
                 {homeDir && (
-                    <Pressable onPress={() => handleRecentPress(homeDir)} hitSlop={4} style={styles.breadcrumbChip}>
+                    <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.home')}
+                        onPress={() => handleRecentPress(homeDir)}
+                        hitSlop={4}
+                        style={styles.breadcrumbChip}
+                    >
                         <Ionicons name="home-outline" size={13} color={theme.colors.textSecondary} />
                     </Pressable>
                 )}
@@ -171,6 +193,9 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                         <React.Fragment key={`${seg}-${i}`}>
                             {i > 0 && <Text style={[styles.breadcrumbSep, { color: theme.colors.textSecondary }]}>/</Text>}
                             <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={seg === '~' ? t('common.home') : seg}
+                                accessibilityState={{ disabled: isLast }}
                                 onPress={() => !isLast && navigateToBreadcrumb(segPath)}
                                 hitSlop={4}
                                 disabled={isLast}
@@ -195,6 +220,8 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                 <View style={styles.controlsLeft}>
                     {parentDirectory && (
                         <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={t('newSession.parentFolder')}
                             onPress={navigateToParentDirectory}
                             hitSlop={4}
                             style={({ pressed }) => [
@@ -211,6 +238,9 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                         </Pressable>
                     )}
                     <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('newSession.showHidden')}
+                        accessibilityState={{ selected: showHidden }}
                         onPress={() => setShowHidden((v) => !v)}
                         style={({ pressed }) => [
                             styles.controlButton,
@@ -229,6 +259,8 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                         </Text>
                     </Pressable>
                     <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('newSession.newFolder')}
                         onPress={handleCreateFolder}
                         style={({ pressed }) => [
                             styles.controlButton,
@@ -257,6 +289,8 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                             return (
                                 <Pressable
                                     key={p}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={label}
                                     onPress={() => handleRecentPress(p)}
                                     style={({ pressed }) => [
                                         styles.recentChip,
@@ -290,7 +324,12 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                         {error}
                     </Text>
                     {parentDirectory && (
-                        <Pressable onPress={navigateToParentDirectory} style={styles.errorBack}>
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={t('newSession.parentFolder')}
+                            onPress={navigateToParentDirectory}
+                            style={styles.errorBack}
+                        >
                             <Text style={[styles.errorBackText, { color: theme.colors.button.primary.background }]}>
                                 {t('newSession.parentFolder')}
                             </Text>
@@ -309,6 +348,8 @@ export const FolderBrowser = React.memo<FolderBrowserProps>(({
                     {filteredEntries.map((entry) => (
                         <Pressable
                             key={entry.name}
+                            accessibilityRole="button"
+                            accessibilityLabel={entry.name}
                             onPress={() => navigateTo(currentPath === '/' ? `/${entry.name}` : `${currentPath}/${entry.name}`)}
                             style={({ pressed }) => [
                                 styles.dirRow,

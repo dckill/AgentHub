@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     sessionUpdateManyAndReturn: vi.fn(),
     machineFindMany: vi.fn(),
     machineUpdateManyAndReturn: vi.fn(),
+    externalShareUpdateMany: vi.fn(),
+    activityCache: { clearSessionUpdates: vi.fn() },
 }));
 
 vi.mock('@/utils/forever', () => ({ forever: mocks.forever }));
@@ -22,6 +24,9 @@ vi.mock('@/storage/db', () => ({
             findMany: mocks.machineFindMany,
             updateManyAndReturn: mocks.machineUpdateManyAndReturn,
         },
+        externalShare: {
+            updateMany: mocks.externalShareUpdateMany,
+        },
     },
 }));
 vi.mock('@/app/events/eventRouter', () => ({
@@ -29,6 +34,7 @@ vi.mock('@/app/events/eventRouter', () => ({
     buildSessionActivityEphemeral: vi.fn(),
     buildMachineActivityEphemeral: vi.fn(),
 }));
+vi.mock('@/app/presence/sessionCache', () => ({ activityCache: mocks.activityCache }));
 
 import { startTimeout } from './timeout';
 
@@ -39,6 +45,7 @@ describe('presence timeout lifecycle', () => {
             new Error('timeout callback started a second sweep'),
         );
         mocks.machineFindMany.mockResolvedValue([]);
+        mocks.externalShareUpdateMany.mockResolvedValue({ count: 0 });
         mocks.delay.mockResolvedValue(undefined);
     });
 
@@ -54,6 +61,33 @@ describe('presence timeout lifecycle', () => {
 
         expect(mocks.sessionFindMany).toHaveBeenCalledOnce();
         expect(mocks.machineFindMany).toHaveBeenCalledOnce();
+        expect(mocks.externalShareUpdateMany).toHaveBeenCalledOnce();
         expect(mocks.delay).toHaveBeenCalledOnce();
+    });
+
+    it('suppresses cached session heartbeats before timeout deactivation', async () => {
+        let sweep: (() => Promise<void>) | undefined;
+        mocks.forever.mockImplementation((_name: string, callback: () => Promise<void>) => {
+            sweep = callback;
+        });
+        mocks.sessionFindMany.mockReset();
+        mocks.sessionFindMany.mockResolvedValueOnce([{
+            id: 's1',
+            accountId: 'u1',
+            active: true,
+            lastActiveAt: new Date(1),
+        }]);
+        mocks.sessionUpdateManyAndReturn.mockResolvedValueOnce([{
+            id: 's1',
+            lastActiveAt: new Date(2),
+        }]);
+
+        startTimeout();
+        await sweep!();
+
+        expect(mocks.activityCache.clearSessionUpdates).toHaveBeenCalledWith('s1');
+        expect(mocks.sessionUpdateManyAndReturn).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 's1', active: true },
+        }));
     });
 });

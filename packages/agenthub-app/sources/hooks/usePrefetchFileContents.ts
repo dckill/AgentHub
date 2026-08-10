@@ -11,6 +11,7 @@
 import * as React from 'react';
 import { sessionExec } from '@/sync/ops';
 import { storage } from '@/sync/storage';
+import { sync } from '@/sync/sync';
 import { isFilePreviewCacheEntryFresh } from '@/sync/filePreviewCachePolicy';
 import { resolveSessionFilePath } from '@/utils/sessionFileLinks';
 import type { GitFileStatus } from '@/sync/gitStatusFiles';
@@ -23,8 +24,14 @@ import { getFilePrefetchVersion, runFilePrefetchQueue, selectFilePrefetchWindow,
  * Prefetch a single file's content + diff into the Zustand cache.
  * Silently swallows errors — prefetch is best-effort.
  */
-async function prefetchFile(sessionId: string, sessionPath: string, file: GitFileStatus, signal: AbortSignal): Promise<void> {
-    if (signal.aborted) return;
+async function prefetchFile(
+    sessionId: string,
+    sessionPath: string,
+    file: GitFileStatus,
+    signal: AbortSignal,
+    isCurrent: () => boolean,
+): Promise<void> {
+    if (signal.aborted || !isCurrent()) return;
     const resolved = resolveSessionFilePath(file.fullPath, sessionPath);
     const filePath = resolved?.absolutePath ?? file.fullPath;
     const gitDiffPath = resolved?.withinSessionRoot ? resolved.relativePath : null;
@@ -51,7 +58,7 @@ async function prefetchFile(sessionId: string, sessionPath: string, file: GitFil
         }
     }
 
-    if (signal.aborted) return;
+    if (signal.aborted || !isCurrent()) return;
     // Fetch file content
     try {
         const fileName = filePath.split('/').pop() || filePath;
@@ -61,7 +68,7 @@ async function prefetchFile(sessionId: string, sessionPath: string, file: GitFil
             fileName,
             signal,
         });
-        if (signal.aborted || loaded.previewKind === 'image' || loaded.skippedLargeFile) return;
+        if (signal.aborted || !isCurrent() || loaded.previewKind === 'image' || loaded.skippedLargeFile) return;
         storage.getState().applyFileCache(
             sessionId,
             filePath,
@@ -86,6 +93,10 @@ export function usePrefetchFileContents(
 ) {
     React.useEffect(() => {
         if (visibleFiles.length === 0) return;
+
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
 
         const session = storage.getState().sessions[sessionId];
         const sessionPathMaybe = session?.metadata?.path;
@@ -123,7 +134,7 @@ export function usePrefetchFileContents(
         // Run prefetch with limited concurrency
         void runFilePrefetchQueue(
             filesToPrefetch,
-            (file) => prefetchFile(sessionId, sessionPath, file, controller.signal),
+            (file) => prefetchFile(sessionId, sessionPath, file, controller.signal, isCurrent),
             { concurrency: MAX_CONCURRENCY, signal: controller.signal },
         );
 

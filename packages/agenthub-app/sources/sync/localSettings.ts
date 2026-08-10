@@ -14,6 +14,8 @@ export const LocalSettingsSchema = z.object({
     consoleLoggingEnabled: z.boolean().describe('Enable console output in production builds'),
     verboseLogging: z.boolean().describe('Log all network requests and responses'),
     sidebarCollapsed: z.boolean().describe('Whether the right file-diffs sidebar is collapsed on desktop'),
+    sidebarPanelsOpen: z.array(z.enum(['changes', 'allFiles', 'sideChat'])).describe('Open session workbench panels'),
+    sidebarPanelActive: z.enum(['changes', 'allFiles', 'sideChat']).nullable().describe('Active session workbench panel'),
     // Scale multipliers (1.0 = default/largest, 0.5 = smallest)
     sessionListScale: z.number().min(0.5).max(1.0).describe('Session list scale multiplier'),
     chatScale: z.number().min(0.5).max(1.0).describe('Chat page scale multiplier'),
@@ -47,6 +49,8 @@ export const localSettingsDefaults: LocalSettings = {
     consoleLoggingEnabled: false,
     verboseLogging: false,
     sidebarCollapsed: false,
+    sidebarPanelsOpen: ['changes'],
+    sidebarPanelActive: 'changes',
     sessionListScale: 1.0,
     chatScale: 1.0,
     fileScale: 1.0,

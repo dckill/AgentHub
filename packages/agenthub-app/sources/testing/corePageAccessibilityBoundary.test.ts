@@ -6,15 +6,10 @@ const appSources = path.resolve(__dirname, '..');
 const read = (relativePath: string) => fs.readFileSync(path.join(appSources, relativePath), 'utf8');
 
 describe('authenticated core page accessibility boundary', () => {
-    it('keeps the settings artwork decorative on Web and Native', () => {
+    it('keeps the settings page semantic without a decorative banner', () => {
         const settings = read('components/SettingsView.tsx');
-        const banner = settings.match(/<Image[\s\S]*?agenthub-settings-banner[\s\S]*?\/>/)?.[0] ?? '';
 
-        expect(banner).toContain('alt=""');
-        expect(banner).toContain('accessibilityLabel=""');
-        expect(banner).toContain('accessible={false}');
-        expect(banner).toContain('accessibilityElementsHidden');
-        expect(banner).toContain('importantForAccessibility="no-hide-descendants"');
+        expect(settings).not.toContain('agenthub-settings-banner');
         expect(settings).toContain('role="main"');
         expect(settings).toContain('role="heading"');
         expect(settings).toContain('aria-level={1}');

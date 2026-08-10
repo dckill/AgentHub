@@ -11,6 +11,7 @@ import { t } from '@/text';
 import { useFileScale } from '@/hooks/useScale';
 import { Modal } from '@/modal';
 import { useFileTransferStore } from '@/sync/fileTransferStore';
+import { sync } from '@/sync/sync';
 import { ensureDownloadDirectoryBeforeStart } from '@/utils/downloadDirectoryPrompt';
 import { useRouter } from 'expo-router';
 import { classifyFilePreview } from '@/utils/filePreviewPolicy';
@@ -102,19 +103,26 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
 
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled && generation !== null && sync.getAccountGeneration() === generation;
         const preview = classifyFilePreview(filePath);
 
         if (preview.kind === 'binary') {
-            setState({ content: '', isBinary: true, error: null, isLoading: false, truncated: false, previewKind: 'binary', skippedLargeFile: false });
+            if (isCurrent()) {
+                setState({ content: '', isBinary: true, error: null, isLoading: false, truncated: false, previewKind: 'binary', skippedLargeFile: false });
+            }
             return;
         }
         if (!previewSource) {
-            setState({ content: '', isBinary: false, error: t('fileBrowser.missingReadSource'), isLoading: false, truncated: false, previewKind: preview.kind, skippedLargeFile: false });
+            if (isCurrent()) {
+                setState({ content: '', isBinary: false, error: t('fileBrowser.missingReadSource'), isLoading: false, truncated: false, previewKind: preview.kind, skippedLargeFile: false });
+            }
             return;
         }
 
         const load = async () => {
             try {
+                if (!isCurrent()) return;
                 setState((prev) => ({
                     ...prev,
                     isLoading: true,
@@ -135,7 +143,7 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
                         }
                     ),
                 });
-                if (cancelled) return;
+                if (!isCurrent()) return;
                 setState({
                     content: loaded.content,
                     isBinary: loaded.isBinary,
@@ -148,7 +156,7 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
                     totalSize: loaded.totalSize,
                 });
             } catch (e) {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setState({ content: '', isBinary: false, error: t('directoryTree.loadFailed'), isLoading: false, truncated: false, previewKind: preview.kind, skippedLargeFile: false });
                 }
             }
@@ -165,12 +173,15 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
     const canPreviewMarkdown = isMarkdownFile && !!state.content && !state.isBinary;
     const downloadMachineId = machineId ?? (sourceKind === 'machine' ? sourceId : null);
     const handleDownload = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         if (!downloadMachineId) {
             Modal.alert(t('common.error'), t('fileBrowser.missingMachineForDownload'));
             return;
         }
         const canDownload = await ensureDownloadDirectoryBeforeStart(transferSettings, setDownloadDirectory);
-        if (!canDownload) {
+        if (!canDownload || !isCurrent()) {
             return;
         }
         const taskId = enqueueDownloadPaused({
@@ -181,6 +192,7 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
             size: state.totalSize,
         });
         startDownload(taskId);
+        if (!isCurrent()) return;
         Modal.alert(t('fileBrowser.queuedTitle'), fileName, [
             {
                 text: t('fileBrowser.view'),
@@ -214,15 +226,17 @@ export const FilePreviewPanel = React.memo<FilePreviewPanelProps>(({
         }
 
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled && generation !== null && sync.getAccountGeneration() === generation;
         setMarkdownImageMap({});
         loadMarkdownImageMapForFile({
             markdown: state.content,
             markdownFilePath: filePath,
             source: previewSource,
         }).then((map) => {
-            if (!cancelled) setMarkdownImageMap(map);
+            if (isCurrent()) setMarkdownImageMap(map);
         }).catch(() => {
-            if (!cancelled) setMarkdownImageMap({});
+            if (isCurrent()) setMarkdownImageMap({});
         });
 
         return () => { cancelled = true; };

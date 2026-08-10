@@ -365,6 +365,18 @@ function maybeEmitSubagentStop(
     active.delete(subagent);
 }
 
+function emitActiveSubagentStops(
+    state: ClaudeSessionProtocolState,
+    turn: string,
+    envelopes: SessionEnvelope[],
+): void {
+    const active = getActiveSubagents(state);
+    for (const subagent of active) {
+        envelopes.push(createEnvelope('agent', { t: 'stop' }, { turn, subagent }));
+    }
+    active.clear();
+}
+
 function clearSubagentTracking(state: ClaudeSessionProtocolState): void {
     getUuidToProviderSubagent(state).clear();
     getTaskPromptToSubagents(state).clear();
@@ -398,6 +410,7 @@ function closeTurn(
         return;
     }
 
+    emitActiveSubagentStops(state, state.currentTurnId, envelopes);
     envelopes.push(createEnvelope('agent', {
         t: 'turn-end',
         status,
@@ -558,7 +571,9 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
                 envelopes.push(createEnvelope('agent', { t: 'text', text: message.message.content }, { turn: turnId, subagent }));
             } else {
                 closeTurn(state, 'completed', envelopes);
-                envelopes.push(createEnvelope('user', { t: 'text', text: message.message.content }));
+                envelopes.push(createEnvelope('user', { t: 'text', text: message.message.content }, {
+                    claudeUuid: pickUuid(message),
+                }));
             }
 
             return {
@@ -585,7 +600,9 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             if (textBlocks.length > 0 && !hasToolResult) {
                 closeTurn(state, 'completed', envelopes);
                 for (const text of textBlocks) {
-                    envelopes.push(createEnvelope('user', { t: 'text', text }));
+                    envelopes.push(createEnvelope('user', { t: 'text', text }, {
+                        claudeUuid: pickUuid(message),
+                    }));
                 }
 
                 return {

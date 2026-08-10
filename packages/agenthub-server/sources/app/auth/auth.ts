@@ -2,6 +2,7 @@ import * as privacyKit from "privacy-kit";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { readVersionedSecrets } from "@/config/versionedSecrets";
+import { onShutdown } from "@/utils/shutdown";
 
 const DEFAULT_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 const CLEANUP_INTERVAL = 60 * 60 * 1000;
@@ -49,6 +50,7 @@ function decodeGeneratedTokenPayload(token: string): { jti: string; exp: number;
 class AuthModule {
     private tokens: AuthTokens | null = null;
     private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+    private unsubscribeShutdown: (() => void) | null = null;
 
     async init(): Promise<void> {
         if (this.tokens) return;
@@ -77,7 +79,21 @@ class AuthModule {
         this.cleanupTimer = setInterval(() => {
             void this.cleanup().catch(error => log({ module: 'auth', level: 'error' }, `Token cleanup failed: ${error}`));
         }, CLEANUP_INTERVAL);
+        if (typeof this.cleanupTimer === 'object' && this.cleanupTimer && 'unref' in this.cleanupTimer) {
+            (this.cleanupTimer as { unref: () => void }).unref();
+        }
+        this.unsubscribeShutdown = onShutdown('auth', async () => this.shutdown());
         log({ module: 'auth' }, `Auth module initialized with key version ${activeVersion}`);
+    }
+
+    async shutdown(): Promise<void> {
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
+        this.unsubscribeShutdown?.();
+        this.unsubscribeShutdown = null;
+        this.tokens = null;
     }
 
     async createToken(userId: string, extras?: Record<string, unknown>): Promise<string> {

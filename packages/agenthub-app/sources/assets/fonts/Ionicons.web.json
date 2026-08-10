@@ -1,6 +1,6 @@
 {
   "generatedBy": "packages/agenthub-app/scripts/generate-ionicons-web-subset.mjs",
-  "glyphCount": 267,
+  "glyphCount": 270,
   "glyphs": [
     "accessibility-outline",
     "add",
@@ -125,6 +125,7 @@
     "git-branch-outline",
     "git-commit",
     "git-commit-outline",
+    "git-compare",
     "git-compare-outline",
     "git-merge-outline",
     "git-network-outline",
@@ -211,6 +212,8 @@
     "push",
     "qr-code-outline",
     "radio",
+    "radio-button-off",
+    "radio-button-on",
     "radio-button-on-outline",
     "radio-outline",
     "reader-outline",
@@ -271,5 +274,5 @@
     "wifi-outline"
   ],
   "sourceFontSha256": "fa2ab7d2557819b2bfe5009e46844efa7170cf177be7735d43aa2ac1295f1d54",
-  "subsetFontSha256": "22f0827e05681b765599602dea230cb4bf562f8f1b23a3d66dd8d4c1ae774174"
+  "subsetFontSha256": "3b19254e89286d506ce2153128ba2937cae6e042fcd2afae4919285ac0ef5ce2"
 }

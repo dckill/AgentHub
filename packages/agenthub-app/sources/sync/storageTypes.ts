@@ -1,74 +1,17 @@
 import { z } from "zod";
+import {
+    AgentStateSchema as SharedAgentStateSchema,
+    MetadataSchema as SharedMetadataSchema,
+    type AgentState as SharedAgentState,
+    type Metadata as SharedMetadata,
+} from "@artsum/agenthub-wire";
 
 //
 // Agent states
 //
 
-export const MetadataSchema = z.object({
-    models: z.array(z.object({
-        code: z.string(),
-        value: z.string(),
-        description: z.string().nullish(),
-        supportedReasoningEfforts: z.array(z.object({
-            code: z.string(),
-            value: z.string(),
-            description: z.string().nullish(),
-        })).optional(),
-        defaultReasoningEffortCode: z.string().optional(),
-        isDefault: z.boolean().optional(),
-    })).optional(),
-    currentModelCode: z.string().optional(),
-    contextWindow: z.number().optional(),
-    operatingModes: z.array(z.object({
-        code: z.string(),
-        value: z.string(),
-        description: z.string().nullish(),
-    })).optional(),
-    currentOperatingModeCode: z.string().optional(),
-    thoughtLevels: z.array(z.object({
-        code: z.string(),
-        value: z.string(),
-        description: z.string().nullish(),
-    })).optional(),
-    currentThoughtLevelCode: z.string().optional(),
-    path: z.string(),
-    host: z.string(),
-    version: z.string().optional(),
-    name: z.string().optional(),
-    os: z.string().optional(),
-    summary: z.object({
-        text: z.string(),
-        updatedAt: z.number()
-    }).optional(),
-    lastUserMessage: z.string().optional(),
-    machineId: z.string().optional(),
-    claudeSessionId: z.string().optional(), // Claude Code session ID
-    codexThreadId: z.string().optional(), // Codex app-server thread ID
-    officialMirror: z.object({
-        provider: z.enum(['claude', 'codex']),
-        id: z.string(),
-    }).optional(),
-    parentSessionId: z.string().optional(), // AgentHub session this session was forked from
-    forkedFromMessageId: z.string().optional(), // AgentHub message used as the fork point
-    tools: z.array(z.string()).optional(),
-    slashCommands: z.array(z.string()).optional(),
-    mcpServers: z.array(z.object({ name: z.string(), status: z.string() })).optional(),
-    skills: z.array(z.string()).optional(),
-    homeDir: z.string().optional(), // User's home directory on the machine
-    agentHubHomeDir: z.string().optional(), // AgentHub configuration directory 
-    startedFromDaemon: z.boolean().optional(),
-    hostPid: z.number().optional(), // Process ID of the session
-    startedBy: z.enum(['daemon', 'terminal']).optional(),
-    flavor: z.string().nullish(), // Session flavor/variant identifier
-    sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
-    dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
-    lifecycleState: z.string().optional(),
-    lifecycleStateSince: z.number().optional(),
-    archivedBy: z.string().optional(),
-    archiveReason: z.string().optional(),
-});
-
-export type Metadata = z.infer<typeof MetadataSchema>;
+export const MetadataSchema = SharedMetadataSchema;
+export type Metadata = SharedMetadata;
 
 export const AgentGoalSourceSchema = z.enum(['claude', 'codex']);
 
@@ -116,28 +59,21 @@ export const AgentGoalStatusSchema = z.discriminatedUnion('status', [
 
 export type AgentGoalStatus = z.infer<typeof AgentGoalStatusSchema>;
 
-export const AgentStateSchema = z.object({
-    controlledByUser: z.boolean().nullish(),
-    requests: z.record(z.string(), z.object({
-        tool: z.string(),
-        arguments: z.any(),
-        createdAt: z.number().nullish()
-    })).nullish(),
-    completedRequests: z.record(z.string(), z.object({
-        tool: z.string(),
-        arguments: z.any(),
-        createdAt: z.number().nullish(),
-        completedAt: z.number().nullish(),
-        status: z.enum(['canceled', 'denied', 'approved']),
-        reason: z.string().nullish(),
-        mode: z.string().nullish(),
-        allowedTools: z.array(z.string()).nullish(),
-        decision: z.enum(['approved', 'approved_for_session', 'denied', 'abort']).nullish()
-    })).nullish(),
-    agentGoalStatus: AgentGoalStatusSchema.optional(),
-});
+export const UsageLimitWindowSchema = z.object({
+    id: z.string().trim().min(1),
+    label: z.string().optional(),
+    status: z.enum(['allowed', 'allowed_warning', 'rejected']).optional(),
+    utilization: z.number().min(0).max(100).nullable().optional(),
+    resetsAt: z.number().nonnegative().nullable().optional(),
+}).strict();
 
-export type AgentState = z.infer<typeof AgentStateSchema>;
+export const UsageLimitsSchema = z.object({
+    capturedAt: z.number().nonnegative(),
+    windows: z.array(UsageLimitWindowSchema),
+}).strict();
+
+export const AgentStateSchema = SharedAgentStateSchema;
+export type AgentState = SharedAgentState;
 
 export const TodoItemSchema = z.object({
     content: z.string(),

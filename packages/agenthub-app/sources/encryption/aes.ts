@@ -7,8 +7,9 @@ export async function encryptAESGCMString(data: string, key64: string): Promise<
 }
 
 export async function decryptAESGCMString(data: string, key64: string): Promise<string | null> {
-    const res = (await crypto.decryptAsyncAES(data, key64)).trim();
-    return res;
+    // Native AES-GCM returns the exact UTF-8 plaintext. Do not trim it: callers
+    // may encrypt protocol strings where leading/trailing whitespace is data.
+    return await crypto.decryptAsyncAES(data, key64);
 }
 
 export async function encryptAESGCM(data: Uint8Array, key64: string): Promise<Uint8Array> {

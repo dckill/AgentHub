@@ -179,7 +179,9 @@ async function handleAuthLogout(): Promise<void> {
       try {
         await stopDaemon();
         console.log(chalk.gray('Stopped daemon'));
-      } catch { }
+      } catch {
+        // Best effort: logout still removes local credentials when the daemon is already stopped.
+      }
 
       // Remove entire agenthub directory (as current logout does)
       if (existsSync(agenthubDir)) {

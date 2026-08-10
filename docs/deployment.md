@@ -265,6 +265,8 @@ npx eas-cli@latest whoami
 - `typecheck` 必须通过。
 - `eas update` 必须在 `packages/agenthub-app` 目录执行；在仓库根目录执行会因为找不到 EAS project 配置而失败。
 - 当前 `runtimeVersion` 为 `1`；只有安装了相同 runtime 的 APK，设备才能收到该 OTA。
+- 常规 OTA 禁止使用 `eas workflow:run`。该命令会先压缩上传整个仓库；标准流程必须在本机导出并通过 `eas update` 直传 OTA 产物。
+- production Android 已启用 SDK 55 bsdiff。安装过带 `ENABLE_BSDIFF_PATCH_SUPPORT=true` 的 APK 后，客户端会优先下载更小的 JS bundle 补丁；旧 APK 仍可接收普通 OTA，但需要下一次原生包更新后才能使用 bundle 差分。
 
 Android production OTA 发布命令：
 
@@ -282,10 +284,18 @@ npx eas-cli@latest update \
   --non-interactive
 ```
 
+也可以在仓库根目录执行等价的固定入口；`OTA_MESSAGE` 应填写本次发布说明：
+
+```bash
+OTA_MESSAGE="<本次 OTA 说明>" \
+npx -y pnpm@10.11.0 --filter agenthub-app ota:production
+```
+
 标准说明：
 
 - `EAS_SKIP_AUTO_FINGERPRINT=1` 用于避开当前环境偶发的 fingerprint 上传超时。
 - 默认只发 `android`，不要顺手发 `all`；当前 Android 已验证稳定，`all` 更慢，也更容易把未准备好的平台一起带上。
+- 本地导出只上传 OTA bundle、manifest 和发生变化的资源，不上传仓库压缩包。设备端会复用缓存资源；是否下发 bsdiff 由 EAS 根据补丁收益自动决定。
 - `--message` 使用本次改动的简短说明，例如 `android ota update status banner`。
 
 发布成功后应记录这些返回值：

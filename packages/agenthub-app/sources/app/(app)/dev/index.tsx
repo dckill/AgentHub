@@ -180,7 +180,9 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.consoleOutput')}
+                    titleLines={0}
                     subtitle={t('devTools.consoleOutputSubtitle')}
+                    subtitleLines={0}
                     rightElement={
                         <Switch
                             accessibilityLabel={t('devTools.consoleOutput')}
@@ -192,7 +194,9 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.verboseLogging')}
+                    titleLines={0}
                     subtitle={t('devTools.verboseLoggingSubtitle')}
+                    subtitleLines={0}
                     rightElement={
                         <Switch
                             accessibilityLabel={t('devTools.verboseLogging')}
@@ -213,67 +217,89 @@ export default function DevScreen() {
             <ItemGroup title={t('devTools.componentDemos')}>
                 <Item
                     title={t('devTools.deviceInfo')}
+                    titleLines={0}
                     subtitle={t('devTools.deviceInfoSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="phone-portrait-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/device-info')}
                 />
                 <Item
                     title={t('devTools.listComponents')}
+                    titleLines={0}
                     subtitle={t('devTools.listComponentsSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="list-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/list-demo')}
                 />
                 <Item
                     title={t('devTools.typography')}
+                    titleLines={0}
                     subtitle={t('devTools.typographySubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="text-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/typography')}
                 />
                 <Item
                     title={t('devTools.colors')}
+                    titleLines={0}
                     subtitle={t('devTools.colorsSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="color-palette-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/colors')}
                 />
                 <Item
                     title={t('devTools.messageDemos')}
+                    titleLines={0}
                     subtitle={t('devTools.messageDemosSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="chatbubbles-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/messages-demo')}
                 />
                 <Item
                     title={t('devTools.invertedList')}
+                    titleLines={0}
                     subtitle={t('devTools.invertedListSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="swap-vertical-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/inverted-list')}
                 />
                 <Item
                     title={t('devTools.toolViews')}
+                    titleLines={0}
                     subtitle={t('devTools.toolViewsSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="construct-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/tools2')}
                 />
                 <Item
                     title={t('devTools.shimmerView')}
+                    titleLines={0}
                     subtitle={t('devTools.shimmerViewSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="sparkles-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/shimmer-demo')}
                 />
                 <Item
                     title={t('devTools.multiTextInput')}
+                    titleLines={0}
                     subtitle={t('devTools.multiTextInputSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="create-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/multi-text-input')}
                 />
                 <Item
                     title={t('devTools.inputStyles')}
+                    titleLines={0}
                     subtitle={t('devTools.inputStylesSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="color-palette-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/input-styles')}
                 />
                 <Item
                     title={t('devTools.modalSystem')}
+                    titleLines={0}
                     subtitle={t('devTools.modalSystemSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="albums-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/modal-demo')}
                 />
@@ -297,25 +323,33 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.unitTests')}
+                    titleLines={0}
                     subtitle={t('devTools.unitTestsSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="flask-outline" size={28} color="#34C759" />}
                     onPress={() => router.push('/dev/tests')}
                 />
                 <Item
                     title={t('devTools.unistylesDemo')}
+                    titleLines={0}
                     subtitle={t('devTools.unistylesDemoSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="brush-outline" size={28} color="#FF6B6B" />}
                     onPress={() => router.push('/dev/unistyles-demo')}
                 />
                 <Item
                     title={t('devTools.qrCodeTest')}
+                    titleLines={0}
                     subtitle={t('devTools.qrCodeTestSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="qr-code-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/qr-test')}
                 />
                 <Item
                     title={t('devTools.sessionComposer')}
+                    titleLines={0}
                     subtitle={t('devTools.sessionComposerSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="add-circle-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/session-composer')}
                 />
@@ -325,7 +359,9 @@ export default function DevScreen() {
             <ItemGroup title={t('devTools.testFeatures')} footer={t('devTools.testFeaturesFooter')}>
                 <Item
                     title={t('devTools.testCrash')}
+                    titleLines={0}
                     subtitle={t('devTools.testCrashSubtitle')}
+                    subtitleLines={0}
                     destructive={true}
                     icon={<Ionicons name="warning-outline" size={28} color="#FF3B30" />}
                     onPress={async () => {
@@ -341,13 +377,17 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.clearCacheTitle')}
+                    titleLines={0}
                     subtitle={t('devTools.clearCacheSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="trash-outline" size={28} color="#FF9500" />}
                     onPress={handleClearCache}
                 />
                 <Item
                     title={t('devTools.resetChangelogTitle')}
+                    titleLines={0}
                     subtitle={t('devTools.resetChangelogSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="sparkles-outline" size={28} color="#007AFF" />}
                     onPress={() => {
                         const latest = getLatestVersion();
@@ -357,7 +397,9 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.resetAppTitle')}
+                    titleLines={0}
                     subtitle={t('devTools.resetAppSubtitle')}
+                    subtitleLines={0}
                     destructive={true}
                     icon={<Ionicons name="refresh-outline" size={28} color="#FF3B30" />}
                     onPress={async () => {
@@ -377,7 +419,9 @@ export default function DevScreen() {
             <ItemGroup title={t('devTools.system')}>
                 <Item
                     title={t('devTools.expoConstants')}
+                    titleLines={0}
                     subtitle={t('devTools.expoConstantsSubtitle')}
+                    subtitleLines={0}
                     icon={<Ionicons name="information-circle-outline" size={28} color="#007AFF" />}
                     onPress={() => router.push('/dev/expo-constants')}
                 />
@@ -393,14 +437,18 @@ export default function DevScreen() {
                 />
                 <Item
                     title={t('devTools.logServer')}
+                    titleLines={0}
                     subtitle={t('devTools.logServerSubtitle')}
+                    subtitleLines={0}
                     detail={getLogServerUrl() || t('devTools.off')}
                     onPress={handleEditLogServerUrl}
                     detailStyle={{ flex: 1, textAlign: 'right', minWidth: '50%' }}
                 />
                 <Item
                     title={t('devTools.socketIoStatus')}
+                    titleLines={0}
                     subtitle={getSocketStatusSubtitle()}
+                    subtitleLines={0}
                     detail={socketStatus.status}
                     rightElement={<SocketStatusIndicator />}
                     showChevron={false}

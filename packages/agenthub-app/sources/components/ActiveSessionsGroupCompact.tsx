@@ -34,6 +34,9 @@ import { connectOfficialCodexSession } from './connectOfficialCodexSession';
 import { getSessionRowActionMenuKind, OFFICIAL_CANDIDATE_ACTION_LABEL_KEYS } from './sessionRowActions';
 import { getOfficialCandidatesListLayout } from './officialCandidatesLayout';
 import { ignoreOfficialThreadsFromWorkbench } from '@/sync/officialWorkbench';
+import { runProjectHideLifecycle } from '@/sync/projectHideLifecycle';
+import { runProjectSessionArchiveLifecycle } from '@/sync/projectSessionArchiveLifecycle';
+import { shouldRenderProjectSessionCard } from '@/sync/projectVisibility';
 
 const STATUS_CONFIG: Record<SessionState, { color: string; dotColor: string; isPulsing: boolean; isConnected: boolean }> = {
     disconnected: { color: '#999', dotColor: '#999', isPulsing: false, isConnected: false },
@@ -69,7 +72,9 @@ function getSessionOfficialWorkbenchId(
 }
 
 function getOfficialWorkbenchStore() {
+    const generation = sync.getAccountGeneration();
     return {
+        isCurrent: () => generation !== null && sync.getAccountGeneration() === generation,
         getThreads: (machineId: string) => storage.getState().officialCodexThreads[machineId] ?? [],
         applyThreads: (machineId: string, threads: OfficialCodexThread[]) => {
             storage.getState().applyOfficialCodexThreads(machineId, threads);
@@ -121,10 +126,17 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
     const [showArchived, setShowArchived] = React.useState(false);
     const [showDetails, setShowDetails] = React.useState(false);
     const [projectActionsAnchor, setProjectActionsAnchor] = React.useState<ActionMenuAnchor | null>(null);
+    const editGenerationRef = React.useRef<number | null>(null);
     const router = useRouter();
 
     const handleEditOpen = React.useCallback(() => {
+        editGenerationRef.current = sync.getAccountGeneration();
         setShowEditSheet(true);
+    }, []);
+
+    const handleEditClose = React.useCallback(() => {
+        editGenerationRef.current = null;
+        setShowEditSheet(false);
     }, []);
 
     const handleShowArchived = React.useCallback(() => {
@@ -136,6 +148,10 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
     }, []);
 
     const handleEditSave = React.useCallback((projectKey: string, name: string, icon: string) => {
+        const editGeneration = editGenerationRef.current;
+        if (editGeneration === null || sync.getAccountGeneration() !== editGeneration) {
+            return;
+        }
         const currentCustomizations = storage.getState().settings.projectCustomizations;
         const updated = {
             ...currentCustomizations,
@@ -145,7 +161,7 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
                 icon: icon !== (currentCustomizations[projectKey]?.icon) ? icon : undefined,
             },
         };
-        storage.getState().applySettingsLocal({ projectCustomizations: updated });
+        sync.applySettings({ projectCustomizations: updated });
     }, [project.displayName]);
 
     const hasBranch = !!project.branch || project.isWorktree;
@@ -159,21 +175,44 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
         } else {
             delete updated[project.key];
         }
-        storage.getState().applySettingsLocal({ projectCustomizations: updated });
+        sync.applySettings({ projectCustomizations: updated });
     }, [project.key]);
 
     const archiveActiveSessions = React.useCallback(async () => {
-        for (const session of project.activeSessions) {
-            await maybeCleanupWorktree(session.id, session.path ?? undefined, session.machineId ?? undefined);
-            const killResult = await sessionKill(session.id);
-            if (!killResult.success) {
-                await sessionArchive(session.id);
-            }
-        }
-        await sync.refreshSessions();
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        return runProjectSessionArchiveLifecycle({
+            sessions: project.activeSessions,
+            isCurrent,
+            archiveSession: async (session, isSessionCurrent) => {
+                if (!isSessionCurrent()) {
+                    return false;
+                }
+                await maybeCleanupWorktree(session.id, session.path ?? undefined, session.machineId ?? undefined);
+                if (!isSessionCurrent()) {
+                    return false;
+                }
+
+                const killResult = await sessionKill(session.id);
+                if (!isSessionCurrent()) {
+                    return false;
+                }
+                if (!killResult.success) {
+                    await sessionArchive(session.id);
+                    return isSessionCurrent();
+                }
+                return true;
+            },
+            refreshSessions: () => sync.refreshSessions(),
+        });
     }, [project.activeSessions]);
 
     const [endingProjectSessions, performEndProjectSessions] = useAgentHubAction(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
         if (project.activeSessions.length === 0) {
             AppModal.alert(t('project.endActiveSessions'), t('project.noActiveSessions'));
             return;
@@ -184,15 +223,23 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
             t('project.endActiveSessionsConfirm', { count: project.activeSessions.length }),
             { confirmText: t('project.endActiveSessions'), destructive: true },
         );
-        if (!confirmed) {
+        if (!confirmed || !isCurrent()) {
             return;
         }
 
-        await archiveActiveSessions();
+        const archived = await archiveActiveSessions();
+        if (!archived || !isCurrent()) {
+            return;
+        }
         AppModal.alert(t('common.success'), t('project.actionComplete'));
     });
 
     const [hidingProject, performHideProject] = useAgentHubAction(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
         const confirmed = await AppModal.confirm(
             t('project.hideProject'),
             t('project.hideProjectConfirm', {
@@ -201,49 +248,63 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
             }),
             { confirmText: t('project.hideProject'), destructive: true },
         );
-        if (!confirmed) {
+        if (!confirmed || !isCurrent()) {
             return;
         }
 
-        if (project.activeSessions.length > 0) {
-            await archiveActiveSessions();
-        }
+        await runProjectHideLifecycle({
+            hasActiveSessions: project.activeSessions.length > 0,
+            archiveActiveSessions,
+            isCurrent,
+            ignoreOfficialThreads: async () => {
+                if (project.officialCodexThreads.length === 0) {
+                    return;
+                }
 
-        if (project.officialCodexThreads.length > 0) {
-            const threadsByMachine = new Map<string, string[]>();
-            for (const thread of project.officialCodexThreads) {
-                if (!thread.machineId) continue;
-                const officialId = getSessionOfficialWorkbenchId(thread);
-                if (!officialId) continue;
-                const existing = threadsByMachine.get(thread.machineId) ?? [];
-                existing.push(officialId);
-                threadsByMachine.set(thread.machineId, existing);
-            }
+                const threadsByMachine = new Map<string, string[]>();
+                for (const thread of project.officialCodexThreads) {
+                    if (!thread.machineId) continue;
+                    const officialId = getSessionOfficialWorkbenchId(thread);
+                    if (!officialId) continue;
+                    const existing = threadsByMachine.get(thread.machineId) ?? [];
+                    existing.push(officialId);
+                    threadsByMachine.set(thread.machineId, existing);
+                }
 
-            const officialWorkbenchStore = getOfficialWorkbenchStore();
-            for (const [machineId, officialIds] of threadsByMachine.entries()) {
-                await ignoreOfficialThreadsFromWorkbench({
-                    machineId,
-                    officialIds,
-                    ...officialWorkbenchStore,
-                });
-            }
-        }
-
-        const current = storage.getState().settings.projectCustomizations[project.key] || {};
-        updateProjectCustomization({ ...current, archived: true });
+                const officialWorkbenchStore = getOfficialWorkbenchStore();
+                for (const [machineId, officialIds] of threadsByMachine.entries()) {
+                    await ignoreOfficialThreadsFromWorkbench({
+                        machineId,
+                        officialIds,
+                        ...officialWorkbenchStore,
+                    });
+                }
+            },
+            applyHiddenCustomization: () => {
+                const current = storage.getState().settings.projectCustomizations[project.key] || {};
+                updateProjectCustomization({ ...current, archived: true });
+            },
+        });
     });
 
     const handleResetCustomization = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
         const confirmed = await AppModal.confirm(
             t('project.resetCustomization'),
             t('project.resetCustomizationConfirm'),
             { confirmText: t('common.reset'), destructive: true },
         );
-        if (!confirmed) {
+        if (!confirmed || !isCurrent()) {
             return;
         }
         updateProjectCustomization(null);
+        if (!isCurrent()) {
+            return;
+        }
         AppModal.alert(t('common.success'), t('project.actionComplete'));
     }, [updateProjectCustomization]);
 
@@ -424,7 +485,7 @@ const SectionHeader = React.memo(({ project }: { project: ProjectGroupData }) =>
 
             <ProjectEditSheet
                 visible={showEditSheet}
-                onClose={() => setShowEditSheet(false)}
+                onClose={handleEditClose}
                 projectKey={project.key}
                 initialName={project.displayName}
                 initialIcon={project.icon}
@@ -526,6 +587,10 @@ export const ProjectGroupView = React.memo(({ project, selectedSessionId }: { pr
     const cardVisuals = getProjectCardVisuals(theme);
     const [showOfficialCandidates, setShowOfficialCandidates] = React.useState(false);
     const hasOfficialCandidates = project.officialCodexThreads.length > 0;
+    const hasSessionCard = shouldRenderProjectSessionCard(
+        project.activeSessions.length,
+        project.officialCodexThreads.length,
+    );
     const toggleOfficialCandidates = React.useCallback(() => {
         setShowOfficialCandidates((current) => !current);
     }, []);
@@ -533,7 +598,7 @@ export const ProjectGroupView = React.memo(({ project, selectedSessionId }: { pr
     return (
         <View>
             <SectionHeader project={project} />
-            <GlassSurface
+            {hasSessionCard ? <GlassSurface
                 tone="raised"
                 style={[
                     styles.projectCard,
@@ -560,7 +625,7 @@ export const ProjectGroupView = React.memo(({ project, selectedSessionId }: { pr
                         selectedSessionId={selectedSessionId}
                     />
                 )}
-            </GlassSurface>
+            </GlassSurface> : null}
         </View>
     );
 });
@@ -648,8 +713,10 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const actionMenuKind = getSessionRowActionMenuKind(session);
     const isOfficialSession = actionMenuKind === 'official';
     const [connectingOfficial, performConnectOfficial] = useAgentHubAction(async () => {
+        const generation = sync.getAccountGeneration();
         await connectOfficialCodexSession({
             session,
+            isCurrent: () => generation !== null && sync.getAccountGeneration() === generation,
             spawnSession: machineSpawnNewSession,
             ensureSessionLoaded: sync.ensureSessionLoaded,
             onSessionVisible: sync.onSessionVisible,
@@ -658,6 +725,11 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         });
     });
     const [ignoringOfficial, performIgnoreOfficial] = useAgentHubAction(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            return;
+        }
         const officialId = getSessionOfficialWorkbenchId(session);
         if ((session.source !== 'official-codex' && session.source !== 'official-claude') || !session.machineId || !officialId) {
             return;
@@ -668,7 +740,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             session.name,
             { confirmText: t(OFFICIAL_CANDIDATE_ACTION_LABEL_KEYS.removeFromWorkbench), destructive: true },
         );
-        if (!confirmed) {
+        if (!confirmed || !isCurrent()) {
             return;
         }
 

@@ -42,3 +42,10 @@ export function getMachineHeaderActionDescriptors(options: { canScanQr: boolean 
 export function getVisibleDeviceMachines<T>(machines: T[]): T[] {
     return machines;
 }
+
+export function sortMachinesOnlineFirst<T>(machines: readonly T[], isOnline: (machine: T) => boolean): T[] {
+    return machines
+        .map((machine, index) => ({ machine, index, online: isOnline(machine) }))
+        .sort((a, b) => Number(b.online) - Number(a.online) || a.index - b.index)
+        .map(({ machine }) => machine);
+}

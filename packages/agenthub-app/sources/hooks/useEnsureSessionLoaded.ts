@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { useSession } from '@/sync/storage';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { getEnsureSessionLoadKey } from './useEnsureSessionLoadedKey';
 
 export function useEnsureSessionLoaded(sessionId: string | null | undefined) {
@@ -17,10 +18,25 @@ export function useEnsureSessionLoaded(sessionId: string | null | undefined) {
         }
 
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled
+            && generation !== null
+            && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) {
+            setIsLoading(false);
+            return () => { cancelled = true; };
+        }
         setIsLoading(true);
 
-        void sync.ensureSessionLoaded(sessionId!)
+        void runSessionActionRequest({
+            isCurrent,
+            request: () => sync.ensureSessionLoaded(sessionId!),
+        })
+            .then((result) => {
+                if (result === null || !isCurrent()) return;
+            })
             .catch((error) => {
+                if (!isCurrent()) return;
                 console.error('Failed to ensure session loaded:', {
                     sessionId,
                     error,
@@ -28,7 +44,7 @@ export function useEnsureSessionLoaded(sessionId: string | null | undefined) {
                 });
             })
             .finally(() => {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setIsLoading(false);
                 }
             });

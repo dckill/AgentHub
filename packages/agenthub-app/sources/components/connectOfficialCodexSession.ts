@@ -3,6 +3,7 @@ import type { SpawnSessionOptions, SpawnSessionResult } from '@/sync/ops';
 
 interface ConnectOfficialCodexSessionOptions {
     session: Pick<SessionRowData, 'source' | 'machineId' | 'path' | 'codexThreadId' | 'claudeSessionId'> & Partial<Pick<SessionRowData, 'name'>>;
+    isCurrent?: () => boolean;
     spawnSession: (options: Pick<SpawnSessionOptions, 'machineId' | 'directory' | 'agent' | 'officialMirrorCodexThreadId' | 'officialMirrorClaudeSessionId'>) => Promise<SpawnSessionResult>;
     ensureSessionLoaded: (sessionId: string) => Promise<unknown>;
     onSessionVisible: (sessionId: string) => void;
@@ -17,7 +18,11 @@ export async function connectOfficialCodexSession({
     onSessionVisible,
     startOfficialResumeSession,
     navigateToSession,
+    isCurrent = () => true,
 }: ConnectOfficialCodexSessionOptions): Promise<void> {
+    if (!isCurrent()) {
+        return;
+    }
     if (!session.machineId || !session.path) {
         return;
     }
@@ -35,13 +40,25 @@ export async function connectOfficialCodexSession({
         officialMirrorCodexThreadId: isCodex ? session.codexThreadId! : undefined,
         officialMirrorClaudeSessionId: isClaude ? session.claudeSessionId! : undefined,
     });
+    if (!isCurrent()) {
+        return;
+    }
 
     if (result.type !== 'success') {
         return;
     }
 
     await ensureSessionLoaded(result.sessionId);
+    if (!isCurrent()) {
+        return;
+    }
     onSessionVisible(result.sessionId);
+    if (!isCurrent()) {
+        return;
+    }
     startOfficialResumeSession(result.sessionId, isClaude ? session.claudeSessionId! : session.codexThreadId!, session.name);
+    if (!isCurrent()) {
+        return;
+    }
     navigateToSession(result.sessionId);
 }

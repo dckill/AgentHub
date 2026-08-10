@@ -178,6 +178,48 @@ describe('session list refresh helpers', () => {
         expect(applyOfficialThreads).not.toHaveBeenCalled();
     });
 
+    it('does not apply official threads when the account generation becomes stale', async () => {
+        const applyOfficialThreads = vi.fn();
+        const archiveOfficialMirrors = vi.fn();
+        const isCurrent = vi.fn(() => false);
+
+        await refreshOfficialThreadsForProjectList({
+            projectItems: [projectItem()],
+            machines: [machine()],
+            sessions: {},
+            listOfficialThreads: vi.fn().mockResolvedValue([
+                { id: 'thread-1', machineId: 'machine-1', cwd: '/repo', title: 'Desktop session', updatedAt: 20, archived: false, provider: 'codex' },
+            ]),
+            applyOfficialThreads,
+            archiveOfficialMirrors,
+            isCurrent,
+        });
+
+        expect(isCurrent).toHaveBeenCalled();
+        expect(applyOfficialThreads).not.toHaveBeenCalled();
+        expect(archiveOfficialMirrors).not.toHaveBeenCalled();
+    });
+
+    it('stops the manual refresh before applying stale-account git or official results', async () => {
+        const invalidateGitStatus = vi.fn();
+        const refreshOfficialThreads = vi.fn().mockResolvedValue(undefined);
+        const isCurrent = vi.fn(() => false);
+
+        await refreshProjectSessionList({
+            projectItems: [projectItem()],
+            machines: [machine()],
+            refreshSessions: vi.fn().mockResolvedValue(undefined),
+            refreshMachines: vi.fn().mockResolvedValue(undefined),
+            invalidateGitStatus,
+            refreshOfficialThreads,
+            isCurrent,
+        });
+
+        expect(isCurrent).toHaveBeenCalled();
+        expect(invalidateGitStatus).not.toHaveBeenCalled();
+        expect(refreshOfficialThreads).not.toHaveBeenCalled();
+    });
+
     it('keeps cached official threads while a machine is transiently offline', async () => {
         const applyOfficialThreads = vi.fn();
 

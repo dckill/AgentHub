@@ -9,6 +9,7 @@ import { UsageDimensionTotal } from '@/sync/apiUsageTotals';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AgentHubError } from '@/utils/errors';
 import { getCurrentLanguage, t } from '@/text';
+import { sync } from '@/sync/sync';
 import { GlassSurface } from '@/components/glass';
 import { Typography } from '@/constants/Typography';
 import { getSpaceKeyActivationProps } from '@/components/keyboardActivation';
@@ -478,12 +479,14 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
     const [error, setError] = useState<string | null>(null);
     const [usageData, setUsageData] = useState<UsageDataPoint[]>([]);
     const [retryKey, setRetryKey] = useState(0);
+    const generation = sync.getAccountGeneration();
 
     useEffect(() => {
         const controller = new AbortController();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
 
         const loadUsageData = async () => {
-            if (!auth.credentials) {
+            if (!auth.credentials || generation === null) {
                 setError(t('usage.notAuthenticated'));
                 setLoading(false);
                 return;
@@ -494,10 +497,10 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
 
             try {
                 const response = await getUsageForPeriod(auth.credentials, period, sessionId, controller.signal);
-                if (controller.signal.aborted) return;
+                if (controller.signal.aborted || !isCurrent()) return;
                 setUsageData(response.usage || []);
             } catch (err) {
-                if (controller.signal.aborted) return;
+                if (controller.signal.aborted || !isCurrent()) return;
                 console.warn('Failed to load usage data:', err);
                 if (err instanceof AgentHubError) {
                     setError(err.message);
@@ -505,7 +508,7 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
                     setError(t('usage.loadFailed'));
                 }
             } finally {
-                if (!controller.signal.aborted) {
+                if (!controller.signal.aborted && isCurrent()) {
                     setLoading(false);
                 }
             }
@@ -515,7 +518,7 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
         return () => {
             controller.abort();
         };
-    }, [auth.credentials, period, retryKey, sessionId]);
+    }, [auth.credentials, generation, period, retryKey, sessionId]);
 
     const allTotals = useMemo(() => calculateTotals(usageData), [usageData]);
     const totals = useMemo(() => calculateTotals(usageData, agentFilter), [usageData, agentFilter]);

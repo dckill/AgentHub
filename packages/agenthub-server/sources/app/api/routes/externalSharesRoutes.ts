@@ -170,9 +170,16 @@ export function externalSharesRoutes(app: Fastify, dependencies: { now?: () => D
                 where: { id: request.params.id, accountId: request.userId },
             });
             if (!existing) return reply.code(404).send({ error: 'Share not found' });
-            const share = existing.revokedAt
-                ? existing
-                : await db.externalShare.update({ where: { id: existing.id }, data: { revokedAt: now() } });
+            const hasCiphertext = Buffer.from(existing.ciphertext).byteLength > 0;
+            const share = !existing.revokedAt || hasCiphertext
+                ? await db.externalShare.update({
+                    where: { id: existing.id },
+                    data: {
+                        ...(existing.revokedAt ? {} : { revokedAt: now() }),
+                        ...(hasCiphertext ? { ciphertext: Buffer.alloc(0) } : {}),
+                    },
+                })
+                : existing;
             return reply.send(toMetadata(share));
         } catch (error) {
             log({ module: 'external-shares', level: 'error', userId: request.userId }, `Failed to revoke external share: ${error}`);
@@ -198,7 +205,20 @@ export function externalSharesRoutes(app: Fastify, dependencies: { now?: () => D
         setPrivateNoStoreHeaders(reply);
         try {
             const share = await db.externalShare.findUnique({ where: { id: request.params.id } });
-            if (!share || share.revokedAt || share.expiresAt.getTime() <= now().getTime()) {
+            if (!share) {
+                return reply.code(404).send({ error: 'Share not found' });
+            }
+            if (share.revokedAt || share.expiresAt.getTime() <= now().getTime()) {
+                if (Buffer.from(share.ciphertext).byteLength > 0) {
+                    try {
+                        await db.externalShare.update({
+                            where: { id: share.id },
+                            data: { ciphertext: Buffer.alloc(0) },
+                        });
+                    } catch (error) {
+                        log({ module: 'external-shares', level: 'warn' }, `Failed to clear stale external share ciphertext: ${error}`);
+                    }
+                }
                 return reply.code(404).send({ error: 'Share not found' });
             }
             return reply.send({

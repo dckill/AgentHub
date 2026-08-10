@@ -61,4 +61,23 @@ describe('routeCodexUserMessage', () => {
 
         expect(queue.push).toHaveBeenCalledWith('Follow up as a normal next turn.', mode);
     });
+
+    it('queues image-bearing messages as a new turn instead of losing images during steering', async () => {
+        const client = {
+            hasSteerableActiveTurn: vi.fn(() => true),
+            steerActiveTurn: vi.fn(),
+        };
+        const queue = { push: vi.fn() };
+
+        await expect(routeCodexUserMessage({
+            client,
+            queue,
+            text: 'Inspect this screenshot.',
+            mode,
+            forceQueue: true,
+        })).resolves.toBe('queued');
+
+        expect(client.steerActiveTurn).not.toHaveBeenCalled();
+        expect(queue.push).toHaveBeenCalledWith('Inspect this screenshot.', mode);
+    });
 });

@@ -111,4 +111,32 @@ describe('connectOfficialCodexSession', () => {
         expect(startOfficialResumeSession).toHaveBeenCalledWith('session-2', '93a9705e-bc6a-406d-8dce-8acc014dedbd', 'Claude investigation');
         expect(navigateToSession).toHaveBeenCalledWith('session-2');
     });
+
+    it('drops the mirror result when the account changes while loading the spawned session', async () => {
+        let current = true;
+        const onSessionVisible = vi.fn();
+        const startOfficialResumeSession = vi.fn();
+        const navigateToSession = vi.fn();
+
+        await connectOfficialCodexSession({
+            session: {
+                source: 'official-codex',
+                machineId: 'machine-1',
+                path: '/repo',
+                codexThreadId: 'thread-1',
+            },
+            isCurrent: () => current,
+            spawnSession: vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-3' })),
+            ensureSessionLoaded: vi.fn(async () => {
+                current = false;
+            }),
+            onSessionVisible,
+            startOfficialResumeSession,
+            navigateToSession,
+        });
+
+        expect(onSessionVisible).not.toHaveBeenCalled();
+        expect(startOfficialResumeSession).not.toHaveBeenCalled();
+        expect(navigateToSession).not.toHaveBeenCalled();
+    });
 });

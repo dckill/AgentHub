@@ -1,6 +1,7 @@
 import { AgentContentView } from '@/components/AgentContentView';
 import { AgentGoalBar, type AgentGoalAction } from '@/components/AgentGoalBar';
 import { AgentInput } from '@/components/AgentInput';
+import { SessionStatusBar } from '@/components/SessionStatusBar';
 import { layout } from '@/components/layout';
 import {
     getAvailableModels,
@@ -22,16 +23,18 @@ import { useDraft } from '@/hooks/useDraft';
 import { Modal } from '@/modal';
 import { gitStatusSync } from '@/sync/gitStatusSync';
 import { sessionAbort, sessionGoalAction, sessionPermissionMode } from '@/sync/ops';
-import { storage, useIsDataReady, useLocalSetting, useLocalSettingMutable, useOfficialResumeSession, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
+import { storage, useIsDataReady, useLocalSetting, useLocalSettingMutable, useOfficialResumeSession, useSessionGitStatus, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { useEnsureSessionLoaded } from '@/hooks/useEnsureSessionLoaded';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
+import { claimSessionControl, releaseSessionControl } from '@/sync/sessionControlApi';
+import { useSessionControlStore } from '@/sync/sessionControlStore';
 import { t } from '@/text';
 import { tracking } from '@/track';
 import { isRunningOnMac } from '@/utils/platform';
 import { useDeviceType, useHeaderHeight, useIsLandscape, useIsTablet } from '@/utils/responsive';
-import { FilesSidebar } from '@/components/FilesSidebar';
+import { SessionWorkbenchSidebar } from '@/components/SessionWorkbenchSidebar';
 import { DirectoryTreeDrawer } from '@/components/DirectoryTreeDrawer';
 import { InlineFileDiff } from '@/components/InlineFileDiff';
 import { FileReferencePicker } from '@/components/FileReferencePicker';
@@ -57,6 +60,7 @@ import { shouldMarkVisibleSessionCompletionViewed } from './visibleSessionComple
 import { shouldShowSessionLoadingOverlay } from './sessionLoadingOverlay';
 import { getSessionLifecycleVisual } from '@/utils/sessionLifecycleStatus';
 import { resolveSessionMessagePlaceholder, type SessionMessageLoadError } from '@/sync/sessionMessageLoadState';
+import { resolveStatusBarGitBranch } from '@/utils/sessionStatusBar';
 
 function SessionMessageLoadErrorView(props: { error: SessionMessageLoadError; onRetry: () => void }) {
     const { theme } = useUnistyles();
@@ -152,7 +156,8 @@ export const SessionView = React.memo((props: { id: string }) => {
     const showSidebar = fileDiffsSidebarEnabled
         && (isRunningOnMac() || Platform.OS === 'web')
         && windowWidth >= SIDEBAR_MIN_WINDOW_WIDTH
-        && isDataReady && !!session;
+        && isDataReady && !!session
+        && session.metadata?.isSideChat !== true;
     // Match left sidebar width: 30% of window, clamped to 250–360px
     const sidebarWidth = Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
 
@@ -181,6 +186,9 @@ export const SessionView = React.memo((props: { id: string }) => {
         setSelectedFile((current) => (current?.fullPath === file.fullPath ? null : file));
     }, []);
     const clearSelectedFile = React.useCallback(() => setSelectedFile(null), []);
+    const renderSideChat = React.useCallback((sideChat: Session) => (
+        <SessionViewLoaded sessionId={sideChat.id} session={sideChat} embedded />
+    ), []);
 
     // When sidebar is hidden or disabled, don't keep a stale selection.
     React.useEffect(() => {
@@ -354,10 +362,11 @@ export const SessionView = React.memo((props: { id: string }) => {
             </View>
             <Animated.View style={[{ minWidth: 0, alignSelf: 'stretch' }, animatedSidebarStyle]}>
                 <View style={{ width: sidebarWidth, flex: 1 }}>
-                    <FilesSidebar
-                        sessionId={sessionId}
+                    <SessionWorkbenchSidebar
+                        session={session}
                         selectedPath={selectedFile?.fullPath ?? null}
                         onFilePress={handleSidebarFilePress}
+                        renderSideChat={renderSideChat}
                     />
                 </View>
             </Animated.View>
@@ -367,13 +376,14 @@ export const SessionView = React.memo((props: { id: string }) => {
 
 const SIDEBAR_MIN_WINDOW_WIDTH = 1100;
 
-function SessionViewLoaded({ sessionId, session }: { sessionId: string, session: Session }) {
+export function SessionViewLoaded({ sessionId, session, embedded = false }: { sessionId: string, session: Session, embedded?: boolean }) {
     const { theme } = useUnistyles();
     const router = useRouter();
     const safeArea = useSafeAreaInsets();
     const isLandscape = useIsLandscape();
     const deviceType = useDeviceType();
     const isTablet = useIsTablet();
+    const sessionControl = useSessionControlStore((state) => state.sessions[sessionId] ?? null);
     const [message, setMessage] = React.useState('');
     const [fileReferences, setFileReferences] = React.useState<string[]>([]);
     const [localFiles, setLocalFiles] = React.useState<LocalFile[]>([]);
@@ -429,7 +439,9 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     const sessionStatus = useSessionStatus(session);
     const sessionUsage = useSessionUsage(sessionId);
+    const sessionGitStatus = useSessionGitStatus(sessionId);
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
+    const sessionStatusBarDisplay = useSetting('sessionStatusBarDisplay');
     const expResumeSession = useSetting('expResumeSession');
     const { canResume, resumeSession, resumingSession } = useSessionQuickActions(session);
     const isArchivedSession = session.metadata?.lifecycleState === 'archived';
@@ -548,7 +560,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // Trigger session visibility and initialize git status sync
     React.useLayoutEffect(() => {
 
-        storage.getState().markSessionViewed(sessionId);
+        if (!embedded) storage.getState().markSessionViewed(sessionId);
 
         // Trigger session sync
         sync.onSessionVisible(sessionId);
@@ -556,7 +568,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
         // Initialize git status sync for this session
         gitStatusSync.getSync(sessionId);
-    }, [sessionId]);
+    }, [embedded, sessionId]);
 
     let content = (
         <>
@@ -588,18 +600,22 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             placeholder={t('session.inputPlaceholder')}
             value={message}
             onChangeText={setMessage}
-            sessionId={sessionId}
-            permissionMode={permissionMode}
-            onPermissionModeChange={updatePermissionMode}
-            availableModes={availableModes}
-            modelMode={modelMode}
-            availableModels={availableModels}
-            onModelModeChange={updateModelMode}
-            effortLevel={effortLevel}
-            availableEffortLevels={availableEffortLevels}
-            onEffortLevelChange={updateEffortLevel}
-            metadata={session.metadata}
-            agentType={agentType}
+            sessionContext={{
+                sessionId,
+                metadata: session.metadata,
+                agentType,
+            }}
+            settings={{
+                permissionMode,
+                onPermissionModeChange: updatePermissionMode,
+                availableModes,
+                modelMode,
+                availableModels,
+                onModelModeChange: updateModelMode,
+                effortLevel,
+                availableEffortLevels,
+                onEffortLevelChange: updateEffortLevel,
+            }}
             connectionStatus={{
                 text: sessionStatus.statusText,
                 color: sessionStatus.state === 'disconnected' ? theme.colors.textSecondary : sessionStatus.state === 'waiting' ? theme.colors.success : sessionStatus.statusColor,
@@ -607,7 +623,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 isPulsing: sessionStatus.isPulsing
             }}
             blockSend={false}
-            onSend={() => {
+            onSend={async () => {
                 if (message.trim() || localFiles.length > 0) {
                     const hasRefs = fileReferences.length > 0;
                     const hasLocalImages = localFiles.some(f => f.mimeType.startsWith('image/'));
@@ -651,21 +667,36 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                         return;
                     }
 
-                    setMessage('');
-                    setFileReferences([]);
-                    setLocalFiles([]);
-                    clearDraft();
-                    sync.sendMessage(sessionId, textToSend, {
+                    const result = await sync.sendMessage(sessionId, textToSend, {
                         source: 'chat',
                         displayText,
                         fileReferences: hasRefs ? fileReferences : undefined,
                         images,
                     });
+                    if (!result.sent) {
+                        if (result.controlDenied) {
+                            await Modal.alert(t('common.sessionControlObserver'), t('common.sessionControlClaimFailed'));
+                        }
+                        if (result.failedAttachments > 0) {
+                            await Modal.alert(t('common.attachmentUploadFailedTitle'), t('common.attachmentUploadFailedMessage'));
+                        }
+                        return;
+                    }
+
+                    setMessage('');
+                    setFileReferences([]);
+                    setLocalFiles([]);
+                    clearDraft();
+                    if (result.failedAttachments > 0) {
+                        await Modal.alert(
+                            t('common.attachmentUploadPartialTitle'),
+                            t('common.attachmentUploadPartialMessage', { count: result.failedAttachments }),
+                        );
+                    }
                 }
             }}
             onAbort={isDisconnected || isOfficialResumePending ? undefined : () => sessionAbort(sessionId)}
             showAbortButton={!isOfficialResumePending && (sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting')}
-            onFileViewerPress={!isOfficialResumePending ? () => router.push(`/session/${sessionId}/files`) : undefined}
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={(query) => getSuggestions(sessionId, query, { hideCompact: true })}
             usageData={sessionUsage ? {
@@ -684,14 +715,16 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 ...(session.latestUsage.contextWindow !== undefined ? { contextWindow: session.latestUsage.contextWindow } : {})
             } : undefined}
             alwaysShowContextSize={alwaysShowContextSize}
-            fileReferences={fileReferences}
-            onFileReferencesChange={setFileReferences}
-            onFilePickerOpen={() => setShowFilePicker(true)}
-            localFiles={localFiles}
-            onLocalFileRemove={(index) => {
+            attachments={{
+                onFileViewerPress: !isOfficialResumePending ? () => router.push(`/session/${sessionId}/files`) : undefined,
+                fileReferences,
+                onFileReferencesChange: setFileReferences,
+                onFilePickerOpen: () => setShowFilePicker(true),
+                localFiles,
+                onLocalFileRemove: (index) => {
                 setLocalFiles(prev => prev.filter((_, i) => i !== index));
-            }}
-            onLocalFilePick={async () => {
+                },
+                onLocalFilePick: async () => {
                 try {
                     const { launchImageLibraryAsync, MediaTypeOptions } = await import('expo-image-picker');
                     const result = await launchImageLibraryAsync({
@@ -714,6 +747,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 } catch (e) {
                     console.error('Failed to pick local file:', e);
                 }
+                },
             }}
             onSlashCommandSelect={(command) => {
                 if (isOfficialResumePending) return;
@@ -722,6 +756,9 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             hideCompactCommand
             onCompactPress={async () => {
                 if (isOfficialResumePending) return;
+                const generation = sync.getAccountGeneration();
+                const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                if (!isCurrent()) return;
                 const confirmed = await Modal.confirm(
                     t('agentInput.context.compactConfirmTitle'),
                     t('agentInput.context.compactConfirmMessage'),
@@ -730,12 +767,56 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                         confirmText: t('agentInput.context.compactConfirmAction'),
                     },
                 );
-                if (!confirmed) {
+                if (!confirmed || !isCurrent()) {
                     return;
                 }
                 sync.sendMessage(sessionId, '/compact', { source: 'chat' });
             }}
         />
+    );
+
+    const latestUsage = sessionUsage ?? session.latestUsage;
+    const statusBar = sessionStatusBarDisplay === 'hidden' ? null : (
+        <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
+            <SessionStatusBar
+                gitBranch={resolveStatusBarGitBranch(sessionGitStatus?.branch, null)}
+                modelLabel={modelMode?.name ?? null}
+                modelMode={modelMode}
+                availableModels={availableModels}
+                onModelModeChange={updateModelMode}
+                effortLabel={effortLevel?.name ?? null}
+                effortLevel={effortLevel}
+                availableEffortLevels={availableEffortLevels}
+                onEffortLevelChange={updateEffortLevel}
+                contextSize={latestUsage?.contextSize}
+                contextWindow={latestUsage?.contextWindow ?? session.metadata?.contextWindow}
+                usageLimits={session.agentState?.usageLimits}
+                controlMode={sessionControl?.mode ?? 'unknown'}
+                onControlClaim={async () => {
+                    const generation = sync.getAccountGeneration();
+                    const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                    if (!isCurrent()) return;
+                    const response = await claimSessionControl(sessionId);
+                    if (!isCurrent()) return;
+                    useSessionControlStore.getState().apply(response);
+                }}
+                onControlRelease={async () => {
+                    const generation = sync.getAccountGeneration();
+                    const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                    if (!isCurrent()) return;
+                    const response = await releaseSessionControl(sessionId);
+                    if (!isCurrent()) return;
+                    useSessionControlStore.getState().apply(response);
+                }}
+            />
+        </CenteredInputWidth>
+    );
+    const composerWithStatus = (
+        <>
+            {sessionStatusBarDisplay === 'above' ? statusBar : null}
+            {composer}
+            {sessionStatusBarDisplay === 'below' ? statusBar : null}
+        </>
     );
 
     const archivedHint = isInactiveArchivedSession ? (
@@ -752,7 +833,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const input = isInactiveArchivedSession ? (
         <>
             {archivedHint}
-            {composer}
+            {composerWithStatus}
         </>
     ) : (
         <>
@@ -770,7 +851,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                     />
                 </CenteredInputWidth>
             )}
-            {composer}
+            {composerWithStatus}
         </>
     );
 

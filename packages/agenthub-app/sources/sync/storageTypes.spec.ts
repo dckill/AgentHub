@@ -25,6 +25,20 @@ describe('MetadataSchema', () => {
         expect(metadata.parentSessionId).toBe('agenthub-parent');
         expect(metadata.forkedFromMessageId).toBe('message-42');
     });
+
+    it('preserves CLI session directory metadata used by downstream tooling', () => {
+        const metadata = MetadataSchema.parse({
+            path: '/workspace',
+            host: 'laptop',
+            homeDir: '/home/user',
+            agentHubHomeDir: '/home/user/.agenthub',
+            agentHubLibDir: '/home/user/.agenthub/lib',
+            agentHubToolsDir: '/home/user/.agenthub/tools',
+        });
+
+        expect(metadata.agentHubLibDir).toBe('/home/user/.agenthub/lib');
+        expect(metadata.agentHubToolsDir).toBe('/home/user/.agenthub/tools');
+    });
 });
 
 describe('AgentGoalStatusSchema', () => {
@@ -159,5 +173,42 @@ describe('AgentGoalStatusSchema', () => {
         });
 
         expect(state.agentGoalStatus?.status).toBe('active');
+    });
+});
+
+describe('AgentStateSchema usage limits', () => {
+    it('preserves backend-neutral plan windows and rejects invalid percentages', () => {
+        const state = AgentStateSchema.parse({
+            usageLimits: {
+                capturedAt: 1_800_000_000_000,
+                windows: [{
+                    id: 'five_hour',
+                    status: 'allowed_warning',
+                    utilization: 92.5,
+                    resetsAt: 1_800_000_100_000,
+                }],
+            },
+        });
+        expect(state.usageLimits?.windows[0]).toMatchObject({ id: 'five_hour', utilization: 92.5 });
+        expect(() => AgentStateSchema.parse({
+            usageLimits: { capturedAt: 1, windows: [{ id: 'five_hour', utilization: 101 }] },
+        })).toThrow();
+    });
+});
+
+describe('AgentStateSchema permission contract', () => {
+    it('preserves the CLI wire field allowTools for completed requests', () => {
+        const state = AgentStateSchema.parse({
+            completedRequests: {
+                permission1: {
+                    tool: 'Bash',
+                    arguments: { command: 'pwd' },
+                    status: 'approved',
+                    allowTools: ['Bash', 'Read'],
+                },
+            },
+        });
+
+        expect(state.completedRequests?.permission1.allowTools).toEqual(['Bash', 'Read']);
     });
 });

@@ -30,4 +30,26 @@ describe('MachinesView operational and action boundaries', () => {
         expect(transfer).toContain('width: 44');
         expect(transfer).toContain('height: 44');
     });
+
+    it('renders the dashboard new-session action as a text-only button', () => {
+        const view = readFileSync(join(sources, 'components/MachinesView.tsx'), 'utf8');
+
+        expect(view).toMatch(/dashboardAction:\s*\{[\s\S]{0,160}minHeight: 44,[\s\S]{0,120}borderWidth: 1,/);
+        expect(view).toMatch(/dashboardActionText:\s*\{[\s\S]{0,120}fontSize: 13,/);
+        expect(view).toContain("<Text style={styles.dashboardActionText}>{t('newSession.title')}</Text>");
+        expect(view).not.toContain('dashboardActionIconFrame');
+        expect(view).not.toContain('dashboardActionIconHighlight');
+        expect(view).not.toContain('dashboardActionIconSecondaryHighlight');
+        expect(view).not.toContain('<Ionicons name="chatbubbles-outline"');
+        expect(view).not.toContain('dashboardActionVisuals');
+    });
+
+    it('guards asynchronous group prompts before projecting account settings', () => {
+        const view = readFileSync(join(sources, 'components/MachinesView.tsx'), 'utf8');
+
+        expect(view).toContain("import { sync } from '@/sync/sync';");
+        expect(view).toContain("import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';");
+        expect(view).toContain('const generation = sync.getAccountGeneration();');
+        expect(view).toContain('runSessionActionRequest({');
+    });
 });

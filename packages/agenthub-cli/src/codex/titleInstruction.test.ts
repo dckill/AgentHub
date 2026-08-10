@@ -9,14 +9,33 @@ import {
 
 describe('buildCodexTurnPrompt', () => {
     it('requests a title update for the first user message after resuming an official Codex thread', () => {
-        const prompt = buildCodexTurnPrompt('continue from mobile', true);
+        const prompt = buildCodexTurnPrompt({
+            message: 'continue from mobile',
+            appendSystemPrompt: undefined,
+            includeAppendSystemPrompt: true,
+            includeTitleInstruction: true,
+        });
 
         expect(prompt).toContain('continue from mobile');
         expect(prompt).toContain(CHANGE_TITLE_INSTRUCTION);
     });
 
     it('does not request a title update after the first title-eligible turn', () => {
-        expect(buildCodexTurnPrompt('follow up', false)).toBe('follow up');
+        expect(buildCodexTurnPrompt({
+            message: 'follow up',
+            appendSystemPrompt: undefined,
+            includeAppendSystemPrompt: false,
+            includeTitleInstruction: false,
+        })).toBe('follow up');
+    });
+
+    it('injects the App system suffix only once per Codex thread', () => {
+        expect(buildCodexTurnPrompt({
+            message: 'choose',
+            appendSystemPrompt: '<options><option>Yes</option></options>',
+            includeAppendSystemPrompt: true,
+            includeTitleInstruction: false,
+        })).toBe('<options><option>Yes</option></options>\n\nchoose');
     });
 });
 
@@ -26,6 +45,13 @@ describe('buildCodexMessageModeHash', () => {
 
         expect(buildCodexMessageModeHash({ ...base, clientUserMessageId: 'message-1' }))
             .not.toBe(buildCodexMessageModeHash({ ...base, clientUserMessageId: 'message-2' }));
+    });
+
+    it('does not batch prompts with different App system suffixes', () => {
+        const base = { permissionMode: 'default' as const, clientUserMessageId: 'same-message' };
+
+        expect(buildCodexMessageModeHash({ ...base, appendSystemPrompt: 'options A' }))
+            .not.toBe(buildCodexMessageModeHash({ ...base, appendSystemPrompt: 'options B' }));
     });
 });
 

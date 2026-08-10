@@ -149,11 +149,13 @@ export function createOfficialCodexThreadSync(opts: {
     threadId: string;
     seenEnvelopeIds?: Iterable<string>;
     seenEnvelopes?: Iterable<SessionEnvelope>;
+    skipInitialHistory?: boolean;
 }) {
     const seenEnvelopeIds = new Set<string>();
     const unmatchedTextFingerprints = new Map<string, number>();
     let lastTitle: string | null = null;
     let pollInFlight: Promise<void> | null = null;
+    let initialHistoryPending = opts.skipInitialHistory === true;
 
     const textFingerprint = (envelope: SessionEnvelope): string | null => {
         if (envelope.ev.t !== 'text') {
@@ -203,6 +205,11 @@ export function createOfficialCodexThreadSync(opts: {
 
             const closedTurns = completedTurnIds(thread);
             const envelopes = mapCodexThreadToSessionEnvelopes(thread);
+            if (initialHistoryPending) {
+                initialHistoryPending = false;
+                for (const envelope of envelopes) seenEnvelopeIds.add(envelope.id);
+                return;
+            }
             for (const envelope of envelopes) {
                 if (envelope.ev.t === 'turn-end' && envelope.turn && !closedTurns.has(envelope.turn)) {
                     continue;

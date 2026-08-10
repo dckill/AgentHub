@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
     rollbackThread: vi.fn(),
     injectItems: vi.fn(),
     listModels: vi.fn(),
+    loggerDebug: vi.fn(),
+    loggerDebugLargeJson: vi.fn(),
 }));
 
 vi.mock('@/codex/codexAppServerClient', () => ({
@@ -25,16 +27,26 @@ vi.mock('@/codex/codexAppServerClient', () => ({
     })),
 }));
 
+vi.mock('@/ui/logger', () => ({
+    logger: {
+        debug: mocks.loggerDebug,
+        debugLargeJson: mocks.loggerDebugLargeJson,
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+    },
+}));
+
 const machine = {
     id: 'machine-1',
     encryptionKey: new Uint8Array(32),
     encryptionVariant: 'legacy' as const,
 };
 
-function rpcClient(stopSession: ReturnType<typeof vi.fn> = vi.fn()) {
+function rpcClient(stopSession: ReturnType<typeof vi.fn> = vi.fn(), spawnSession: ReturnType<typeof vi.fn> = vi.fn()) {
     const client = new ApiMachineClient('token', machine as any);
     client.setRPCHandlers({
-        spawnSession: vi.fn(),
+        spawnSession,
         stopSession,
         requestShutdown: vi.fn(),
         checkCliUpdate: vi.fn(async () => ({
@@ -87,11 +99,79 @@ describe('ApiMachineClient Codex fork RPC handlers', () => {
         expect(result).toEqual({ message: 'Session stop requested', state: 'not-found' });
     });
 
+    it('rejects non-allowlisted environment variables at the machine RPC boundary', async () => {
+        const spawnSession = vi.fn();
+
+        await expect(callRpc(rpcClient(vi.fn(), spawnSession), 'spawn-agenthub-session', {
+            directory: '/tmp/project',
+            environmentVariables: { AWS_SECRET_ACCESS_KEY: 'must-not-cross-machine-boundary' },
+        })).resolves.toMatchObject({
+            __rpcError: {
+                code: 'INTERNAL_ERROR',
+                message: expect.stringMatching(/non-allowlisted key/),
+            },
+        });
+        expect(spawnSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-UUID Claude duplicate cut points before touching the filesystem', async () => {
+        await expect(callRpc(rpcClient(), 'claude-duplicate-session', {
+            directory: '/tmp/project',
+            claudeSessionId: '93a9705e-bc6a-406d-8dce-8acc014dedbd',
+            cutAfterUuid: '../../outside-session',
+        })).resolves.toMatchObject({
+            __rpcError: {
+                code: 'INTERNAL_ERROR',
+                message: 'valid cutAfterUuid is required',
+            },
+        });
+    });
+
+    it('does not put spawn credentials into the machine log message', async () => {
+        const spawnSession = vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-1' }));
+        const secret = 'sk-ant-oat01-credential-secret';
+
+        await expect(callRpc(rpcClient(vi.fn(), spawnSession), 'spawn-agenthub-session', {
+            directory: '/tmp/project',
+            token: secret,
+            environmentVariables: { LANG: 'en_US.UTF-8' },
+        })).resolves.toEqual({ type: 'success', sessionId: 'session-1' });
+
+        const spawnLog = mocks.loggerDebug.mock.calls
+            .map(([message]) => message)
+            .find((message): message is string => typeof message === 'string' && message.includes('Spawning session'));
+        expect(spawnLog).toBeDefined();
+        expect(spawnLog).not.toContain(secret);
+        expect(spawnLog).not.toContain('"token"');
+        expect(spawnSession).toHaveBeenCalledWith(expect.objectContaining({ token: secret }));
+    });
+
     it('exposes encrypted CLI update lifecycle RPCs', async () => {
         const client = rpcClient();
         await expect(callRpc(client, 'check-cli-update', {})).resolves.toMatchObject({ phase: 'available', latestVersion: '1.2.0' });
         await expect(callRpc(client, 'update-cli', { version: '1.2.0' })).resolves.toMatchObject({ accepted: true });
         await expect(callRpc(client, 'rollback-cli', {})).resolves.toMatchObject({ accepted: true });
+    });
+
+    it('returns encrypted live system metrics without persisting them', async () => {
+        await expect(callRpc(rpcClient(), 'get-system-metrics', {})).resolves.toMatchObject({
+            sampledAt: expect.any(Number),
+            system: {
+                platform: expect.any(String),
+                name: expect.any(String),
+                architecture: expect.any(String),
+            },
+            cpu: {
+                usagePercent: expect.any(Number),
+                logicalCores: expect.any(Number),
+            },
+            memory: {
+                totalBytes: expect.any(Number),
+                usedBytes: expect.any(Number),
+                availableBytes: expect.any(Number),
+            },
+            disks: expect.any(Array),
+        });
     });
 
     it('forks a Codex thread through the app-server client', async () => {

@@ -18,6 +18,21 @@ function flattenKeys(value: unknown, prefix = ''): string[] {
     return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => flattenKeys(child, prefix ? `${prefix}.${key}` : key));
 }
 
+function flattenLeafPaths(value: unknown, prefix = ''): string[] {
+    if (!value || typeof value !== 'object' || typeof value === 'function') {
+        return prefix ? [prefix] : [];
+    }
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => (
+        flattenLeafPaths(child, prefix ? `${prefix}.${key}` : key)
+    ));
+}
+
+function getPath(value: unknown, path: string): unknown {
+    return path.split('.').reduce((current, segment) => (
+        current && typeof current === 'object' ? (current as Record<string, unknown>)[segment] : undefined
+    ), value);
+}
+
 const locales = { ca, en, es, it: itLocale, ja, pl, pt, ru, zhHans, zhHant };
 
 describe('translation parity', () => {
@@ -112,6 +127,24 @@ describe('translation parity', () => {
     it('uses correct English singular and plural error labels', () => {
         expect(en.toolGroup.errors({ count: 1 })).toBe('1 error');
         expect(en.toolGroup.errors({ count: 2 })).toBe('2 errors');
+    });
+
+    it('does not fall back to English in the side-chat journey', () => {
+        const translatedLocales = { ca, es, it: itLocale, ja, pl, pt, ru };
+        const keys = flattenLeafPaths(en.sideChat);
+
+        for (const [locale, dictionary] of Object.entries(translatedLocales)) {
+            for (const key of keys) {
+                const localized = getPath(dictionary.sideChat, key);
+                const english = getPath(en.sideChat, key);
+                if (typeof localized === 'function' && typeof english === 'function') {
+                    expect(localized({ index: 2 }), `${locale}.sideChat.${key}`)
+                        .not.toBe(english({ index: 2 }));
+                } else {
+                    expect(localized, `${locale}.sideChat.${key}`).not.toBe(english);
+                }
+            }
+        }
     });
 
 });

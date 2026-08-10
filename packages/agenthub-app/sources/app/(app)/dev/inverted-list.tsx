@@ -68,18 +68,27 @@ export default function InvertedListTest() {
                         <View style={styles.buttonRow}>
                             <TouchableOpacity
                                 onPress={() => setListType('flash')}
+                                accessibilityRole="radio"
+                                accessibilityLabel="FlashList"
+                                accessibilityState={{ selected: listType === 'flash' }}
                                 style={[styles.button, listType === 'flash' ? styles.buttonActive : styles.buttonInactive]}
                             >
                                 <Text style={[styles.buttonText, listType === 'flash' ? styles.buttonTextActive : styles.buttonTextInactive]}>FlashList</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setListType('flat')}
+                                accessibilityRole="radio"
+                                accessibilityLabel="FlatList"
+                                accessibilityState={{ selected: listType === 'flat' }}
                                 style={[styles.button, listType === 'flat' ? styles.buttonActive : styles.buttonInactive]}
                             >
                                 <Text style={[styles.buttonText, listType === 'flat' ? styles.buttonTextActive : styles.buttonTextInactive]}>FlatList</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setListType('legend')}
+                                accessibilityRole="radio"
+                                accessibilityLabel="LegendList"
+                                accessibilityState={{ selected: listType === 'legend' }}
                                 style={[styles.button, listType === 'legend' ? styles.buttonActive : styles.buttonInactive]}
                             >
                                 <Text style={[styles.buttonText, listType === 'legend' ? styles.buttonTextActive : styles.buttonTextInactive]}>LegendList</Text>
@@ -92,18 +101,27 @@ export default function InvertedListTest() {
                             <View style={styles.buttonRow}>
                                 <TouchableOpacity
                                     onPress={() => setPaddingType('animated')}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel="Animated"
+                                    accessibilityState={{ selected: paddingType === 'animated' }}
                                     style={[styles.button, paddingType === 'animated' ? styles.buttonActive : styles.buttonInactive]}
                                 >
                                     <Text style={[styles.buttonText, paddingType === 'animated' ? styles.buttonTextActive : styles.buttonTextInactive]}>Animated</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => setPaddingType('non-animated')}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel="Non-Animated"
+                                    accessibilityState={{ selected: paddingType === 'non-animated' }}
                                     style={[styles.button, paddingType === 'non-animated' ? styles.buttonActive : styles.buttonInactive]}
                                 >
                                     <Text style={[styles.buttonText, paddingType === 'non-animated' ? styles.buttonTextActive : styles.buttonTextInactive]}>Non-Animated</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => setPaddingType('header-footer')}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel="Header/Footer"
+                                    accessibilityState={{ selected: paddingType === 'header-footer' }}
                                     style={[styles.button, paddingType === 'header-footer' ? styles.buttonActive : styles.buttonInactive]}
                                 >
                                     <Text style={[styles.buttonText, paddingType === 'header-footer' ? styles.buttonTextActive : styles.buttonTextInactive]}>Header/Footer</Text>
@@ -188,6 +206,7 @@ export default function InvertedListTest() {
                         <TextInput
                             style={styles.textInput}
                             placeholder="Type a message..."
+                            accessibilityLabel="Message"
                             value={inputText}
                             onChangeText={setInputText}
                             onSubmitEditing={addMessage}
@@ -195,6 +214,8 @@ export default function InvertedListTest() {
                         />
                         <TouchableOpacity
                             onPress={addMessage}
+                            accessibilityRole="button"
+                            accessibilityLabel="Send"
                             style={styles.sendButton}
                         >
                             <Text style={styles.sendButtonText}>Send</Text>

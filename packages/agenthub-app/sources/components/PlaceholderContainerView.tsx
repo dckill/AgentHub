@@ -37,6 +37,7 @@ export const PlaceholderContainerView: React.FC<PlaceholderContainerViewProps> =
                     contentContainerStyle
                 ]}
                 onPress={() => Keyboard.dismiss()}
+                accessible={false}
             >
                 <Animated.View style={animatedStyle}>
                     {children}

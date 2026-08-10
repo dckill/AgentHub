@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { MessageMetaSchema, MessageMeta } from './typesMessageMeta';
 import { sessionEnvelopeSchema, type SessionEnvelope } from '@artsum/agenthub-wire';
+import { stripLeadingTaskNotificationWrappers } from '@artsum/agenthub-wire';
 
 //
 // Raw types
@@ -426,6 +427,8 @@ export type NormalizedMessage = ({
     isSidechain: boolean,
     meta?: MessageMeta,
     usage?: UsageData,
+    claudeUuid?: string,
+    codexItemId?: string,
 };
 
 function normalizeSessionEnvelope(
@@ -493,6 +496,11 @@ function normalizeSessionEnvelope(
     }
 
     if (envelope.ev.t === 'text') {
+        const visibleText = stripLeadingTaskNotificationWrappers(envelope.ev.text);
+        if (visibleText.trim().length === 0 && visibleText !== envelope.ev.text) {
+            return null;
+        }
+
         if (envelope.role === 'user') {
             return {
                 id: messageId,
@@ -502,9 +510,11 @@ function normalizeSessionEnvelope(
                 isSidechain: false,
                 content: {
                     type: 'text',
-                    text: envelope.ev.text
+                    text: visibleText
                 },
-                meta
+                meta,
+                claudeUuid: envelope.claudeUuid,
+                codexItemId: envelope.codexItemId,
             } satisfies NormalizedMessage;
         }
 
@@ -517,17 +527,19 @@ function normalizeSessionEnvelope(
             content: [
                 envelope.ev.thinking ? {
                     type: 'thinking',
-                    thinking: envelope.ev.text,
+                    thinking: visibleText,
                     uuid: contentUUID,
                     parentUUID
                 } : {
                     type: 'text',
-                    text: envelope.ev.text,
+                    text: visibleText,
                     uuid: contentUUID,
                     parentUUID
                 }
             ],
-            meta
+            meta,
+            claudeUuid: envelope.claudeUuid,
+            codexItemId: envelope.codexItemId,
         } satisfies NormalizedMessage;
     }
 
@@ -587,23 +599,33 @@ function normalizeSessionEnvelope(
             createdAt: messageCreatedAt,
             role: 'agent',
             isSidechain,
-            content: [{
-                type: 'tool-call',
-                id: messageId,
-                name: 'file',
-                input: {
-                    ref: envelope.ev.ref,
-                    name: envelope.ev.name,
-                    size: envelope.ev.size,
-                    ...(envelope.ev.mimeType ? { mimeType: envelope.ev.mimeType } : {}),
-                    ...maybeImageMetadata
+            content: [
+                {
+                    type: 'tool-call',
+                    id: messageId,
+                    name: 'file',
+                    input: {
+                        ref: envelope.ev.ref,
+                        name: envelope.ev.name,
+                        size: envelope.ev.size,
+                        ...(envelope.ev.mimeType ? { mimeType: envelope.ev.mimeType } : {}),
+                        ...maybeImageMetadata
+                    },
+                    description: envelope.ev.image
+                        ? `Attached image: ${envelope.ev.name} (${envelope.ev.image.width}x${envelope.ev.image.height})`
+                        : `Attached file: ${envelope.ev.name}`,
+                    uuid: contentUUID,
+                    parentUUID
                 },
-                description: envelope.ev.image
-                    ? `Attached image: ${envelope.ev.name} (${envelope.ev.image.width}x${envelope.ev.image.height})`
-                    : `Attached file: ${envelope.ev.name}`,
-                uuid: contentUUID,
-                parentUUID
-            }],
+                {
+                    type: 'tool-result',
+                    tool_use_id: messageId,
+                    content: null,
+                    is_error: false,
+                    uuid: `${contentUUID}:result`,
+                    parentUUID: contentUUID
+                }
+            ],
             meta
         } satisfies NormalizedMessage;
     }

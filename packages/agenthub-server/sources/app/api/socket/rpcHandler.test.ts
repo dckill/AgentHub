@@ -62,4 +62,32 @@ describe('rpcHandler presence', () => {
         expect(ninthBeforeRelease).toEqual({ ok: false, error: 'Too many in-flight RPC calls' });
         expect(fetchSockets).toHaveBeenCalledTimes(8);
     });
+
+    it('rejects session control RPCs from user-scoped sockets without a device identity', async () => {
+        const handlers: Record<string, Function> = {};
+        const target = {
+            id: 'target-socket',
+            timeout: vi.fn(() => target),
+            emitWithAck: vi.fn(async () => ({ ok: true })),
+        };
+        const fetchSockets = vi.fn(async () => [target]);
+        const socket = {
+            id: 'caller-socket',
+            data: { clientType: 'user-scoped' },
+            on: vi.fn((event: string, handler: Function) => { handlers[event] = handler; }),
+            emit: vi.fn(),
+            join: vi.fn(),
+            leave: vi.fn(),
+        };
+        const io = {
+            in: vi.fn(() => ({ timeout: vi.fn(() => ({ fetchSockets })) })),
+        };
+        rpcHandler('user-1', socket as any, io as any);
+
+        const callback = vi.fn();
+        await handlers['rpc-call']({ method: 'session-1:bash', params: { command: 'pwd' } }, callback);
+
+        expect(callback).toHaveBeenCalledWith({ ok: false, error: 'Session control requires a device identity' });
+        expect(io.in).not.toHaveBeenCalled();
+    });
 });

@@ -2,7 +2,8 @@ import * as React from 'react';
 import { useAgentHubAction } from '@/hooks/useAgentHubAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { applyArchiveStopObservation, applyArchiveStopProjection, machineResumeSession, requestSessionArchiveStop } from '@/sync/ops';
+import { applyArchiveStopObservation, applyArchiveStopProjection, forkAndSpawn, machineResumeSession, requestSessionArchiveStop } from '@/sync/ops';
+import type { SessionArchiveStopResult } from '@/sync/ops';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
@@ -15,6 +16,10 @@ import { isMachineOnline } from '@/utils/machineUtils';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/sync/storage';
 import { useWorktreeMerge } from '@/hooks/useWorktreeMerge';
+import { getSessionForkSource } from '@/utils/sessionFork';
+import { showDuplicateSheet } from '@/components/DuplicateSheet';
+import { runSessionArchiveActionLifecycle } from '@/sync/sessionArchiveActionLifecycle';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 export interface SessionActionItem {
     id: string;
@@ -115,6 +120,8 @@ export function useSessionQuickActions(
         () => expResumeSession ? getResumeAvailability(session, machine, sessionStatus.isConnected) : { canResume: false, canShowResume: false, subtitle: '', message: '' },
         [machine, session, sessionStatus.isConnected, expResumeSession],
     );
+    const forkSource = React.useMemo(() => getSessionForkSource(session), [session]);
+    const canFork = Boolean(forkSource && machine && isMachineOnline(machine));
 
     const openDetails = React.useCallback(() => {
         router.push(`/session/${session.id}/info`);
@@ -147,18 +154,25 @@ export function useSessionQuickActions(
             throw new AgentHubError(t('sessionInfo.resumeSessionMissingMachine'), false);
         }
 
-        const result = await machineResumeSession({
-            machineId,
-            sessionId: session.id,
-            model: session.modelMode ?? undefined,
-            permissionMode: session.permissionMode ?? undefined,
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const result = await runSessionActionRequest({
+            isCurrent,
+            request: () => machineResumeSession({
+                machineId,
+                sessionId: session.id,
+                model: session.modelMode ?? undefined,
+                permissionMode: session.permissionMode ?? undefined,
+            }),
         });
+        if (result === null) return;
 
         switch (result.type) {
             case 'success': {
                 // Session reconnects to the same ID, so messages are preserved.
                 // Refresh to pick up the updated session state.
                 await sync.refreshSessions();
+                if (!isCurrent()) return;
 
                 if (session.permissionMode) {
                     storage.getState().updateSessionPermissionMode(result.sessionId, session.permissionMode);
@@ -178,24 +192,68 @@ export function useSessionQuickActions(
     });
 
     const [archivingSession, performArchive] = useAgentHubAction(async () => {
-        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
-
-        // Prefer daemon-managed structured stopping; preserve legacy kill/archive
-        // fallback for old, offline, or already-exited runners.
-        let stopResult;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         try {
-            stopResult = await requestSessionArchiveStop(session.id, machineId || undefined, {
-                onDaemonState: (daemonState) => {
+            await runSessionArchiveActionLifecycle<Extract<SessionArchiveStopResult, { source: 'daemon' }>, SessionArchiveStopResult>({
+                isCurrent,
+                cleanup: () => maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId),
+                // Prefer daemon-managed structured stopping; preserve legacy kill/archive
+                // fallback for old, offline, or already-exited runners.
+                stop: (onDaemonState) => requestSessionArchiveStop(session.id, machineId || undefined, {
+                    onDaemonState,
+                }),
+                applyObservation: (daemonState) => {
                     storage.getState().applySessions([applyArchiveStopObservation(session, daemonState)]);
                 },
+                applyProjection: (stopResult) => {
+                    storage.getState().applySessions([applyArchiveStopProjection(session, stopResult)]);
+                },
+                refresh: () => sync.refreshSessions().catch(() => {}),
+                onAfterArchive: () => onAfterArchive?.(),
             });
         } catch (error) {
             throw new AgentHubError(error instanceof Error ? error.message : t('sessionInfo.failedToArchiveSession'), false);
         }
-        storage.getState().applySessions([applyArchiveStopProjection(session, stopResult)]);
-        void sync.refreshSessions().catch(() => {});
-        onAfterArchive?.();
     });
+
+    const [forkingSession, performFork] = useAgentHubAction(async () => {
+        if (!forkSource) {
+            throw new AgentHubError(t('session.forkErrorMissingMetadata'), false);
+        }
+        if (!canFork) {
+            throw new AgentHubError(t('session.forkMachineOffline'), false);
+        }
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const result = await runSessionActionRequest({
+            isCurrent,
+            request: async () => await forkAndSpawn(forkSource),
+        });
+        if (result === null) return;
+        if (result.type !== 'success') {
+            throw new AgentHubError(
+                result.type === 'error' ? result.errorMessage : t('session.forkErrorGeneric'),
+                false,
+            );
+        }
+        if (!isCurrent()) return;
+        if (session.permissionMode) storage.getState().updateSessionPermissionMode(result.sessionId, session.permissionMode);
+        if (session.modelMode) storage.getState().updateSessionModelMode(result.sessionId, session.modelMode);
+        navigateToSession(result.sessionId);
+    });
+
+    const openDuplicateSheet = React.useCallback(() => {
+        if (!forkSource) {
+            Modal.alert(t('common.error'), t('session.forkErrorMissingMetadata'));
+            return;
+        }
+        if (!canFork) {
+            Modal.alert(t('common.error'), t('session.forkMachineOffline'));
+            return;
+        }
+        showDuplicateSheet({ sessionId: session.id });
+    }, [canFork, forkSource, session.id]);
 
     const archiveSession = React.useCallback(() => {
         performArchive();
@@ -218,6 +276,11 @@ export function useSessionQuickActions(
             items.push({ id: 'resume', icon: 'play-circle-outline', label: t('sessionInfo.resumeSession'), onPress: resumeSession });
         }
 
+        if (forkSource) {
+            items.push({ id: 'fork-session', icon: 'git-branch-outline', label: t('session.forkSession'), onPress: performFork });
+            items.push({ id: 'duplicate-session', icon: 'copy-outline', label: t('session.duplicateSession'), onPress: openDuplicateSheet });
+        }
+
         if (canMerge) {
             items.push({ id: 'merge-worktree', icon: 'git-merge-outline', label: t('sessionInfo.mergeWorktree'), onPress: mergeWorktreeAction });
         }
@@ -236,8 +299,11 @@ export function useSessionQuickActions(
         canMerge,
         copySessionMetadata,
         copySessionMetadataAndLogs,
+        forkSource,
         mergeWorktreeAction,
         openDetails,
+        openDuplicateSheet,
+        performFork,
         resumeAvailability.canShowResume,
         resumeSession,
     ]);
@@ -260,12 +326,16 @@ export function useSessionQuickActions(
         canArchive: true,
         canCopySessionMetadata,
         canMerge,
+        canFork,
         canResume: resumeAvailability.canResume,
         canShowResume: resumeAvailability.canShowResume,
         copySessionMetadata,
         copySessionMetadataAndLogs,
         mergeWorktreeAction,
         mergingWorktree,
+        forkSession: performFork,
+        forkingSession,
+        openDuplicateSheet,
         openDetails,
         resumeSession,
         resumeSessionSubtitle: resumeAvailability.subtitle,

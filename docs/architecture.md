@@ -49,6 +49,7 @@ CLI/daemon、每会话 runner，以及 Claude Code/Codex。机器文件传输方
 
 - 服务端负责认证、路由、排序、持久化和广播，但不应看到明文会话内容。
 - 账号、机器、会话、制品和托管凭据有不同的加密域；详见 [端到端加密](./encryption.md)。
+- 托管凭据是有意的边界例外：服务端在认证且具备账号/机器/会话归属校验后解密 `apiKey`/`baseUrl`，仅为 daemon 启动本机代理时注入子进程环境变量；服务端日志只记录环境变量键名，不记录凭据值。会话、机器、制品和消息仍保持端到端密文转发。
 - Socket.IO 事件可按 `user-scoped`、`session-scoped`、`machine-scoped` 三种连接类型过滤，减少无关广播。
 - 生产会话消息的加密内容同时支持 legacy `role: user | agent` 结构和 `sessionProtocol` envelope。当前 Claude Code 与 Codex 路径发送 turn-start、text/tool/file、turn-end 等 envelope；App reducer 只读兼容旧版本历史消息。
 

@@ -17,13 +17,24 @@ import { join, basename } from 'node:path'
 const REDACTED = '[REDACTED]';
 const SENSITIVE_KEY = /(?:authorization|cookie|credential|pass(?:word|phrase)?|secret|token|api[_-]?key|private[_-]?key|machine[_-]?key|encryption[_-]?key)/i;
 
-function redactSensitiveString(value: string): string {
-  return value
+export function redactSensitiveString(value: string): string {
+  const redactSerializedKeyValues = (input: string): string => input.replace(
+    /(["']?)([A-Za-z0-9_.-]+)\1\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\s]+)/g,
+    (match, quote: string, key: string, rawValue: string) => {
+      if (!SENSITIVE_KEY.test(key)) return match;
+      const valueStart = match.lastIndexOf(rawValue);
+      return `${match.slice(0, valueStart)}"${REDACTED}"`;
+    },
+  );
+
+  const normalized = value
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, `$1${REDACTED}`)
     .replace(/(https?:\/\/[^\s/:@]+:)[^\s@/]+@/gi, `$1${REDACTED}@`)
     .replace(/([?&](?:access[_-]?token|auth|api[_-]?key|key|password|secret|token)=)[^&#\s]*/gi, `$1${REDACTED}`)
-    .replace(/((?:authorization|password|passphrase|secret|token|api[_-]?key|private[_-]?key)\s*[:=]\s*)('[^']*'|"[^"]*"|[^\s,;]+)/gi, `$1${REDACTED}`)
-    .replace(/\b(?:sk|ghp|github_pat)_[A-Za-z0-9_-]{12,}\b/g, REDACTED);
+    .replace(/((?:authorization|password|passphrase|secret|token|api[_-]?key|private[_-]?key)\s*[:=]\s*)('[^']*'|"[^"]*"|[^\s,;]+)/gi, `$1${REDACTED}`);
+
+  return redactSerializedKeyValues(normalized)
+    .replace(/\b(?:sk-ant|sk-proj|sk|ghp|github_pat)[_-][A-Za-z0-9_-]{8,}\b/gi, REDACTED);
 }
 
 export function redactSensitiveLogData(value: unknown, seen = new WeakSet<object>(), depth = 0): unknown {
@@ -91,7 +102,7 @@ class Logger {
     public readonly logFilePath = getSessionLogPath()
   ) {
     // Remote logging enabled only when explicitly set with server URL
-    if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING 
+    if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING === 'true'
       && process.env.AGENTHUB_SERVER_URL) {
       this.dangerouslyUnencryptedServerLoggingUrl = process.env.AGENTHUB_SERVER_URL
       console.log(chalk.yellow('[REMOTE LOGGING] Sending logs to server for AI debugging'))

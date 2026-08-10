@@ -62,6 +62,16 @@ export const es: TranslationStructure = {
         close: 'Cerrar',
         backAgainToExit: 'Pulsa Atrás de nuevo para salir de AgentHub',
         unknownError: 'Error desconocido',
+        attachmentUploadFailedTitle: 'Error al subir el archivo adjunto',
+        attachmentUploadFailedMessage: 'La imagen no se pudo subir de forma segura. El contenido se conservó; comprueba la conexión e inténtalo de nuevo.',
+        attachmentUploadPartialTitle: 'Algunos archivos adjuntos fallaron',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `No se pudieron subir ${count} imágenes. Los demás archivos adjuntos y el mensaje se enviaron.`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `Archivo adjunto: ${name}`,
+        sessionControlObserver: 'Solo lectura: otro dispositivo controla esta sesión',
+        sessionControlController: 'Este dispositivo controla la sesión',
+        sessionControlRelease: 'Liberar control',
+        sessionControlClaim: 'Tomar control',
+        sessionControlClaimFailed: 'Esta sesión está controlada por otro dispositivo',
     },
 
     profile: {
@@ -203,6 +213,13 @@ export const es: TranslationStructure = {
         },
         alwaysShowContextSize: 'Mostrar siempre tamaño del contexto',
         alwaysShowContextSizeDescription: 'Mostrar uso del contexto incluso cuando no esté cerca del límite',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'Escala',
         scalingDescription: 'Ajusta el tamaño de los elementos de la interfaz',
@@ -478,6 +495,16 @@ export const es: TranslationStructure = {
         newSessionPlaceholder: '¿En qué te gustaría trabajar?',
         importOfficialTitle: 'Tomando el control de la sesión del ordenador',
         importOfficialDescription: 'Importando la conversación, restaurando el contexto y sincronizando el estado actual. La sesión no estará disponible hasta que termine.',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -589,6 +616,14 @@ export const es: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: '¿Listo para programar?',
@@ -890,7 +925,9 @@ export const es: TranslationStructure = {
         }
     },
 
+    sideChat: { panelTitle: 'Chats laterales', allFiles: 'Todos los archivos', newChat: 'Nuevo chat lateral', startButton: 'Iniciar chat lateral', creating: 'Creando…', unavailable: 'Esta sesión no se puede bifurcar mientras su máquina esté desconectada o no estén disponibles los metadatos del proveedor.', emptyTitle: 'Aún no hay chats laterales', emptySubtitle: 'Inicia una conversación aislada que conserva el contexto principal sin escribir en su transcripción.', close: 'Cerrar chat lateral', expand: 'Abrir chat lateral a pantalla completa', defaultTitle: ({ index }: { index: number }) => `Chat lateral ${index}` },
     files: {
+        addPanel: 'Add workbench panel',
         loadFailed: 'No se pudieron cargar los cambios. Comprueba la conexión e inténtalo de nuevo.',
         fileLoadFailed: 'No se pudo cargar este archivo. Comprueba la conexión e inténtalo de nuevo.',
         searchFailed: 'No se pudieron buscar los archivos. Inténtalo de nuevo.',
@@ -1209,6 +1246,16 @@ export const es: TranslationStructure = {
         offlineHelp: '• Asegúrate de que tu computadora esté en línea\n• Ejecuta `agenthub daemon status` para diagnosticar\n• ¿Estás usando la última versión del CLI? Actualiza con `npm install -g @artsum/agenthub@latest`',
         launchNewSessionInDirectory: 'Iniciar nueva sesión en directorio',
         statusAndProperties: 'Estado y propiedades',
+        systemResources: 'Recursos del sistema',
+        memory: 'Memoria',
+        network: 'Red',
+        downloadSpeed: 'Descarga',
+        uploadSpeed: 'Subida',
+        storage: 'Almacenamiento',
+        used: 'Usado',
+        available: 'Disponible',
+        metricsUnavailable: 'Métricas en vivo no disponibles',
+        metricsStale: 'Mostrando la última instantánea disponible',
         actions: 'Funciones',
         startSessionOnThisMachine: 'Iniciar sesión en este dispositivo',
         startSessionOnThisMachineSubtitle: 'Abre la pantalla de nueva sesión con este dispositivo seleccionado.',

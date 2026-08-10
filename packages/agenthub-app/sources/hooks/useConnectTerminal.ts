@@ -11,6 +11,7 @@ import { useCheckScannerPermissions } from '@/hooks/useCheckCameraPermissions';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 interface UseConnectTerminalOptions {
     onSuccess?: () => void;
@@ -28,22 +29,40 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
             Modal.alert(t('common.error'), t('modals.invalidAuthUrl'), [{ text: t('common.ok') }]);
             return false;
         }
+
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
+            Modal.alert(t('common.error'), t('modals.failedToConnectTerminal'), [{ text: t('common.ok') }]);
+            return false;
+        }
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         
         setIsLoading(true);
         try {
-            const accountSecret = decodeBase64(auth.credentials!.secret, 'base64url');
+            const accountSecret = decodeBase64(credentials.secret, 'base64url');
             if (parsed.type === 'account') {
                 const response = encryptBox(accountSecret, parsed.publicKey);
-                await authAccountApprove(auth.credentials!.token, parsed.publicKey, response);
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => authAccountApprove(credentials.token, parsed.publicKey, response),
+                });
+                if (result === null || !isCurrent()) return false;
             } else {
+                if (!isCurrent()) return false;
                 const responseV1 = encryptBox(accountSecret, parsed.publicKey);
                 let responseV2Bundle = new Uint8Array(sync.encryption.contentDataKey.length + 1);
                 responseV2Bundle[0] = 0;
                 responseV2Bundle.set(sync.encryption.contentDataKey, 1);
                 const responseV2 = encryptBox(responseV2Bundle, parsed.publicKey);
-                await authApprove(auth.credentials!.token, parsed.publicKey, responseV1, responseV2);
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => authApprove(credentials.token, parsed.publicKey, responseV1, responseV2),
+                });
+                if (result === null || !isCurrent()) return false;
             }
 
+            if (!isCurrent()) return false;
             Modal.alert(t('common.success'), parsed.type === 'account' ? t('modals.deviceLinkedSuccessfully') : t('modals.terminalConnectedSuccessfully'), [
                 { 
                     text: t('common.ok'), 
@@ -52,12 +71,14 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
             ]);
             return true;
         } catch (e) {
-            console.error(e);
-            Modal.alert(t('common.error'), t('modals.failedToConnectTerminal'), [{ text: t('common.ok') }]);
-            options?.onError?.(e);
+            if (isCurrent()) {
+                console.error(e);
+                Modal.alert(t('common.error'), t('modals.failedToConnectTerminal'), [{ text: t('common.ok') }]);
+                options?.onError?.(e);
+            }
             return false;
         } finally {
-            setIsLoading(false);
+            if (isCurrent()) setIsLoading(false);
         }
     }, [auth.credentials, options]);
 

@@ -9,16 +9,6 @@ const FILE_TRANSFER_CHUNK_TIMEOUT_MS = 15_000;
 const FILE_TRANSFER_LOOKUP_TIMEOUT_MS = 2_000;
 
 type RoomSocket = RemoteSocket<DefaultEventsMap, any>;
-type TransferTarget = {
-    userId: string;
-    machineId: string;
-    transferId: string;
-    attemptId: string;
-    targetSocketId: string;
-    updatedAt: number;
-};
-
-const activeTransferTargets = new Map<string, TransferTarget>();
 
 function rpcRoom(userId: string, method: string): string {
     return `${RPC_ROOM_PREFIX}${userId}:${method}`;
@@ -41,44 +31,15 @@ function firstAckResponse(response: unknown): unknown {
     return Array.isArray(response) ? response[0] : response;
 }
 
-function transferKey(userId: string, machineId: string, transferId: string): string {
-    return `${userId}:${machineId}:${transferId}`;
-}
-
-function rememberTransferTarget(userId: string, machineId: string, transferId: string, attemptId: string, targetSocketId: string) {
-    activeTransferTargets.set(transferKey(userId, machineId, transferId), {
-        userId,
-        machineId,
-        transferId,
-        attemptId,
-        targetSocketId,
-        updatedAt: Date.now(),
-    });
-}
-
-function getTransferTarget(userId: string, machineId: string, transferId: string): TransferTarget | null {
-    return activeTransferTargets.get(transferKey(userId, machineId, transferId)) ?? null;
-}
-
-function forgetTransferTarget(userId: string, machineId: string, transferId: string) {
-    activeTransferTargets.delete(transferKey(userId, machineId, transferId));
-}
-
-function forgetSocketTargets(socketId: string) {
-    for (const [key, value] of activeTransferTargets) {
-        if (value.targetSocketId === socketId) {
-            activeTransferTargets.delete(key);
-        }
-    }
+function fileTransferRoom(userId: string, machineId: string, transferId: string, attemptId: string): string {
+    return ['file-transfer', userId, machineId, transferId, attemptId]
+        .map((part) => encodeURIComponent(part))
+        .join(':');
 }
 
 export function fileTransferHandler(userId: string, socket: Socket, io: Server) {
-    socket.on('disconnect', () => {
-        forgetSocketTargets(socket.id);
-    });
-
     socket.on('file-transfer-start', async (data: any, callback: (response: any) => void) => {
-        let rememberedTarget: { machineId: string; transferId: string } | null = null;
+        let joinedRoom: string | null = null;
         try {
             if (socket.data.clientType === 'machine-scoped') {
                 callback?.({ ok: false, error: 'Machine sockets cannot start file transfers' });
@@ -97,25 +58,32 @@ export function fileTransferHandler(userId: string, socket: Socket, io: Server) 
                 return;
             }
 
-            rememberTransferTarget(userId, machineId, transferId, attemptId, socket.id);
-            rememberedTarget = { machineId, transferId };
-            log({ module: 'websocket' }, `File transfer start user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} targetSocket=${socket.id}`);
+            joinedRoom = fileTransferRoom(userId, machineId, transferId, attemptId);
+            await socket.join(joinedRoom);
+            log({ module: 'websocket' }, `File transfer start user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} targetRoom=${joinedRoom}`);
             const response = await target
                 .timeout(FILE_TRANSFER_START_TIMEOUT_MS)
                 .emitWithAck('file-transfer-start', {
                     params,
-                    targetSocketId: socket.id,
+                    // Keep the wire field name for CLI compatibility; it now carries
+                    // a deterministic Socket.IO room so Redis adapters can route it.
+                    targetSocketId: joinedRoom,
                     attemptId,
                 });
             const ack = firstAckResponse(response) ?? { ok: false, error: 'No file transfer start response' };
             if (!(ack as any)?.ok) {
-                forgetTransferTarget(userId, machineId, transferId);
+                await socket.leave(joinedRoom);
+                joinedRoom = null;
                 log({ module: 'websocket', level: 'warn' }, `File transfer start rejected user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId}: ${(ack as any)?.error || 'unknown error'}`);
             }
             callback?.(ack);
         } catch (error) {
-            if (rememberedTarget) {
-                forgetTransferTarget(userId, rememberedTarget.machineId, rememberedTarget.transferId);
+            if (joinedRoom) {
+                try {
+                    await socket.leave(joinedRoom);
+                } catch {
+                    // The socket may already be disconnected; cleanup is best effort.
+                }
             }
             const message = error instanceof Error ? error.message : 'Failed to start file transfer';
             callback?.({ ok: false, error: message });
@@ -129,13 +97,15 @@ export function fileTransferHandler(userId: string, socket: Socket, io: Server) 
                 return;
             }
 
-            const { machineId, transferId, params } = data ?? {};
+            const { machineId, transferId, attemptId, params } = data ?? {};
             if (!machineId || typeof machineId !== 'string' || typeof params !== 'string') {
                 callback?.({ ok: false, error: 'Invalid file transfer cancel request' });
                 return;
             }
             if (typeof transferId === 'string') {
-                forgetTransferTarget(userId, machineId, transferId);
+                if (typeof attemptId === 'string' && attemptId) {
+                    await socket.leave(fileTransferRoom(userId, machineId, transferId, attemptId));
+                }
                 log({ module: 'websocket' }, `File transfer cancel user=${userId} machine=${machineId} transfer=${transferId}`);
             }
 
@@ -178,20 +148,15 @@ export function fileTransferHandler(userId: string, socket: Socket, io: Server) 
                 return;
             }
 
-            const latestTarget = getTransferTarget(userId, machineId, transferId);
-            if (!latestTarget) {
-                callback?.({ ok: false, error: 'File transfer target unavailable' });
-                return;
-            }
-            if (latestTarget.attemptId !== attemptId) {
+            const expectedTargetRoom = fileTransferRoom(userId, machineId, transferId, attemptId);
+            if (targetSocketId !== expectedTargetRoom) {
                 callback?.({ ok: true, stale: true });
                 return;
             }
 
-            const latestTargetSocketId = latestTarget.targetSocketId;
             const startedAt = Date.now();
             try {
-                const response = await io.to(latestTargetSocketId)
+                const response = await io.to(expectedTargetRoom)
                     .timeout(FILE_TRANSFER_CHUNK_TIMEOUT_MS)
                     .emitWithAck('file-transfer-chunk', {
                         transferId,
@@ -201,13 +166,13 @@ export function fileTransferHandler(userId: string, socket: Socket, io: Server) 
                 const ack = firstAckResponse(response) ?? { ok: true };
                 const duration = Date.now() - startedAt;
                 if (!(ack as any)?.ok || duration > 1000 || (metadata as any).done) {
-                    log({ module: 'websocket', level: (ack as any)?.ok === false ? 'warn' : 'info' }, `File transfer chunk forwarded user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} offset=${(metadata as any).offset} bytes=${(metadata as any).bytesRead} done=${!!(metadata as any).done} targetSocket=${latestTargetSocketId} durationMs=${duration} ok=${(ack as any)?.ok !== false} error=${(ack as any)?.error || ''}`);
+                    log({ module: 'websocket', level: (ack as any)?.ok === false ? 'warn' : 'info' }, `File transfer chunk forwarded user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} offset=${(metadata as any).offset} bytes=${(metadata as any).bytesRead} done=${!!(metadata as any).done} targetRoom=${expectedTargetRoom} durationMs=${duration} ok=${(ack as any)?.ok !== false} error=${(ack as any)?.error || ''}`);
                 }
                 callback?.(ack);
             } catch (error) {
                 const duration = Date.now() - startedAt;
                 const message = error instanceof Error ? error.message : 'Failed to forward file transfer chunk';
-                log({ module: 'websocket', level: 'error' }, `File transfer chunk failed user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} offset=${(metadata as any).offset} bytes=${(metadata as any).bytesRead} done=${!!(metadata as any).done} targetSocket=${latestTargetSocketId} durationMs=${duration}: ${message}`);
+                log({ module: 'websocket', level: 'error' }, `File transfer chunk failed user=${userId} machine=${machineId} transfer=${transferId} attempt=${attemptId} offset=${(metadata as any).offset} bytes=${(metadata as any).bytesRead} done=${!!(metadata as any).done} targetRoom=${expectedTargetRoom} durationMs=${duration}: ${message}`);
                 callback?.({ ok: false, error: message });
             }
         } catch (error) {

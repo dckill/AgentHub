@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SUPPORTED_LANGUAGE_CODES } from './_all';
+import { SUPPORTED_TRANSLATION_LANGUAGE_CODES } from './_all';
 
 describe('translation chunk boundary', () => {
     it('loads one non-English language on Web while preserving the Native map', () => {
@@ -15,7 +15,7 @@ describe('translation chunk boundary', () => {
         expect(textRuntime).toContain('translations[currentLanguage] ?? en');
         expect(rootLayout).toContain('await loadCurrentTranslations()');
 
-        for (const language of SUPPORTED_LANGUAGE_CODES.filter((code) => code !== 'en')) {
+        for (const language of SUPPORTED_TRANSLATION_LANGUAGE_CODES) {
             expect(webLoader).toContain(`case '${language}'`);
             expect(webLoader).toContain(`import('./translations/${language}')`);
             expect(nativeLoader).toContain(`from './translations/${language}'`);

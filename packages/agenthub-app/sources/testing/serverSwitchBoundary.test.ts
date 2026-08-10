@@ -14,6 +14,17 @@ describe('server switch account boundary', () => {
         expect(source).toContain("setError(t('errors.operationFailed'))");
     });
 
+    it('guards validation and confirmation results after account changes', () => {
+        const source = fs.readFileSync(path.join(appRoot, 'app/(app)/server.tsx'), 'utf8');
+
+        expect(source).toContain("import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';");
+        expect(source).toContain("import { sync } from '@/sync/sync';");
+        expect(source).toContain('const generation = sync.getAccountGeneration();');
+        expect(source).toContain('const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;');
+        expect(source).toContain('runSessionActionRequest({');
+        expect(source).toContain('if (!confirmed || !isCurrent())');
+    });
+
     it('does not expose the low-level endpoint writer outside the auth boundary or dev tooling', () => {
         const files = [
             'auth/AuthContext.tsx',

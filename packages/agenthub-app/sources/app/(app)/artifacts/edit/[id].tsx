@@ -7,6 +7,7 @@ import { t } from '@/text';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 import { storage, useArtifact } from '@/sync/storage';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { GlassButton } from '@/components/glass';
@@ -124,6 +125,13 @@ export default function EditArtifactScreen() {
             return;
         }
         
+        const generation = sync.getAccountGeneration();
+        if (generation === null) {
+            setLoadError(t('artifacts.error'));
+            setIsLoading(false);
+            return;
+        }
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         let cancelled = false;
         
         (async () => {
@@ -133,24 +141,24 @@ export default function EditArtifactScreen() {
                 // If body is not loaded, fetch it
                 if (artifact.body === undefined) {
                     const fullArtifact = await sync.fetchArtifactWithBody(id);
-                    if (!cancelled) {
+                    if (!cancelled && isCurrent()) {
                         storage.getState().updateArtifact(fullArtifact);
                         setTitle(fullArtifact.title || '');
                         setBody(fullArtifact.body || '');
                         setBaseline({ title: fullArtifact.title ?? null, body: fullArtifact.body ?? null });
                     }
-                } else {
+                } else if (!cancelled && isCurrent()) {
                     setTitle(artifact.title || '');
                     setBody(artifact.body || '');
                     setBaseline({ title: artifact.title, body: artifact.body ?? null });
                 }
             } catch (err) {
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     console.error('Failed to load artifact for editing:', err);
                     setLoadError(t('artifacts.error'));
                 }
             } finally {
-                if (!cancelled) {
+                if (!cancelled && isCurrent()) {
                     setIsLoading(false);
                 }
             }
@@ -180,6 +188,10 @@ export default function EditArtifactScreen() {
     
     const handleSave = React.useCallback(async () => {
         if (isSaving || !hasChanges) return;
+
+        const generation = sync.getAccountGeneration();
+        if (generation === null) return;
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         
         // At least one field should have content
         if (!title.trim() && !body.trim()) {
@@ -189,26 +201,34 @@ export default function EditArtifactScreen() {
             );
             return;
         }
+
+        if (!isCurrent()) return;
         
         try {
             setIsSaving(true);
             
             // Update the artifact
-            await sync.updateArtifact(
-                id,
-                title.trim() || null,
-                body.trim() || null
-            );
+            const updated = await runSessionActionRequest({
+                isCurrent,
+                request: () => sync.updateArtifact(
+                    id,
+                    title.trim() || null,
+                    body.trim() || null,
+                ),
+            });
+            if (updated === null || !isCurrent()) return;
             
             // Navigate back
-            router.back();
+            if (isCurrent()) router.back();
         } catch (err) {
-            console.error('Failed to update artifact:', err);
-            await Modal.alert(
-                t('common.error'),
-                t('artifacts.updateError')
-            );
-            setIsSaving(false);
+            if (isCurrent()) {
+                console.error('Failed to update artifact:', err);
+                await Modal.alert(
+                    t('common.error'),
+                    t('artifacts.updateError')
+                );
+                if (isCurrent()) setIsSaving(false);
+            }
         }
     }, [id, title, body, hasChanges, isSaving, router]);
     

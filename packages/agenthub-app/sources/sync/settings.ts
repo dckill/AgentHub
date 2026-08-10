@@ -7,6 +7,9 @@ import * as z from 'zod';
 // Current schema version for backward compatibility
 export const SUPPORTED_SCHEMA_VERSION = 2;
 
+export const SESSION_STATUS_BAR_DISPLAY_MODES = ['hidden', 'above', 'below'] as const;
+export type SessionStatusBarDisplay = typeof SESSION_STATUS_BAR_DISPLAY_MODES[number];
+
 export const SettingsSchema = z.object({
     // Schema version for compatibility detection
     schemaVersion: z.number().default(SUPPORTED_SCHEMA_VERSION).describe('Settings schema version for compatibility checks'),
@@ -22,6 +25,8 @@ export const SettingsSchema = z.object({
     experiments: z.boolean().describe('Whether to enable experimental features'),
     alwaysShowContextSize: z.boolean().describe('Always show context size in agent input'),
     agentInputEnterToSend: z.boolean().describe('Whether pressing Enter submits/sends in the agent input (web)'),
+    sessionStatusBarDisplay: z.enum(SESSION_STATUS_BAR_DISPLAY_MODES).describe('Whether and where to show session status'),
+    usageLimitShowRemaining: z.boolean().describe('Show plan quota remaining instead of used'),
 
     hideInactiveSessions: z.boolean().describe('Hide inactive sessions in the main list'),
     expResumeSession: z.boolean().describe('Enable experimental session resume feature'),
@@ -92,6 +97,8 @@ export const settingsDefaults: Settings = {
     experiments: false,
     alwaysShowContextSize: false,
     agentInputEnterToSend: true,
+    sessionStatusBarDisplay: 'hidden',
+    usageLimitShowRemaining: false,
 
     hideInactiveSessions: false,
     expResumeSession: false,

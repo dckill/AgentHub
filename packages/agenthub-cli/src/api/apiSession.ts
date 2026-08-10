@@ -2,7 +2,7 @@ import { logger } from '@/ui/logger'
 import { EventEmitter } from 'node:events'
 import { io, Socket } from 'socket.io-client'
 import { AgentState, ClientToServerEvents, Metadata, ServerToClientEvents, Session, Update, UserMessage, UserMessageSchema, Usage } from './types'
-import { decodeBase64, decrypt, encodeBase64, encrypt } from './encryption';
+import { decodeBase64, decrypt, decryptBlob, encodeBase64, encrypt } from './encryption';
 import { backoff, delay } from '@/utils/time';
 import { configuration } from '@/configuration';
 import { RawJSONLines } from '@/claude/types';
@@ -22,6 +22,9 @@ import { InvalidateSync } from '@/utils/sync';
 import axios from 'axios';
 import { join } from 'node:path';
 import { TerminalOutboxJournal } from './terminalOutboxJournal';
+import { deriveKey } from '@/utils/deriveKey';
+import { attachDecodedImages, parseIncomingImageAttachment, type DecodedIncomingImage } from './attachmentInbox';
+import { emitSessionUpdateWithAck, type SessionUpdateAckSocket } from './sessionUpdateAck';
 
 /**
  * Unified agent message data types used at the mobile transport boundary.
@@ -109,6 +112,7 @@ type V3PostSessionMessagesResponse = {
 };
 
 const SESSION_END_ACK_TIMEOUT_MS = 2_000;
+const SESSION_UPDATE_ACK_TIMEOUT_MS = 30_000;
 const SESSION_END_FLUSH_TIMEOUT_MS = 1_000;
 const DEFAULT_FLUSH_TIMEOUT_MS = 10_000;
 
@@ -122,6 +126,8 @@ export class ApiSessionClient extends EventEmitter {
     private socket: Socket<ServerToClientEvents, ClientToServerEvents>;
     private pendingMessages: UserMessage[] = [];
     private pendingMessageCallback: ((message: UserMessage) => void) | null = null;
+    private pendingImages: DecodedIncomingImage[] = [];
+    private blobKey: Uint8Array | null = null;
     readonly rpcHandlerManager: RpcHandlerManager;
     private agentStateLock = new AsyncLock();
     private metadataLock = new AsyncLock();
@@ -264,7 +270,11 @@ export class ApiSessionClient extends EventEmitter {
                     }
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(data.body.message.content.c));
                     logger.debugLargeJson('[SOCKET] [UPDATE] Received update:', body)
-                    this.routeIncomingMessage(body);
+                    if (parseIncomingImageAttachment(body)) {
+                        this.receiveSync.invalidate();
+                        return;
+                    }
+                    void this.routeIncomingMessage(body);
                     this.lastSeq = messageSeq;
                 } else if (data.body.t === 'update-session') {
                     if (data.body.metadata && data.body.metadata.version > this.metadataVersion) {
@@ -345,13 +355,66 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
-    private routeIncomingMessage(message: unknown) {
+    private async getBlobKey(): Promise<Uint8Array> {
+        if (!this.blobKey) {
+            this.blobKey = await deriveKey(
+                this.encryptionKey,
+                'AgentHub Blobs',
+                [this.encryptionVariant === 'dataKey' ? 'session' : 'master'],
+            );
+        }
+        return this.blobKey;
+    }
+
+    private async downloadIncomingAttachment(ref: string): Promise<Uint8Array> {
+        const reservation = await axios.post<{ downloadUrl: string }>(
+            `${configuration.serverUrl}/v1/sessions/${encodeURIComponent(this.sessionId)}/attachments/request-download`,
+            { ref },
+            { headers: this.authHeaders(), timeout: 30_000 },
+        );
+        const downloadUrl = reservation.data.downloadUrl;
+        if (typeof downloadUrl !== 'string') throw new Error('Attachment download reservation returned no URL');
+        const sameServer = new URL(downloadUrl).origin === new URL(configuration.serverUrl).origin;
+        const response = await axios.get<ArrayBuffer>(downloadUrl, {
+            headers: sameServer ? { Authorization: `Bearer ${this.token}` } : undefined,
+            responseType: 'arraybuffer',
+            timeout: 60_000,
+            maxRedirects: 5,
+            maxContentLength: 10 * 1024 * 1024,
+        });
+        return new Uint8Array(response.data);
+    }
+
+    private async routeIncomingMessage(message: unknown) {
+        const attachment = parseIncomingImageAttachment(message);
+        if (attachment) {
+            try {
+                const encrypted = await this.downloadIncomingAttachment(attachment.ref);
+                const data = decryptBlob(encrypted, await this.getBlobKey());
+                if (data) {
+                    this.pendingImages.push({
+                        data,
+                        mimeType: attachment.mimeType,
+                        name: attachment.name,
+                        ...(attachment.width !== undefined ? { width: attachment.width } : {}),
+                        ...(attachment.height !== undefined ? { height: attachment.height } : {}),
+                    });
+                }
+            } catch (error) {
+                logger.debug('[API] Failed to download incoming image attachment', {
+                    sessionId: this.sessionId,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+            return;
+        }
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
+            const routed = attachDecodedImages(userResult.data, this.pendingImages.splice(0));
             if (this.pendingMessageCallback) {
-                this.pendingMessageCallback(userResult.data);
+                this.pendingMessageCallback(routed);
             } else {
-                this.pendingMessages.push(userResult.data);
+                this.pendingMessages.push(routed);
             }
             return;
         }
@@ -396,7 +459,7 @@ export class ApiSessionClient extends EventEmitter {
 
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
-                    this.routeIncomingMessage(body);
+                    await this.routeIncomingMessage(body);
                 } catch (error) {
                     logger.debug('[API] Failed to decrypt fetched message', {
                         sessionId: this.sessionId,
@@ -772,7 +835,18 @@ export class ApiSessionClient extends EventEmitter {
         this.metadataLock.inLock(async () => {
             await backoff(async () => {
                 let updated = handler(this.metadata!); // Weird state if metadata is null - should never happen but here we are
-                const answer = await this.socket.emitWithAck('update-metadata', { sid: this.sessionId, expectedVersion: this.metadataVersion, metadata: encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) });
+                const answer = await emitSessionUpdateWithAck<any>({
+                    socket: this.socket as unknown as SessionUpdateAckSocket,
+                    event: 'update-metadata',
+                    data: {
+                        sid: this.sessionId,
+                        expectedVersion: this.metadataVersion,
+                        metadata: encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)),
+                    },
+                    timeoutMs: SESSION_UPDATE_ACK_TIMEOUT_MS,
+                    onError: (error) => logger.debug('[SOCKET] update-metadata ack failed:', error),
+                });
+                if (!answer) return;
                 if (answer.result === 'success') {
                     this.metadata = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(answer.metadata));
                     this.metadataVersion = answer.version;
@@ -798,7 +872,18 @@ export class ApiSessionClient extends EventEmitter {
         this.agentStateLock.inLock(async () => {
             await backoff(async () => {
                 let updated = handler(this.agentState || {});
-                const answer = await this.socket.emitWithAck('update-state', { sid: this.sessionId, expectedVersion: this.agentStateVersion, agentState: updated ? encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) : null });
+                const answer = await emitSessionUpdateWithAck<any>({
+                    socket: this.socket as unknown as SessionUpdateAckSocket,
+                    event: 'update-state',
+                    data: {
+                        sid: this.sessionId,
+                        expectedVersion: this.agentStateVersion,
+                        agentState: updated ? encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) : null,
+                    },
+                    timeoutMs: SESSION_UPDATE_ACK_TIMEOUT_MS,
+                    onError: (error) => logger.debug('[SOCKET] update-state ack failed:', error),
+                });
+                if (!answer) return;
                 if (answer.result === 'success') {
                     this.agentState = answer.agentState ? decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(answer.agentState)) : null;
                     this.agentStateVersion = answer.version;

@@ -64,6 +64,16 @@ export const zhHans: TranslationStructure = {
         close: '关闭',
         backAgainToExit: '再次返回将退出 AgentHub',
         unknownError: '未知错误',
+        attachmentUploadFailedTitle: '附件上传失败',
+        attachmentUploadFailedMessage: '图片未能安全上传，内容已保留，请检查网络后重试。',
+        attachmentUploadPartialTitle: '部分附件上传失败',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `${count} 个图片未能上传；其余附件和消息已发送。`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `附件：${name}`,
+        sessionControlObserver: '只读：其他设备正在控制此会话',
+        sessionControlController: '当前设备正在控制此会话',
+        sessionControlRelease: '释放控制权',
+        sessionControlClaim: '接管控制权',
+        sessionControlClaimFailed: '此会话由其他设备控制',
     },
 
     profile: {
@@ -204,6 +214,13 @@ export const zhHans: TranslationStructure = {
         },
         alwaysShowContextSize: '始终显示上下文大小',
         alwaysShowContextSizeDescription: '即使未接近限制时也显示上下文使用情况',
+        sessionStatusBar: '会话状态栏',
+        sessionStatusBarDescription: '在输入框附近显示分支、模型、推理强度、上下文和套餐限额',
+        sessionStatusBarHidden: '关闭',
+        sessionStatusBarAbove: '上方',
+        sessionStatusBarBelow: '下方',
+        usageLimitShowRemaining: '显示剩余额度',
+        usageLimitShowRemainingDescription: '将套餐限额百分比显示为剩余量而非已用量',
         // Scaling
         scaling: '缩放',
         scalingDescription: '调整界面元素大小',
@@ -479,6 +496,16 @@ export const zhHans: TranslationStructure = {
         newSessionPlaceholder: '您想做什么？',
         importOfficialTitle: '正在接管电脑会话',
         importOfficialDescription: '正在导入对话内容、恢复上下文并同步当前状态，完成前暂不可操作。',
+        forkSession: '分叉完整会话',
+        duplicateSession: '从消息处分叉',
+        duplicateMessageHint: '长按可从这条消息创建独立分支',
+        duplicateSheetTitle: '创建对话分支',
+        duplicateSheetSubtitle: '选择新独立会话应保留到哪一条用户消息（包含该消息）。',
+        duplicateSheetEmpty: '没有找到可用的用户消息分叉点。',
+        duplicateSheetConfirm: '创建分支',
+        forkErrorMissingMetadata: '此会话缺少分叉所需的设备或提供商元数据。',
+        forkErrorGeneric: '无法创建对话分支。',
+        forkMachineOffline: '源设备在线时才能创建对话分支。',
     },
 
     commandPalette: {
@@ -590,6 +617,14 @@ export const zhHans: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `上下文：已用 ${used} / ${total} 个 token（${percent}%）`,
+            limitFiveHour: '5 小时限额',
+            limitSevenDay: '7 天限额',
+            limitRemaining: ({ percent }: { percent: number }) => `剩余 ${percent}%`,
+            limitResets: ({ time }: { time: string }) => `${time} 重置`,
+            limitAsOf: ({ age }: { age: string }) => `更新于 ${age} 前`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: '准备开始编程？',
@@ -891,7 +926,14 @@ export const zhHans: TranslationStructure = {
         }
     },
 
+    sideChat: {
+        panelTitle: '侧边对话', allFiles: '全部文件', newChat: '新建侧边对话', startButton: '开始侧边对话', creating: '正在创建…',
+        unavailable: '机器离线或缺少 Provider 会话元数据，当前会话暂时无法分叉。',
+        emptyTitle: '还没有侧边对话', emptySubtitle: '创建一条继承父会话上下文、但不会写回父会话记录的隔离对话。',
+        close: '关闭侧边对话', expand: '全屏打开侧边对话', defaultTitle: ({ index }: { index: number }) => `侧边对话 ${index}`,
+    },
     files: {
+        addPanel: '添加工作台面板',
         loadFailed: '无法加载更改，请检查网络连接后重试。',
         fileLoadFailed: '无法加载此文件，请检查网络连接后重试。',
         searchFailed: '无法搜索文件，请重试。',
@@ -1208,6 +1250,16 @@ export const zhHans: TranslationStructure = {
         notFound: '未找到设备',
         launchNewSessionInDirectory: '在目录中启动新会话',
         statusAndProperties: '状态与属性',
+        systemResources: '系统资源',
+        memory: '内存',
+        network: '网络',
+        downloadSpeed: '下载',
+        uploadSpeed: '上传',
+        storage: '磁盘',
+        used: '已用',
+        available: '剩余',
+        metricsUnavailable: '暂时无法获取实时指标',
+        metricsStale: '正在显示最后一次可用数据',
         actions: '功能',
         startSessionOnThisMachine: '在这台设备启动会话',
         startSessionOnThisMachineSubtitle: '进入新建会话页面，并预选这台设备。',

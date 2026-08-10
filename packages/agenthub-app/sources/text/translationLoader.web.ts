@@ -1,7 +1,7 @@
 import type { TranslationStructure } from './_default';
-import type { SupportedLanguage } from './_all';
+import type { TranslationLanguage } from './_all';
 
-export async function loadTranslation(language: Exclude<SupportedLanguage, 'en'>): Promise<TranslationStructure> {
+export async function loadTranslation(language: TranslationLanguage): Promise<TranslationStructure> {
     switch (language) {
         case 'ru': return (await import('./translations/ru')).ru;
         case 'pl': return (await import('./translations/pl')).pl;

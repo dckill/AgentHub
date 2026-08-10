@@ -11,6 +11,9 @@
 - 不再新增浏览器、截图、录屏、人工点击或其他图形化验证步骤，也不再把真实页面截图作为完成门槛。UI / 视觉 / 交互改动通过组件测试、语义/无障碍断言、状态机测试、布局边界测试、E2E 协议测试和 production build 自动化验证；已有历史图形证据保留但不重复执行。
 - 只有用户之后明确要求人工视觉验收或平台商店强制需要截图时，才临时恢复对应图形化步骤；若启动浏览器或模拟器，结束后仍必须清理相关残留进程。
 - Android 本机打包产物必须统一放到仓库根目录 `artifacts/`。
+- Android OTA 增量发布默认使用 `production` 通道；除非用户明确指定其他通道，不再重复询问发布通道。
+- Android OTA 必须从 `packages/agenthub-app` 本地执行 `eas update --channel production --environment production --platform android`，只上传本地导出的 OTA bundle、manifest 和新增资源。禁止用 `eas workflow:run` 作为常规 OTA 发布入口，因为它会先压缩并上传整个仓库，体积大且不属于客户端增量更新。
+- Expo SDK 55 的 Android 正式包必须保持 `updates.enableBsdiffPatchSupport: true` 和原生 `ENABLE_BSDIFF_PATCH_SUPPORT=true`，让支持该能力的客户端优先下载 JS bundle 差分补丁；未命中补丁时允许回退到完整 bundle。该原生能力首次启用后，需要安装一次包含此配置的新 APK，后续纯 JS / 资源改动继续使用 OTA，不重复上传或安装整包。
 - 个人正式包默认命名为 `agenthub-production-arm64-YYYYMMDD-HHMM.apk`，并同时刷新 `agenthub-production-arm64-latest.apk`。
 - 后续打 Android APK 优先使用 `npx -y pnpm@10.11.0 --filter agenthub-app android:apk:arm64` 或 `scripts/build-android.sh`，不要只把 Gradle 内部输出目录当成交付产物。
 - 修改 AgentHub daemon、runner、CLI 更新流程时，必须同时考虑：Linux `agenthub-daemon.service` 需要 `KillMode=process`；systemd 托管 daemon 的 bundle 替换应交给 `Restart=on-failure` 重启；agent runner 在 SIGTERM/SIGINT/归档/异常退出时必须补齐 active turn 的 `turn-end` 并关闭 thinking，避免 App 会话卡在“思考中”。
@@ -28,7 +31,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Happy-AgentRemote** (16473 symbols, 38467 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Happy-AgentRemote** (20014 symbols, 45396 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

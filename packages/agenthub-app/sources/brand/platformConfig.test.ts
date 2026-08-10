@@ -35,6 +35,7 @@ describe('AgentHub generated platform config', () => {
                 slug: string;
                 version: string;
                 runtimeVersion: string;
+                updates: { enableBsdiffPatchSupport?: boolean };
                 scheme: string;
                 ios: { bundleIdentifier: string };
                 android: { package: string; googleServicesFile?: string };
@@ -54,6 +55,7 @@ describe('AgentHub generated platform config', () => {
                 expect(config.scheme).toBe(agentHubConfigManifest.expo.scheme);
                 expect(config.version).toBe(agentHubConfigManifest.expo.version);
                 expect(config.runtimeVersion).toBe(agentHubConfigManifest.expo.runtimeVersion);
+                expect(config.updates.enableBsdiffPatchSupport).toBe(true);
             }
         } finally {
             process.env.APP_ENV = previousAppEnv;
@@ -91,12 +93,16 @@ describe('AgentHub generated platform config', () => {
     it('keeps native Android production config aligned with AgentHub manifest', () => {
         const buildGradle = readAppFile('android/app/build.gradle');
         const stringsXml = readAppFile('android/app/src/main/res/values/strings.xml');
+        const androidManifest = readAppFile('android/app/src/main/AndroidManifest.xml');
         const expected = agentHubConfigManifest.androidProduction;
 
         expect(buildGradle).toContain(`namespace '${expected.namespace}'`);
         expect(buildGradle).toContain(`applicationId '${expected.applicationId}'`);
         expect(buildGradle).toContain(`versionName "${expected.versionName}"`);
         expect(stringsXml).toContain(`<string name="app_name">${expected.appName}</string>`);
+        expect(androidManifest).toContain(
+            '<meta-data android:name="expo.modules.updates.ENABLE_BSDIFF_PATCH_SUPPORT" android:value="true"/>',
+        );
     });
 
     it('keeps Tauri config files aligned with AgentHub manifest', () => {

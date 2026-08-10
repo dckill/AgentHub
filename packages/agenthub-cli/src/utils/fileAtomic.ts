@@ -19,7 +19,9 @@ export async function atomicFileWrite(filePath: string, content: string): Promis
     // Clean up temp file on error
     try {
       await unlink(tmpFile);
-    } catch {}
+    } catch {
+      // Best effort: the original write/rename error is the actionable failure to report.
+    }
     throw error;
   }
 }

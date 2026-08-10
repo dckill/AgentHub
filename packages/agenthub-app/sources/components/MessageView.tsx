@@ -16,6 +16,17 @@ import { useChatScale } from '@/hooks/useScale';
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from './parseLocalCommandMessage';
 import { GlassSurface } from '@/components/glass';
 import { getAgentEventVisuals, getToolSurfaceVisuals, getUserMessageVisuals } from './messageSurfaceVisuals';
+import { showDuplicateSheet } from './DuplicateSheet';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+
+function sendMessageOption(sessionId: string, title: string): void {
+  const generation = sync.getAccountGeneration();
+  const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+  void runSessionActionRequest({
+    isCurrent,
+    request: () => sync.sendMessage(sessionId, title, { source: 'option' }),
+  });
+}
 
 
 export const MessageView = (props: {
@@ -90,10 +101,24 @@ function UserTextBlock(props: {
   const { theme } = useUnistyles();
   const userVisuals = getUserMessageVisuals(theme);
   const handleOptionPress = React.useCallback((option: Option) => {
-    sync.sendMessage(props.sessionId, option.title, { source: 'option' });
+    sendMessageOption(props.sessionId, option.title);
   }, [props.sessionId]);
 
   const text = props.message.displayText || props.message.text;
+  const handleDuplicateFromMessage = React.useCallback(() => {
+    showDuplicateSheet({
+      sessionId: props.sessionId,
+      initialRewindPointId: props.message.codexItemId ?? props.message.claudeUuid,
+      initialMessageText: props.message.text,
+      initialForkedFromMessageId: props.message.id,
+    });
+  }, [props.message.claudeUuid, props.message.codexItemId, props.message.id, props.message.text, props.sessionId]);
+  const duplicateInteractionProps = {
+    onLongPress: handleDuplicateFromMessage,
+    accessibilityHint: t('session.duplicateMessageHint'),
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: text,
+  };
   const isClaudeFlavor = !props.metadata?.flavor || props.metadata.flavor === 'claude';
   if (isClaudeFlavor && isUserSlashCommandEcho(props.message.text, props.message.localId != null)) {
     return null;
@@ -107,6 +132,7 @@ function UserTextBlock(props: {
     return (
       <View style={[styles.userMessageContainer, { paddingHorizontal: s(16) }]}>
         <Pressable
+          {...duplicateInteractionProps}
           style={[
             styles.userMessageBubble,
             styles.goalMessageBubble,
@@ -139,6 +165,7 @@ function UserTextBlock(props: {
       <View style={[styles.userMessageContainer, { paddingHorizontal: s(16) }]}>
         {parsed.args ? (
           <Pressable
+            {...duplicateInteractionProps}
             style={[
               styles.userMessageBubble,
               styles.commandMessageBubble,
@@ -170,6 +197,7 @@ function UserTextBlock(props: {
   return (
     <View style={[styles.userMessageContainer, { paddingHorizontal: s(16) }]}>
       <Pressable
+        {...duplicateInteractionProps}
         style={[
           styles.userMessageBubble,
           {
@@ -259,7 +287,7 @@ function AgentTextBlock(props: {
 }) {
   const { s } = useChatScale();
   const handleOptionPress = React.useCallback((option: Option) => {
-    sync.sendMessage(props.sessionId, option.title, { source: 'option' });
+    sendMessageOption(props.sessionId, option.title);
   }, [props.sessionId]);
 
   // Hide thinking messages

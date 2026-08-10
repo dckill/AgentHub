@@ -76,6 +76,25 @@ describe('officialArchiveSync', () => {
         expect(archiveSession).not.toHaveBeenCalled();
     });
 
+    it('stops archiving when the account generation becomes stale during lookup', async () => {
+        const archiveSession = vi.fn().mockResolvedValue({ success: true });
+        const isCurrent = vi.fn()
+            .mockReturnValueOnce(true)
+            .mockReturnValue(false);
+
+        const result = await archiveArchivedOfficialCodexMirrorsForMachine('m1', {
+            s1: session('s1', { machineId: 'm1', codexThreadId: 'thread-1' }),
+        }, {
+            listThreadStates: vi.fn().mockResolvedValue([{ id: 'thread-1', archived: true }]),
+            archiveSession,
+            isCurrent,
+        });
+
+        expect(isCurrent).toHaveBeenCalled();
+        expect(archiveSession).not.toHaveBeenCalled();
+        expect(result).toEqual({ checkedThreadCount: 1, archivedSessionCount: 0 });
+    });
+
     it('builds a stable sync key for active Codex mirrors only', () => {
         const key = buildActiveCodexMirrorSyncKey({
             s2: session('s2', { machineId: 'm1', codexThreadId: 'thread-2' }),

@@ -9,6 +9,8 @@ import { isAccountQrUrl, parseAccountQrUrl } from '@/auth/accountQrUrl';
 import { useCheckScannerPermissions } from '@/hooks/useCheckCameraPermissions';
 import { Modal } from '@/modal';
 import { t } from '@/text';
+import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 interface UseConnectAccountOptions {
     onSuccess?: () => void;
@@ -26,12 +28,25 @@ export function useConnectAccount(options?: UseConnectAccountOptions) {
             Modal.alert(t('common.error'), t('modals.invalidAuthUrl'), [{ text: t('common.ok') }]);
             return false;
         }
+
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
+            Modal.alert(t('common.error'), t('modals.failedToLinkDevice'), [{ text: t('common.ok') }]);
+            return false;
+        }
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         
         setIsLoading(true);
         try {
-            const response = encryptBox(decodeBase64(auth.credentials!.secret, 'base64url'), publicKey);
-            await authAccountApprove(auth.credentials!.token, publicKey, response);
+            const response = encryptBox(decodeBase64(credentials.secret, 'base64url'), publicKey);
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => authAccountApprove(credentials.token, publicKey, response),
+            });
+            if (result === null || !isCurrent()) return false;
             
+            if (!isCurrent()) return false;
             Modal.alert(t('common.success'), t('modals.deviceLinkedSuccessfully'), [
                 { 
                     text: t('common.ok'), 
@@ -40,12 +55,14 @@ export function useConnectAccount(options?: UseConnectAccountOptions) {
             ]);
             return true;
         } catch (e) {
-            console.error(e);
-            Modal.alert(t('common.error'), t('modals.failedToLinkDevice'), [{ text: t('common.ok') }]);
-            options?.onError?.(e);
+            if (isCurrent()) {
+                console.error(e);
+                Modal.alert(t('common.error'), t('modals.failedToLinkDevice'), [{ text: t('common.ok') }]);
+                options?.onError?.(e);
+            }
             return false;
         } finally {
-            setIsLoading(false);
+            if (isCurrent()) setIsLoading(false);
         }
     }, [auth.credentials, options]);
 

@@ -308,6 +308,7 @@ export function sessionRoutes(app: Fastify) {
         });
         if (session) {
             log({ module: 'session-create', sessionId: session.id, userId, tag }, `Found existing session: ${session.id} for tag ${tag}`);
+            activityCache.resumeSessionUpdates(session.id);
             return reply.send({
                 session: {
                     id: session.id,
@@ -468,6 +469,10 @@ export function sessionRoutes(app: Fastify) {
                 expectedMetadataVersion: request.body.expectedMetadataVersion!,
             };
 
+        // Clear before the write: a heartbeat validation may already be in
+        // flight and must not re-cache or reactivate this session.
+        activityCache.clearSessionUpdates(sessionId);
+
         const result = await db.session.updateMany({
             where: {
                 id: sessionId,
@@ -487,14 +492,11 @@ export function sessionRoutes(app: Fastify) {
         });
 
         if (result.count === 0) {
+            activityCache.resumeSessionUpdates(sessionId);
             return reply.code(archiveMetadata ? 409 : 404).send({
                 error: archiveMetadata ? 'Session metadata version mismatch' : 'Session not found',
             });
         }
-
-        // Prevent a cached session-alive entry from reactivating the row after
-        // this explicit archive. The next heartbeat must revalidate the DB row.
-        activityCache.invalidateSession(sessionId, userId);
 
         // Notify all clients about the session deactivation
         const sessionActivity = buildSessionActivityEphemeral(sessionId, false, Date.now(), false);
@@ -519,9 +521,11 @@ export function sessionRoutes(app: Fastify) {
         const userId = request.userId;
         const { sessionId } = request.params;
 
+        activityCache.clearSessionUpdates(sessionId);
         const deleted = await sessionDelete({ uid: userId }, sessionId);
 
         if (!deleted) {
+            activityCache.resumeSessionUpdates(sessionId);
             return reply.code(404).send({ error: 'Session not found or not owned by user' });
         }
 

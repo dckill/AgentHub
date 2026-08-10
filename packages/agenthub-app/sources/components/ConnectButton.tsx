@@ -37,6 +37,9 @@ export const ConnectButton = React.memo(() => {
             
             <TouchableOpacity
                 onPress={() => setShowManualEntry(!showManualEntry)}
+                accessibilityRole="button"
+                accessibilityLabel={t('connectButton.authenticateWithUrlPaste')}
+                accessibilityState={{ expanded: showManualEntry }}
                 style={{
                     marginTop: 12,
                     flexDirection: 'row',
@@ -96,10 +99,13 @@ export const ConnectButton = React.memo(() => {
                             autoCapitalize="none"
                             autoCorrect={false}
                             onSubmitEditing={handleManualConnect}
+                            accessibilityLabel={t('connectButton.pasteAuthUrl')}
                         />
                         <TouchableOpacity
                             onPress={handleManualConnect}
                             disabled={!manualUrl.trim()}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('connectButton.authenticate')}
                             style={{
                                 marginLeft: 8,
                                 padding: 8,

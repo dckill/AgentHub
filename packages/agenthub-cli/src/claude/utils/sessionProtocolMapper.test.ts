@@ -22,6 +22,7 @@ describe('mapClaudeLogMessageToSessionEnvelopes', () => {
         expect(result.currentTurnId).toBeNull();
         expect(result.envelopes).toHaveLength(1);
         expect(result.envelopes[0].role).toBe('user');
+        expect(result.envelopes[0].claudeUuid).toBe('u-1');
         expect(result.envelopes[0].ev).toEqual({ t: 'text', text: 'hello from user' });
     });
 
@@ -40,6 +41,7 @@ describe('mapClaudeLogMessageToSessionEnvelopes', () => {
         expect(result.currentTurnId).toBeNull();
         expect(result.envelopes).toHaveLength(1);
         expect(result.envelopes[0].role).toBe('user');
+        expect(result.envelopes[0].claudeUuid).toBe('u-blocks-1');
         expect(result.envelopes[0].ev).toEqual({ t: 'text', text: 'what model are you?' });
     });
 
@@ -100,6 +102,26 @@ describe('mapClaudeLogMessageToSessionEnvelopes', () => {
             t: 'turn-end',
             status,
         });
+    });
+
+    it('stops every active subagent before an aborted turn ends', () => {
+        const first = createId();
+        const second = createId();
+        const state = {
+            currentTurnId: 'turn-1',
+            startedSubagents: new Set([first, second]),
+            activeSubagents: new Set([first, second]),
+        };
+
+        const result = closeClaudeTurnWithStatus(state, 'cancelled');
+
+        expect(result.envelopes.map((envelope) => envelope.ev)).toEqual([
+            { t: 'stop' },
+            { t: 'stop' },
+            { t: 'turn-end', status: 'cancelled' },
+        ]);
+        expect(result.envelopes.slice(0, 2).map((envelope) => envelope.subagent)).toEqual([first, second]);
+        expect(state.activeSubagents.size).toBe(0);
     });
 
     it('maps tool use and tool result blocks to tool-call lifecycle', () => {

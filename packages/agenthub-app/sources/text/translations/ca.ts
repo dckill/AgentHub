@@ -62,6 +62,16 @@ export const ca: TranslationStructure = {
         close: 'Tanca',
         backAgainToExit: 'Torna a prémer enrere per sortir d’AgentHub',
         unknownError: 'Error desconegut',
+        attachmentUploadFailedTitle: 'Ha fallat la pujada de l’adjunt',
+        attachmentUploadFailedMessage: 'La imatge no s’ha pogut pujar de manera segura. El contingut s’ha conservat; comprova la connexió i torna-ho a provar.',
+        attachmentUploadPartialTitle: 'Alguns adjunts han fallat',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `No s’han pogut pujar ${count} imatges. La resta d’adjunts i el missatge s’han enviat.`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `Adjunt: ${name}`,
+        sessionControlObserver: 'Només lectura: un altre dispositiu controla aquesta sessió',
+        sessionControlController: 'Aquest dispositiu controla la sessió',
+        sessionControlRelease: 'Allibera el control',
+        sessionControlClaim: 'Pren el control',
+        sessionControlClaimFailed: 'Aquesta sessió està controlada per un altre dispositiu',
     },
 
     profile: {
@@ -203,6 +213,13 @@ export const ca: TranslationStructure = {
         },
         alwaysShowContextSize: 'Mostra sempre la mida del context',
         alwaysShowContextSizeDescription: 'Mostra l\'ús del context fins i tot quan no estigui prop del límit',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'Escala',
         scalingDescription: 'Ajusta la mida dels elements de la interfície',
@@ -478,6 +495,16 @@ export const ca: TranslationStructure = {
         newSessionPlaceholder: 'En què t\'agradaria treballar?',
         importOfficialTitle: 'Prenent el control de la sessió de l’ordinador',
         importOfficialDescription: 'S’està important la conversa, restaurant el context i sincronitzant l’estat actual. La sessió no es pot utilitzar fins que acabi.',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -589,6 +616,14 @@ export const ca: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: 'Llest per programar?',
@@ -890,7 +925,9 @@ export const ca: TranslationStructure = {
         }
     },
 
+    sideChat: { panelTitle: 'Xats laterals', allFiles: 'Tots els fitxers', newChat: 'Nou xat lateral', startButton: 'Inicia un xat lateral', creating: 'Creant…', unavailable: 'Aquesta sessió no es pot bifurcar mentre la màquina estigui fora de línia o les metadades del proveïdor no estiguin disponibles.', emptyTitle: 'Encara no hi ha xats laterals', emptySubtitle: 'Inicia una conversa aïllada que conserva el context principal sense escriure al seu historial.', close: 'Tanca el xat lateral', expand: 'Obre el xat lateral a pantalla completa', defaultTitle: ({ index }: { index: number }) => `Xat lateral ${index}` },
     files: {
+        addPanel: 'Add workbench panel',
         loadFailed: 'No s’han pogut carregar els canvis. Comprova la connexió i torna-ho a provar.',
         fileLoadFailed: 'No s’ha pogut carregar aquest fitxer. Comprova la connexió i torna-ho a provar.',
         searchFailed: 'No s’han pogut cercar els fitxers. Torna-ho a provar.',
@@ -1209,6 +1246,16 @@ export const ca: TranslationStructure = {
         offlineHelp: '• Assegura\'t que l\'ordinador estigui en línia\n• Executa `agenthub daemon status` per diagnosticar\n• Fas servir l\'última versió del CLI? Actualitza amb `npm install -g @artsum/agenthub@latest`',
         launchNewSessionInDirectory: 'Inicia una nova sessió al directori',
         statusAndProperties: 'Estat i propietats',
+        systemResources: 'Recursos del sistema',
+        memory: 'Memòria',
+        network: 'Xarxa',
+        downloadSpeed: 'Baixada',
+        uploadSpeed: 'Pujada',
+        storage: 'Emmagatzematge',
+        used: 'Utilitzat',
+        available: 'Disponible',
+        metricsUnavailable: 'Mètriques en directe no disponibles',
+        metricsStale: 'Es mostra la darrera instantània disponible',
         actions: 'Funcions',
         startSessionOnThisMachine: 'Inicia una sessió en aquest dispositiu',
         startSessionOnThisMachineSubtitle: 'Obre la pantalla de nova sessió amb aquest dispositiu seleccionat.',

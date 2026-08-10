@@ -20,6 +20,15 @@ describe('settings', () => {
             expect(settingsParse({}).collapseAgentWork).toBe(true);
         });
 
+        it('keeps the session status bar opt-in and usage percentages used-by-default', () => {
+            expect(settingsDefaults.sessionStatusBarDisplay).toBe('hidden');
+            expect(settingsDefaults.usageLimitShowRemaining).toBe(false);
+            expect(settingsParse({ sessionStatusBarDisplay: 'below', usageLimitShowRemaining: true })).toMatchObject({
+                sessionStatusBarDisplay: 'below',
+                usageLimitShowRemaining: true,
+            });
+        });
+
         it('preserves an explicit automatic agent work collapsing preference', () => {
             expect(settingsParse({ collapseAgentWork: false }).collapseAgentWork).toBe(false);
         });
@@ -203,6 +212,8 @@ describe('settings', () => {
                 alwaysShowContextSize: false,
 
                 agentInputEnterToSend: true,
+                sessionStatusBarDisplay: 'hidden',
+                usageLimitShowRemaining: false,
                 hideInactiveSessions: false,
                 expResumeSession: false,
                 fileDiffsSidebar: false,

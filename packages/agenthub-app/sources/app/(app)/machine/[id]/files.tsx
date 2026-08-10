@@ -22,6 +22,7 @@ import { isMachineOnline } from '@/utils/machineUtils';
 import { ensureDownloadDirectoryBeforeStart } from '@/utils/downloadDirectoryPrompt';
 import { ScreenReaderHeading } from '@/components/ScreenReaderHeading';
 import { sync } from '@/sync/sync';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
 
 export default function MachineFilesScreen() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
@@ -173,13 +174,20 @@ export default function MachineFilesScreen() {
             disabled: !machineId || !isOnline,
             onPress: async () => {
                 if (!machineId || !isOnline) return;
+                const generation = sync.getAccountGeneration();
+                const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                if (!isCurrent()) return;
                 const confirmed = await Modal.confirm(
                     t('fileBrowser.deleteTitle'),
                     t('fileBrowser.deleteMessage', { path: node.path }),
                     { cancelText: t('common.cancel'), confirmText: t('common.delete'), destructive: true },
                 );
-                if (!confirmed) return;
-                const result = await machineDeleteFile(machineId, node.path);
+                if (!confirmed || !isCurrent()) return;
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => machineDeleteFile(machineId, node.path),
+                });
+                if (result === null || !isCurrent()) return;
                 if (!result.success) {
                     Modal.alert(t('common.error'), result.error || t('fileBrowser.deleteFailed'));
                     return;

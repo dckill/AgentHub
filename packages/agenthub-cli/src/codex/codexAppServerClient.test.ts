@@ -124,6 +124,157 @@ describe('CodexAppServerClient sandbox integration', () => {
         mockSpawn.mockImplementation(() => createMockProcess());
     });
 
+    it('returns a timeout reason when a turn never reaches a terminal event', async () => {
+        const proc = createMockProcess({
+            onRequest: (msg, stdout) => {
+                if (msg.method === 'thread/start' && msg.id != null) {
+                    setTimeout(() => pushJsonLine(stdout, {
+                        id: msg.id,
+                        result: { thread: { id: 'thread-timeout-1' } },
+                    }), 0);
+                }
+                if (msg.method === 'turn/start' && msg.id != null) {
+                    setTimeout(() => pushJsonLine(stdout, {
+                        id: msg.id,
+                        result: { turn: { id: 'turn-timeout-1' } },
+                    }), 0);
+                }
+            },
+        });
+        mockSpawn.mockImplementationOnce(() => proc);
+
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+        await client.connect();
+        await client.startThread({ model: 'gpt-test', cwd: '/tmp/project' });
+
+        await expect(client.sendTurnAndWait('never completes', { turnTimeoutMs: 1 }))
+            .resolves.toEqual({ aborted: true, reason: 'timeout' });
+        await client.disconnect();
+    });
+
+    it('cleans up the spawned process when initialize handshake fails', async () => {
+        const proc = createMockProcess({ pid: 2602 });
+        mockSpawn.mockImplementationOnce(() => proc);
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+        const error = new Error('initialize failed');
+        (client as any).request = vi.fn().mockRejectedValue(error);
+
+        await expect(client.connect()).rejects.toBe(error);
+        expect(proc.kill).toHaveBeenCalled();
+        expect((client as any).process).toBeNull();
+        expect((client as any).readline).toBeNull();
+    });
+
+    it('cancels a pending approval when the turn timeout closes the turn', async () => {
+        const responses: MockRpcMessage[] = [];
+        let releaseApproval: (() => void) | undefined;
+        const proc = createMockProcess({
+            onRequest: (msg, stdout) => {
+                if (msg.id != null && msg.method === undefined && msg.result !== undefined) {
+                    responses.push(msg);
+                }
+                if (msg.method === 'thread/start' && msg.id != null) {
+                    setTimeout(() => pushJsonLine(stdout, {
+                        id: msg.id,
+                        result: { thread: { id: 'thread-approval-timeout' } },
+                    }), 0);
+                }
+                if (msg.method === 'turn/start' && msg.id != null) {
+                    setTimeout(() => {
+                        pushJsonLine(stdout, {
+                            id: msg.id,
+                            result: { turn: { id: 'turn-approval-timeout' } },
+                        });
+                        pushJsonLine(stdout, {
+                            id: 77,
+                            method: 'item/commandExecution/requestApproval',
+                            params: { itemId: 'approval-77', command: 'rm -rf /tmp/demo' },
+                        });
+                    }, 0);
+                }
+            },
+        });
+        mockSpawn.mockImplementationOnce(() => proc);
+
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+        client.setApprovalHandler(() => new Promise((resolve) => {
+            releaseApproval = () => resolve('approved');
+        }));
+        await client.connect();
+        await client.startThread({ model: 'gpt-test', cwd: '/tmp/project' });
+
+        await expect(client.sendTurnAndWait('wait for approval', { turnTimeoutMs: 10 }))
+            .resolves.toEqual({ aborted: true, reason: 'timeout' });
+        await waitFor(() => responses.some((response) => response.id === 77));
+        releaseApproval?.();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(responses.filter((response) => response.id === 77)).toHaveLength(1);
+        expect(responses.find((response) => response.id === 77)?.result).toEqual({ decision: 'cancel' });
+        await client.disconnect();
+    });
+
+    it('clears local thread state so the next prompt starts a fresh thread', async () => {
+        const requests: MockRpcMessage[] = [];
+        let nextThreadNumber = 1;
+        const proc = createMockProcess({
+            pid: 2601,
+            onRequest: (msg, stdout) => {
+                requests.push(msg);
+                if (msg.method === 'thread/start' && msg.id != null) {
+                    const threadId = `thread-${nextThreadNumber++}`;
+                    setTimeout(() => pushJsonLine(stdout, {
+                        id: msg.id,
+                        result: {
+                            thread: { id: threadId, path: `/tmp/${threadId}` },
+                            model: 'gpt-test',
+                            modelProvider: 'openai',
+                            cwd: '/tmp/project',
+                            approvalPolicy: 'on-request',
+                            sandbox: { type: 'readOnly' },
+                            reasoningEffort: null,
+                        },
+                    }), 0);
+                }
+            },
+        });
+        mockSpawn.mockImplementation(() => proc);
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+
+        await client.connect();
+        await client.startThread({ model: 'gpt-test', cwd: '/tmp/project' });
+        expect(client.threadId).toBe('thread-1');
+
+        client.clearThreadState();
+        expect(client.threadId).toBeNull();
+        expect(client.turnId).toBeNull();
+        expect(client.hasActiveThread()).toBe(false);
+
+        await client.startThread({ model: 'gpt-test', cwd: '/tmp/project' });
+        expect(client.threadId).toBe('thread-2');
+        expect(requests.filter((message) => message.method === 'thread/start')).toHaveLength(2);
+        await client.disconnect();
+    });
+
+    it('bounds completed turn deduplication memory while keeping the newest turns', async () => {
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+        const eventHandler = vi.fn();
+        client.setEventHandler(eventHandler);
+
+        for (let index = 0; index < 1100; index += 1) {
+            (client as any).emitRawTurnCompletion(`turn-${index}`, 'completed', null, 'test');
+        }
+
+        const completedTurnIds = (client as any).completedTurnIds as Set<string>;
+        expect(completedTurnIds.size).toBeLessThanOrEqual(1024);
+        expect(completedTurnIds.has('turn-1099')).toBe(true);
+        expect(completedTurnIds.has('turn-0')).toBe(false);
+    });
+
     afterAll(() => {
         process.env.RUST_LOG = originalRustLog;
     });
@@ -307,7 +458,7 @@ describe('CodexAppServerClient sandbox integration', () => {
         await waitFor(() => client.hasSteerableActiveTurn());
         proc.emit('exit', 137, 'SIGKILL');
 
-        await expect(pendingTurn).resolves.toEqual({ aborted: true });
+        await expect(pendingTurn).resolves.toEqual({ aborted: true, reason: 'backend-failure' });
         await waitFor(() => fatalHandler.mock.calls.length === 1);
         expect(fatalHandler).toHaveBeenCalledWith(
             expect.objectContaining({ message: 'Codex process exited (code=137, signal=SIGKILL)' }),
@@ -412,12 +563,47 @@ describe('CodexAppServerClient sandbox integration', () => {
                             id: msg.id,
                             result: {
                                 thread: { id: 'thread-1', path: '/tmp/thread-1' },
+                                turns: [{
+                                    id: 'turn-1',
+                                    status: 'completed',
+                                    completedAt: 200,
+                                    items: [{
+                                        type: 'agentMessage',
+                                        id: 'agent-recovered-1',
+                                        text: 'recovered answer',
+                                        phase: 'final_answer',
+                                    }],
+                                }],
                                 model: 'gpt-test',
                                 modelProvider: 'openai',
                                 cwd: '/tmp/project',
                                 approvalPolicy: 'on-request',
                                 sandbox: { type: 'readOnly' },
                                 reasoningEffort: null,
+                            },
+                        });
+                    }, 0);
+                }
+
+                if (msg.method === 'thread/read' && msg.id != null) {
+                    setTimeout(() => {
+                        pushJsonLine(stdout, {
+                            id: msg.id,
+                            result: {
+                                thread: {
+                                    id: 'thread-1',
+                                    turns: [{
+                                        id: 'turn-1',
+                                        status: 'completed',
+                                        completedAt: 200,
+                                        items: [{
+                                            type: 'agentMessage',
+                                            id: 'agent-recovered-1',
+                                            text: 'recovered answer',
+                                            phase: 'final_answer',
+                                        }],
+                                    }],
+                                },
                             },
                         });
                     }, 0);
@@ -466,18 +652,28 @@ describe('CodexAppServerClient sandbox integration', () => {
             forceRestartOnTimeout: true,
         });
 
-        await expect(pendingTurn).resolves.toEqual({ aborted: true });
+        await expect(pendingTurn).resolves.toEqual({ aborted: true, reason: 'interrupt' });
         expect(abortResult).toEqual({
             hadActiveTurn: true,
             aborted: true,
             forcedRestart: true,
             resumedThread: true,
         });
-        expect(events).toContainEqual(expect.objectContaining({
+        expect(events).not.toContainEqual(expect.objectContaining({
             type: 'turn_aborted',
-            reason: 'interrupted',
             turn_id: 'turn-1',
-            forced_restart: true,
+        }));
+        expect(events).toContainEqual(expect.objectContaining({
+            type: 'agent_message',
+            turn_id: 'turn-1',
+            item_id: 'agent-recovered-1',
+            message: 'recovered answer',
+            phase: 'final_answer',
+        }));
+        expect(events).toContainEqual(expect.objectContaining({
+            type: 'task_complete',
+            turn_id: 'turn-1',
+            status: 'completed',
         }));
 
         const resumeRequest = secondProcessRequests.find((msg) => msg.method === 'thread/resume');
@@ -733,6 +929,35 @@ describe('CodexAppServerClient sandbox integration', () => {
         await client.disconnect();
     });
 
+    it('processes raw item notifications after a legacy event in a mixed protocol stream', async () => {
+        const { CodexAppServerClient } = await import('./codexAppServerClient');
+        const client = new CodexAppServerClient();
+        const events: any[] = [];
+        client.setEventHandler((event) => events.push(event));
+
+        (client as any).handleNotification('codex/event', {
+            msg: { type: 'task_started', turn_id: 'mixed-turn-1' },
+        });
+        (client as any).handleNotification('item/started', {
+            item: {
+                type: 'commandExecution',
+                id: 'mixed-call-1',
+                command: 'pwd',
+                cwd: '/tmp/project',
+            },
+        });
+
+        expect(events).toContainEqual({ type: 'task_started', turn_id: 'mixed-turn-1' });
+        expect(events).toContainEqual({
+            type: 'exec_command_begin',
+            call_id: 'mixed-call-1',
+            callId: 'mixed-call-1',
+            command: 'pwd',
+            cwd: '/tmp/project',
+            description: 'pwd',
+        });
+    });
+
     it('sends per-turn model and execution policy overrides on an active thread', async () => {
         const requests: MockRpcMessage[] = [];
         let turnCount = 0;
@@ -806,6 +1031,7 @@ describe('CodexAppServerClient sandbox integration', () => {
             model: 'gpt-switched',
             approvalPolicy: 'never',
             sandbox: 'danger-full-access',
+            extraInputItems: [{ type: 'localImage', path: '/tmp/private-image.png' }],
         })).resolves.toEqual({ aborted: false });
 
         const turnRequests = requests.filter((msg) => msg.method === 'turn/start');
@@ -820,6 +1046,10 @@ describe('CodexAppServerClient sandbox integration', () => {
             approvalPolicy: 'never',
             sandboxPolicy: { type: 'dangerFullAccess' },
             clientUserMessageId: 'client-user-message-2',
+            input: [
+                { type: 'text', text: 'second turn' },
+                { type: 'localImage', path: '/tmp/private-image.png' },
+            ],
         });
 
         await client.disconnect();

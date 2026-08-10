@@ -1,5 +1,16 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import tweetnacl from 'tweetnacl';
+import {
+    CONTENT_KEY_DERIVATION_USAGE,
+    DATA_KEY_NONCE_BYTES,
+    deriveKey as deriveSharedKey,
+    deriveSecretKeyTreeChild as deriveSharedChild,
+    deriveSecretKeyTreeRoot as deriveSharedRoot,
+    decryptDataKeyBundle,
+    encryptDataKeyBundle,
+    hmacSha512,
+    type KeyTreeState,
+} from '@artsum/agenthub-wire';
 
 // --- Base64 encoding/decoding ---
 
@@ -31,48 +42,18 @@ export function getRandomBytes(size: number): Uint8Array {
     return new Uint8Array(randomBytes(size));
 }
 
-// --- HMAC-SHA512 ---
-
-export function hmac_sha512(key: Uint8Array, data: Uint8Array): Uint8Array {
-    const hmac = createHmac('sha512', key);
-    hmac.update(data);
-    return new Uint8Array(hmac.digest());
-}
-
 // --- Key derivation tree ---
 
-export type KeyTreeState = {
-    key: Uint8Array;
-    chainCode: Uint8Array;
-};
+export type { KeyTreeState } from '@artsum/agenthub-wire';
 
-export function deriveSecretKeyTreeRoot(seed: Uint8Array, usage: string): KeyTreeState {
-    const I = hmac_sha512(new TextEncoder().encode(usage + ' Master Seed'), seed);
-    return {
-        key: I.slice(0, 32),
-        chainCode: I.slice(32),
-    };
-}
-
-export function deriveSecretKeyTreeChild(chainCode: Uint8Array, index: string): KeyTreeState {
-    const data = new Uint8Array([0x00, ...new TextEncoder().encode(index)]);
-    const I = hmac_sha512(chainCode, data);
-    return {
-        key: I.slice(0, 32),
-        chainCode: I.slice(32),
-    };
-}
-
-export function deriveKey(master: Uint8Array, usage: string, path: string[]): Uint8Array {
-    let state = deriveSecretKeyTreeRoot(master, usage);
-    for (const index of path) {
-        state = deriveSecretKeyTreeChild(state.chainCode, index);
-    }
-    return state.key;
-}
+/** Compatibility aliases retained for Agent callers; the implementation lives in Wire. */
+export const hmac_sha512 = hmacSha512;
+export const deriveSecretKeyTreeRoot = deriveSharedRoot;
+export const deriveSecretKeyTreeChild = deriveSharedChild;
+export const deriveKey = deriveSharedKey;
 
 export function deriveContentKeyPair(secret: Uint8Array): { publicKey: Uint8Array; secretKey: Uint8Array } {
-    const seed = deriveKey(secret, 'AgentHub EnCoder', ['content']);
+    const seed = deriveKey(secret, CONTENT_KEY_DERIVATION_USAGE, ['content']);
     // libsodium's crypto_box_seed_keypair does SHA-512(seed)[0:32] internally
     const hashedSeed = new Uint8Array(createHash('sha512').update(seed).digest());
     const boxSecretKey = hashedSeed.slice(0, 32);
@@ -83,34 +64,15 @@ export function deriveContentKeyPair(secret: Uint8Array): { publicKey: Uint8Arra
 // --- AES-256-GCM encryption ---
 
 export function encryptWithDataKey(data: unknown, dataKey: Uint8Array): Uint8Array {
-    const nonce = getRandomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', dataKey, nonce);
+    const nonce = getRandomBytes(DATA_KEY_NONCE_BYTES);
     const plaintext = new TextEncoder().encode(JSON.stringify(data));
-    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    const authTag = cipher.getAuthTag();
-
-    // Bundle: version(1) + nonce(12) + ciphertext + authTag(16)
-    const bundle = new Uint8Array(1 + 12 + encrypted.length + 16);
-    bundle[0] = 0; // version
-    bundle.set(nonce, 1);
-    bundle.set(new Uint8Array(encrypted), 13);
-    bundle.set(new Uint8Array(authTag), 13 + encrypted.length);
-    return bundle;
+    return encryptDataKeyBundle(plaintext, dataKey, nonce);
 }
 
 export function decryptWithDataKey(bundle: Uint8Array, dataKey: Uint8Array): unknown | null {
-    if (bundle.length < 1 + 12 + 16) return null; // minimum: version + nonce + authTag
-    if (bundle[0] !== 0) return null; // only version 0
-
-    const nonce = bundle.slice(1, 13);
-    const authTag = bundle.slice(bundle.length - 16);
-    const ciphertext = bundle.slice(13, bundle.length - 16);
-
     try {
-        const decipher = createDecipheriv('aes-256-gcm', dataKey, nonce);
-        decipher.setAuthTag(authTag);
-        const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-        return JSON.parse(new TextDecoder().decode(decrypted));
+        const decrypted = decryptDataKeyBundle(bundle, dataKey);
+        return decrypted ? JSON.parse(new TextDecoder().decode(decrypted)) : null;
     } catch {
         return null;
     }
@@ -203,4 +165,3 @@ export function decryptBoxBundle(bundle: Uint8Array, recipientSecretKey: Uint8Ar
     const decrypted = tweetnacl.box.open(ciphertext, nonce, ephemeralPublicKey, recipientSecretKey);
     return decrypted ? new Uint8Array(decrypted) : null;
 }
-

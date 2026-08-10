@@ -57,12 +57,16 @@ export class MessageIngestService {
 
         this.processing.add(sessionId);
         const lock = this.lock(sessionId);
+        let completed = false;
         void lock.inLock(() => {
             this.drain(sessionId);
+            completed = true;
+        }).catch((error) => {
+            console.error(`Failed to apply queued messages for session ${sessionId}; retaining them for retry`, error);
         }).finally(() => {
             this.processing.delete(sessionId);
             const pending = this.queues.get(sessionId);
-            if (pending && pending.length > 0) {
+            if (completed && pending && pending.length > 0) {
                 this.schedule(sessionId);
             }
         });
@@ -75,7 +79,12 @@ export class MessageIngestService {
                 break;
             }
             const batch = pending.splice(0, pending.length);
-            this.applyMessages(sessionId, batch);
+            try {
+                this.applyMessages(sessionId, batch);
+            } catch (error) {
+                pending.unshift(...batch);
+                throw error;
+            }
         }
     }
 }

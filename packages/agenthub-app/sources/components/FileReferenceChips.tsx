@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native-unistyles';
 import { hapticsLight } from './haptics';
+import { t } from '@/text';
 
 interface FileReferenceChipsProps {
     paths: string[];
@@ -67,6 +68,8 @@ export const FileReferenceChips = React.memo(function FileReferenceChips(props: 
                             }}
                             hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                             style={(p) => [styles.removeButton, p.pressed && styles.removeButtonPressed]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('common.close')} ${name}`}
                         >
                             <Ionicons name="close" size={12} style={styles.removeIcon} />
                         </Pressable>

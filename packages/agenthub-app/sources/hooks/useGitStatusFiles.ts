@@ -11,6 +11,7 @@ import * as React from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getGitStatusFiles, GitStatusFiles } from '@/sync/gitStatusFiles';
 import { storage, useSession, useSessionGitStatusFiles } from '@/sync/storage';
+import { sync } from '@/sync/sync';
 import { classifyGitStatusLoadResult } from '@/hooks/gitStatusLoadState';
 
 export function useGitStatusFiles(sessionId: string) {
@@ -22,10 +23,14 @@ export function useGitStatusFiles(sessionId: string) {
     const cachedState = classifyGitStatusLoadResult(cached);
 
     const refresh = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         setIsFetching(true);
         setHasError(false);
         try {
             const result = await getGitStatusFiles(sessionId);
+            if (!isCurrent()) return;
             const resultState = classifyGitStatusLoadResult(result);
             if (resultState.kind === 'ready') {
                 storage.getState().applyGitStatusFiles(sessionId, resultState.data);
@@ -35,10 +40,11 @@ export function useGitStatusFiles(sessionId: string) {
                 setHasError(true);
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Failed to load git status files:', error);
             setHasError(true);
         } finally {
-            setIsFetching(false);
+            if (isCurrent()) setIsFetching(false);
         }
     }, [sessionId]);
 

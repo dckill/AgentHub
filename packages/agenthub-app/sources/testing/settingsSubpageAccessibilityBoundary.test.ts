@@ -98,6 +98,17 @@ describe('authenticated settings subpage accessibility boundary', () => {
         }
     });
 
+    it('allows every Developer Tools description to reflow in long locales', () => {
+        const source = withoutJsxComments(read('app/(app)/dev/index.tsx'));
+        const subtitleCount = (source.match(/subtitle=\{/g) ?? []).length;
+        const titleWrapCount = (source.match(/(^|\s)titleLines=\{0\}/g) ?? []).length;
+        const subtitleWrapCount = (source.match(/(^|\s)subtitleLines=\{0\}/g) ?? []).length;
+
+        expect(subtitleCount).toBeGreaterThanOrEqual(10);
+        expect(titleWrapCount).toBe(subtitleCount);
+        expect(subtitleWrapCount).toBe(subtitleCount);
+    });
+
     it('stacks every Appearance scale value below its title for narrow long locales', () => {
         const appearance = withoutJsxComments(read('app/(app)/settings/appearance.tsx'));
         const scaleKeys = [

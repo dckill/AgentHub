@@ -43,7 +43,7 @@ function JsonViewer({ title, data, defaultExpanded = false }: JsonViewerProps) {
     
     return (
         <View style={{ marginBottom: 12 }}>
-            <Pressable
+            <View
                 style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -51,25 +51,34 @@ function JsonViewer({ title, data, defaultExpanded = false }: JsonViewerProps) {
                     paddingVertical: 12,
                     backgroundColor: 'white',
                 }}
-                onPress={() => setIsExpanded(!isExpanded)}
             >
-                <Ionicons
-                    name={isExpanded ? 'chevron-down' : 'chevron-forward'}
-                    size={20}
-                    color="#8E8E93"
-                    style={{ marginRight: 8 }}
-                />
-                <Text style={{ flex: 1, fontSize: 16, ...Typography.default('semiBold') }}>
-                    {title}
-                </Text>
+                <Pressable
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                    onPress={() => setIsExpanded(!isExpanded)}
+                    accessibilityRole="button"
+                    accessibilityLabel={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
+                    accessibilityState={{ expanded: isExpanded }}
+                >
+                    <Ionicons
+                        name={isExpanded ? 'chevron-down' : 'chevron-forward'}
+                        size={20}
+                        color="#8E8E93"
+                        style={{ marginRight: 8 }}
+                    />
+                    <Text style={{ flex: 1, fontSize: 16, ...Typography.default('semiBold') }}>
+                        {title}
+                    </Text>
+                </Pressable>
                 <Pressable
                     onPress={handleCopy}
                     hitSlop={10}
                     style={{ padding: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Copy ${title} JSON`}
                 >
                     <Ionicons name="copy-outline" size={20} color="#007AFF" />
                 </Pressable>
-            </Pressable>
+            </View>
             
             {isExpanded && (
                 <View style={{ 

@@ -40,6 +40,8 @@ export type UserTextMessage = {
     fileReferences?: string[];
     images?: ImageData[];
     meta?: MessageMeta;
+    claudeUuid?: string;
+    codexItemId?: string;
 }
 
 export type ModeSwitchMessage = {

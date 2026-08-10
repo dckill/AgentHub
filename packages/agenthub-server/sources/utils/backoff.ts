@@ -24,6 +24,9 @@ export function createBackoff(
         const maxDelay = opts && opts.maxDelay !== undefined ? opts.maxDelay : 10000;
         const factor = opts && opts.factor !== undefined ? opts.factor : 0.5;
         while (true) {
+            if (signal?.aborted) {
+                throw new AbortedExeption();
+            }
             try {
                 return await callback();
             } catch (e: any) {
@@ -33,6 +36,7 @@ export function createBackoff(
                 }
                 warn(e);
                 let waitForRequest = exponentialRandomizedBackoffDelay(currentFailureCount, minDelay, maxDelay, factor);
+                currentFailureCount += 1;
                 await delay(waitForRequest, signal);
             }
         }

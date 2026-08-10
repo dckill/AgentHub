@@ -93,6 +93,22 @@ export function getAvailableNewSessionAgents(
     return available.length > 0 ? available : ALL_NEW_SESSION_AGENTS;
 }
 
+/**
+ * Revalidates a persisted agent selection against the selected machine at the
+ * moment a session is launched. Missing or inconclusive capability metadata
+ * keeps the persisted value for backward compatibility with older daemons.
+ */
+export function resolveNewSessionAgent(
+    selectedAgent: NewSessionAgentType,
+    availability: NewSessionAgentAvailability | null | undefined,
+): NewSessionAgentType {
+    if (!availability || availability[selectedAgent] !== false) {
+        return selectedAgent;
+    }
+
+    return ALL_NEW_SESSION_AGENTS.find((agent) => availability[agent.key] === true)?.key ?? selectedAgent;
+}
+
 export function getNextNewSessionAgentKey(
     agents: NewSessionAgentOption[],
     currentAgent: NewSessionAgentType,
@@ -100,6 +116,28 @@ export function getNextNewSessionAgentKey(
     const choices = agents.length > 0 ? agents : ALL_NEW_SESSION_AGENTS;
     const index = choices.findIndex(agent => agent.key === currentAgent);
     return choices[(index + 1) % choices.length].key;
+}
+
+/** Picks an online machine for first-use drafts, retaining existing order as fallback. */
+export function getInitialMachineId(
+    machines: ReadonlyArray<{ id: string; active: boolean }>,
+): string | null {
+    return machines.find(machine => machine.active)?.id ?? machines[0]?.id ?? null;
+}
+
+/** Resolves a persisted semantic mode key against the current runtime options. */
+export function resolveModeSelection<T extends { key: string }>(
+    options: ReadonlyArray<T>,
+    draftKey: string | null | undefined,
+    defaultKey: string,
+): T | null {
+    if (options.length === 0) {
+        return null;
+    }
+
+    return options.find(option => option.key === draftKey)
+        ?? options.find(option => option.key === defaultKey)
+        ?? options[0];
 }
 
 export function shouldClearSelectedCredential(

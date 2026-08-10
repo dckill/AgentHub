@@ -35,6 +35,14 @@ export function reconcileSessionSnapshot(input: SessionSnapshotInput): SnapshotS
         return Object.values(input.existingSessions);
     }
 
+    // A non-empty server snapshot with no decryptable records is a transport
+    // or key failure, not evidence that every local session was deleted.
+    if (input.rawSessionIds.length > 0
+        && input.decryptedSessions.length === 0
+        && Object.keys(input.existingSessions).length > 0) {
+        return Object.values(input.existingSessions);
+    }
+
     const decryptedById = new Map(input.decryptedSessions.map((session) => [session.id, session]));
     const reconciled: SnapshotSession[] = [];
     for (const sessionId of input.rawSessionIds) {

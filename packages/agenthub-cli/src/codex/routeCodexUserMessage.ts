@@ -16,8 +16,9 @@ export async function routeCodexUserMessage<TMode>(opts: {
     text: string;
     mode: TMode;
     clientUserMessageId?: string | null;
+    forceQueue?: boolean;
 }): Promise<'steered' | 'queued'> {
-    if (opts.client.hasSteerableActiveTurn()) {
+    if (!opts.forceQueue && opts.client.hasSteerableActiveTurn()) {
         const result = await opts.client.steerActiveTurn(opts.text, {
             clientUserMessageId: opts.clientUserMessageId,
         });

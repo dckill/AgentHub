@@ -73,6 +73,16 @@ export const ru: TranslationStructure = {
         close: 'Закрыть',
         backAgainToExit: 'Нажмите «Назад» ещё раз, чтобы выйти из AgentHub',
         unknownError: 'Неизвестная ошибка',
+        attachmentUploadFailedTitle: 'Не удалось загрузить вложение',
+        attachmentUploadFailedMessage: 'Не удалось безопасно загрузить изображение. Содержимое сохранено; проверьте подключение и повторите попытку.',
+        attachmentUploadPartialTitle: 'Некоторые вложения не загружены',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `Не удалось загрузить изображений: ${count}. Остальные вложения и сообщение отправлены.`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `Вложение: ${name}`,
+        sessionControlObserver: 'Только чтение: другой устройство управляет сессией',
+        sessionControlController: 'Это устройство управляет сессией',
+        sessionControlRelease: 'Освободить управление',
+        sessionControlClaim: 'Получить управление',
+        sessionControlClaimFailed: 'Сессией управляет другое устройство',
     },
 
     connect: {
@@ -176,6 +186,13 @@ export const ru: TranslationStructure = {
         },
         alwaysShowContextSize: 'Всегда показывать размер контекста',
         alwaysShowContextSizeDescription: 'Отображать использование контекста даже когда не близко к лимиту',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'Масштаб',
         scalingDescription: 'Настройте размер элементов интерфейса',
@@ -545,6 +562,14 @@ export const ru: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: 'Готовы к программированию?',
@@ -640,6 +665,16 @@ export const ru: TranslationStructure = {
         newSessionPlaceholder: 'Над чем вы хотите поработать?',
         importOfficialTitle: 'Перехват сеанса компьютера',
         importOfficialDescription: 'Импортируем диалог, восстанавливаем контекст и синхронизируем текущее состояние. Сеанс будет недоступен до завершения.',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -906,7 +941,9 @@ export const ru: TranslationStructure = {
         }
     },
 
+    sideChat: { panelTitle: 'Боковые чаты', allFiles: 'Все файлы', newChat: 'Новый боковой чат', startButton: 'Начать боковой чат', creating: 'Создание…', unavailable: 'Эту сессию нельзя разветвить, пока машина отключена или метаданные провайдера недоступны.', emptyTitle: 'Боковых чатов пока нет', emptySubtitle: 'Начните изолированный разговор с сохранением контекста родительской сессии без записи в её историю.', close: 'Закрыть боковой чат', expand: 'Открыть боковой чат на весь экран', defaultTitle: ({ index }: { index: number }) => `Боковой чат ${index}` },
     files: {
+        addPanel: 'Add workbench panel',
         loadFailed: 'Не удалось загрузить изменения. Проверьте подключение и повторите попытку.',
         fileLoadFailed: 'Не удалось загрузить этот файл. Проверьте подключение и повторите попытку.',
         searchFailed: 'Не удалось выполнить поиск файлов. Повторите попытку.',
@@ -1213,6 +1250,16 @@ export const ru: TranslationStructure = {
         offlineHelp: '• Убедитесь, что компьютер online\n• Выполните `agenthub daemon status` для диагностики\n• Используете последнюю версию CLI? Обновите командой `npm install -g @artsum/agenthub@latest`',
         launchNewSessionInDirectory: 'Запустить новую сессию в папке',
         statusAndProperties: 'Статус и свойства',
+        systemResources: 'Системные ресурсы',
+        memory: 'Память',
+        network: 'Сеть',
+        downloadSpeed: 'Загрузка',
+        uploadSpeed: 'Отправка',
+        storage: 'Диски',
+        used: 'Использовано',
+        available: 'Доступно',
+        metricsUnavailable: 'Метрики в реальном времени недоступны',
+        metricsStale: 'Показан последний доступный снимок',
         actions: 'Функции',
         startSessionOnThisMachine: 'Запустить сессию на этом устройстве',
         startSessionOnThisMachineSubtitle: 'Открывает экран новой сессии с выбранным устройством.',

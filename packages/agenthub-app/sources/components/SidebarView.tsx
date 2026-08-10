@@ -13,6 +13,7 @@ import { t } from '@/text';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { isTauri } from '@/utils/isTauri';
 import { getAccessibleActionProps } from './accessibilityProps';
+import { ShortcutHintBadge, useShortcutHints } from './ShortcutHints';
 
 const TAURI_TRAFFIC_LIGHT_WIDTH = 72;
 
@@ -85,6 +86,16 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         height: 44,
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
+    },
+    navButtonShortcutActive: {
+        borderRadius: 8,
+        backgroundColor: theme.colors.surfaceSelected,
+    },
+    navShortcutBadge: {
+        position: 'absolute',
+        right: -7,
+        bottom: -4,
     },
     settingsButton: {
         color: theme.colors.header.tint,
@@ -144,6 +155,7 @@ export const SidebarView = React.memo(() => {
     const headerHeight = useHeaderHeight();
     const socketStatus = useSocketStatus();
     const settings = useSettings();
+    const { visible: shortcutHintsVisible } = useShortcutHints();
 
     // Compute connection status once per render (theme-reactive, no stale memoization)
     const connectionStatus = (() => {
@@ -261,9 +273,10 @@ export const SidebarView = React.memo(() => {
                             {...getAccessibleActionProps(t('settings.title'))}
                             onPress={() => router.push('/settings')}
                             hitSlop={15}
-                            style={styles.navButton}
+                            style={[styles.navButton, shortcutHintsVisible && styles.navButtonShortcutActive]}
                         >
                             <Ionicons name="settings-outline" size={24} color={theme.colors.header.tint} />
+                            <ShortcutHintBadge shortcutKey="," style={styles.navShortcutBadge} />
                         </Pressable>
                     </View>
 

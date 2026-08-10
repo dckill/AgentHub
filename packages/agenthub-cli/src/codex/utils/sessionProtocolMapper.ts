@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { createId } from '@paralleldrive/cuid2';
 import type { ReasoningOutput } from './reasoningProcessor';
 import type { DiffToolCall, DiffToolResult } from './diffProcessor';
-import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope } from '@artsum/agenthub-wire';
+import {
+    createEnvelope,
+    stripLeadingTaskNotificationWrappers,
+    type CreateEnvelopeOptions,
+    type SessionEnvelope,
+} from '@artsum/agenthub-wire';
 import type { Thread, ThreadItem, ThreadTurn } from '../codexAppServerTypes';
 
 export type CodexTurnState = {
@@ -35,6 +40,24 @@ type LegacyToolLikeMessage = {
 
 type TurnEndStatus = 'completed' | 'failed' | 'cancelled';
 
+type CollabTracking = {
+    receiverThreadIdsByCall: Map<string, string[]>;
+    toolByCall: Map<string, string>;
+};
+
+const collabTrackingByProviderMap = new WeakMap<Map<string, string>, CollabTracking>();
+
+function getCollabTracking(providerMap: Map<string, string>): CollabTracking {
+    const existing = collabTrackingByProviderMap.get(providerMap);
+    if (existing) return existing;
+    const created: CollabTracking = {
+        receiverThreadIdsByCall: new Map(),
+        toolByCall: new Map(),
+    };
+    collabTrackingByProviderMap.set(providerMap, created);
+    return created;
+}
+
 function getStartedSubagents(state: CodexTurnState): Set<string> {
     return state.startedSubagents ?? new Set<string>();
 }
@@ -63,14 +86,29 @@ function maybeEmitSubagentStart(
     startedSubagents: Set<string>,
     activeSubagents: Set<string>,
     envelopes: SessionEnvelope[],
+    title?: string,
 ): void {
     if (!subagent || startedSubagents.has(subagent)) {
         return;
     }
 
-    envelopes.push(createEnvelope('agent', { t: 'start' }, { ...opts, subagent }));
+    envelopes.push(createEnvelope('agent', {
+        t: 'start',
+        ...(title ? { title } : {}),
+    }, { ...opts, subagent }));
     startedSubagents.add(subagent);
     activeSubagents.add(subagent);
+}
+
+function maybeEmitSubagentStop(
+    subagent: string | undefined,
+    opts: CreateEnvelopeOptions,
+    activeSubagents: Set<string>,
+    envelopes: SessionEnvelope[],
+): void {
+    if (!subagent || !activeSubagents.has(subagent)) return;
+    envelopes.push(createEnvelope('agent', { t: 'stop' }, { ...opts, subagent }));
+    activeSubagents.delete(subagent);
 }
 
 function emitSubagentStops(
@@ -95,13 +133,48 @@ function buildEnvelopeOptions(currentTurnId: string | null, subagent?: string): 
 }
 
 function pickProviderSubagent(message: Record<string, unknown>): string | undefined {
-    const candidates = [message.subagent, message.parent_call_id, message.parentCallId];
+    const candidates = [
+        message.subagent,
+        message.agent_thread_id,
+        message.agentThreadId,
+        message.parent_call_id,
+        message.parentCallId,
+    ];
     for (const candidate of candidates) {
         if (typeof candidate === 'string' && candidate.length > 0) {
             return candidate;
         }
     }
     return undefined;
+}
+
+function pickString(message: Record<string, unknown>, ...keys: string[]): string | undefined {
+    for (const key of keys) {
+        const value = message[key];
+        if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    }
+    return undefined;
+}
+
+function pickStringArray(message: Record<string, unknown>, ...keys: string[]): string[] {
+    for (const key of keys) {
+        const value = message[key];
+        if (Array.isArray(value)) {
+            return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+        }
+    }
+    return [];
+}
+
+function ensureSessionSubagent(
+    providerId: string,
+    providerMap: Map<string, string>,
+): string {
+    const existing = providerMap.get(providerId);
+    if (existing) return existing;
+    const created = createId();
+    providerMap.set(providerId, created);
+    return created;
 }
 
 function resolveSessionSubagent(
@@ -121,6 +194,11 @@ function resolveSessionSubagent(
     const created = createId();
     providerSubagentToSessionSubagent.set(providerSubagent, created);
     return created;
+}
+
+function visibleCodexMessageText(text: string): string | null {
+    const visible = stripLeadingTaskNotificationWrappers(text);
+    return visible.trim().length > 0 ? visible : null;
 }
 
 function pickCallId(message: Record<string, unknown>): string {
@@ -265,18 +343,22 @@ export function mapCodexThreadItemToSessionEnvelopes(
     switch (item.type) {
         case 'userMessage': {
             const text = textFromInputItems(item.content);
-            return text
-                ? [createEnvelope('user', { t: 'text', text }, {
+            const visibleText = text ? visibleCodexMessageText(text) : null;
+            return visibleText
+                ? [createEnvelope('user', { t: 'text', text: visibleText }, {
                     id: item.id,
+                    codexItemId: item.id,
                     time: startedAt,
                 })]
                 : [];
         }
         case 'agentMessage': {
             const text = typeof item.text === 'string' ? item.text.trim() : '';
-            return text.length > 0
-                ? [createEnvelope('agent', { t: 'text', text }, {
+            const visibleText = visibleCodexMessageText(text);
+            return visibleText
+                ? [createEnvelope('agent', { t: 'text', text: visibleText }, {
                     id: item.id,
+                    codexItemId: item.id,
                     turn: turn.id,
                     time: completedAt,
                 })]
@@ -468,7 +550,9 @@ export function mapCodexMcpMessageToSessionEnvelopes(message: Record<string, unk
         });
         startedSubagents.clear();
         activeSubagents.clear();
-        providerSubagentToSessionSubagent.clear();
+        const tracking = getCollabTracking(providerSubagentToSessionSubagent);
+        tracking.receiverThreadIdsByCall.clear();
+        tracking.toolByCall.clear();
         return {
             currentTurnId: turnId,
             finalAnswerMessageId: null,
@@ -502,7 +586,9 @@ export function mapCodexMcpMessageToSessionEnvelopes(message: Record<string, unk
         }
         const lifecycleOpts = { turn: turnId } satisfies CreateEnvelopeOptions;
         const status = pickTurnEndStatus(message, type);
-        providerSubagentToSessionSubagent.clear();
+        const tracking = getCollabTracking(providerSubagentToSessionSubagent);
+        tracking.receiverThreadIdsByCall.clear();
+        tracking.toolByCall.clear();
         return {
             currentTurnId: null,
             finalAnswerMessageId: null,
@@ -532,6 +618,139 @@ export function mapCodexMcpMessageToSessionEnvelopes(message: Record<string, unk
         };
     }
 
+    if (type === 'collab_agent_begin' || type === 'collab_agent_end') {
+        const call = pickCallId(message);
+        const tracking = getCollabTracking(providerSubagentToSessionSubagent);
+        const payloadReceivers = pickStringArray(message, 'receiver_thread_ids', 'receiverThreadIds');
+        const receivers = payloadReceivers.length > 0
+            ? payloadReceivers
+            : (tracking.receiverThreadIdsByCall.get(call) ?? []);
+        const payloadTool = pickString(message, 'tool');
+        const tool = payloadTool ?? tracking.toolByCall.get(call) ?? 'subagent';
+        const prompt = pickString(message, 'prompt');
+        const model = pickString(message, 'model');
+        const status = pickString(message, 'status');
+        const sessionSubagents = receivers.map((receiver) => (
+            ensureSessionSubagent(receiver, providerSubagentToSessionSubagent)
+        ));
+        const lifecycleOpts = buildEnvelopeOptions(state.currentTurnId);
+        const envelopes: SessionEnvelope[] = [];
+
+        if (type === 'collab_agent_begin') {
+            tracking.receiverThreadIdsByCall.set(call, receivers);
+            tracking.toolByCall.set(call, tool);
+            const primary = sessionSubagents[0];
+            const title = prompt ?? (tool === 'spawnAgent' ? 'Spawn Codex subagent' : `Codex subagent: ${tool}`);
+            envelopes.push(createEnvelope('agent', {
+                t: 'tool-call-start',
+                call,
+                name: 'CodexSubagent',
+                title,
+                description: title,
+                args: {
+                    ...(prompt ? { prompt } : {}),
+                    ...(model ? { model } : {}),
+                    ...(status ? { status } : {}),
+                    ...(primary ? { sessionSubagent: primary } : {}),
+                    sessionSubagents,
+                    agentStates: [],
+                },
+            }, { ...lifecycleOpts, id: `${call}:start` }));
+            for (let index = 0; index < sessionSubagents.length; index += 1) {
+                maybeEmitSubagentStart(
+                    sessionSubagents[index],
+                    lifecycleOpts,
+                    startedSubagents,
+                    activeSubagents,
+                    envelopes,
+                    prompt,
+                );
+            }
+        } else {
+            const rawStates = message.agents_states ?? message.agentsStates;
+            const terminalSubagents = new Set<string>();
+            if (rawStates && typeof rawStates === 'object' && !Array.isArray(rawStates)) {
+                for (const [providerId, rawState] of Object.entries(rawStates as Record<string, unknown>)) {
+                    if (!rawState || typeof rawState !== 'object' || Array.isArray(rawState)) continue;
+                    const stateRecord = rawState as Record<string, unknown>;
+                    const subagent = ensureSessionSubagent(providerId, providerSubagentToSessionSubagent);
+                    const childStatus = pickString(stateRecord, 'status');
+                    const childMessage = pickString(stateRecord, 'message');
+                    if (childStatus === 'completed' || childStatus === 'failed'
+                        || childStatus === 'cancelled' || childStatus === 'canceled'
+                        || childStatus === 'interrupted' || childStatus === 'closed') {
+                        terminalSubagents.add(subagent);
+                    }
+                    const text = `Codex subagent${childStatus ? ` ${childStatus}` : ''}${childMessage ? `: ${childMessage}` : ''}`;
+                    envelopes.push(createEnvelope('agent', { t: 'service', text }, {
+                        ...lifecycleOpts,
+                        subagent,
+                    }));
+                }
+            }
+            if (tool === 'closeAgent') {
+                sessionSubagents.forEach((subagent) => terminalSubagents.add(subagent));
+            }
+            for (const subagent of terminalSubagents) {
+                maybeEmitSubagentStop(subagent, lifecycleOpts, activeSubagents, envelopes);
+            }
+            envelopes.push(createEnvelope('agent', {
+                t: 'tool-call-end',
+                call,
+                ...(status === 'failed' ? { isError: true } : {}),
+            }, { ...lifecycleOpts, id: `${call}:end` }));
+            tracking.receiverThreadIdsByCall.delete(call);
+            tracking.toolByCall.delete(call);
+        }
+
+        return {
+            currentTurnId: state.currentTurnId,
+            finalAnswerMessageId: state.finalAnswerMessageId,
+            startedSubagents,
+            activeSubagents,
+            providerSubagentToSessionSubagent,
+            envelopes,
+        };
+    }
+
+    if (type === 'subagent_activity') {
+        const subagent = resolveSessionSubagent(message, providerSubagentToSessionSubagent);
+        if (!subagent) {
+            return {
+                currentTurnId: state.currentTurnId,
+                startedSubagents,
+                activeSubagents,
+                providerSubagentToSessionSubagent,
+                envelopes: [],
+            };
+        }
+        const kind = pickString(message, 'kind');
+        const path = pickString(message, 'agent_path', 'agentPath');
+        const opts = buildEnvelopeOptions(state.currentTurnId, subagent);
+        const envelopes: SessionEnvelope[] = [];
+        if (kind === 'started') {
+            maybeEmitSubagentStart(subagent, opts, startedSubagents, activeSubagents, envelopes, path);
+            envelopes.push(createEnvelope('agent', {
+                t: 'service',
+                text: path ? `Codex subagent started: ${path}` : 'Codex subagent started',
+            }, opts));
+        } else if (kind === 'interrupted' || kind === 'completed' || kind === 'failed') {
+            envelopes.push(createEnvelope('agent', {
+                t: 'service',
+                text: `Codex subagent ${kind}`,
+            }, opts));
+            maybeEmitSubagentStop(subagent, opts, activeSubagents, envelopes);
+        }
+        return {
+            currentTurnId: state.currentTurnId,
+            finalAnswerMessageId: state.finalAnswerMessageId,
+            startedSubagents,
+            activeSubagents,
+            providerSubagentToSessionSubagent,
+            envelopes,
+        };
+    }
+
     const subagent = resolveSessionSubagent(message, providerSubagentToSessionSubagent);
     const opts = buildEnvelopeOptions(state.currentTurnId, subagent);
 
@@ -546,10 +765,22 @@ export function mapCodexMcpMessageToSessionEnvelopes(message: Record<string, unk
             };
         }
 
+        const visibleText = visibleCodexMessageText(message.message);
+        if (!visibleText) {
+            return {
+                currentTurnId: state.currentTurnId,
+                finalAnswerMessageId: state.finalAnswerMessageId,
+                startedSubagents,
+                activeSubagents,
+                providerSubagentToSessionSubagent,
+                envelopes: [],
+            };
+        }
+
         const envelopes: SessionEnvelope[] = [];
         maybeEmitSubagentStart(subagent, opts, startedSubagents, activeSubagents, envelopes);
         const itemId = providerItemId(message);
-        const textEnvelope = createEnvelope('agent', { t: 'text', text: message.message }, {
+        const textEnvelope = createEnvelope('agent', { t: 'text', text: visibleText }, {
             ...opts,
             ...(itemId ? { id: itemId } : {}),
         });
@@ -709,13 +940,17 @@ export function closeCodexTurnWithStatus(
     state: CodexTurnState,
     status: TurnEndStatus = 'cancelled',
 ): CodexMapperResult {
-    return mapCodexMcpMessageToSessionEnvelopes(
+    const result = mapCodexMcpMessageToSessionEnvelopes(
         {
             type: status === 'completed' ? 'task_complete' : 'turn_aborted',
             status,
         },
         state,
     );
+    // Runner shutdown is terminal for the session; unlike a normal turn end,
+    // no later turn can reuse provider identities.
+    result.providerSubagentToSessionSubagent.clear();
+    return result;
 }
 
 export function mapCodexProcessorMessageToSessionEnvelopes(

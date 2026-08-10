@@ -5,6 +5,8 @@ import {
     getDirectoryBrowserRootPath,
     type DirectoryTreeSourceDescriptor,
 } from '@/utils/directoryTreeSource';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 // Extended tree node with lazy-loaded children state
 export type LocalTreeNode = {
@@ -107,21 +109,32 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
             return;
         }
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled && generation !== null && sync.getAccountGeneration() === generation;
 
         const load = async () => {
+            if (!isCurrent()) return;
             setIsLoading(true);
             setError(null);
             try {
-                const available = await source.isMethodAvailable('getDirectoryTree');
+                const available = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => source.isMethodAvailable('getDirectoryTree'),
+                });
+                if (available === null) return;
                 if (!available) {
-                    if (!cancelled) {
+                    if (isCurrent()) {
                         setTree([]);
                         setError(getUnavailableDirectoryRpcMessage(descriptor.kind));
                     }
                     return;
                 }
-                const result = await source.getDirectoryTree(effectiveRootPath, 1);
-                if (!cancelled) {
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => source.getDirectoryTree(effectiveRootPath, 1),
+                });
+                if (result === null) return;
+                if (isCurrent()) {
                     if (result.success && result.tree) {
                         const localChildren = sortLocalTree(
                             (result.tree.children ?? []).map(toLocalTreeNode),
@@ -132,11 +145,11 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
                     }
                 }
             } catch (e) {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setError(e instanceof Error ? e.message : 'Unknown error');
                 }
             } finally {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setIsLoading(false);
                 }
             }
@@ -147,6 +160,9 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
     }, [descriptor.kind, effectiveRootPath, source]);
 
     const toggleNode = React.useCallback(async (path: string) => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         setExpanded((prev) => {
             const next = new Set(prev);
             if (next.has(path)) {
@@ -160,6 +176,7 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
         // If expanding and children not yet loaded, fetch them
         // Use a ref-like approach to get current state inside callback
         setTree((currentTree) => {
+            if (!isCurrent()) return currentTree;
             const node = findNodeByPath(currentTree, path);
 
             if (node && !node.childrenLoaded) {
@@ -167,13 +184,20 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
 
                 (async () => {
                     try {
-                        const available = await source.isMethodAvailable('listDirectory');
+                        const available = await runSessionActionRequest({
+                            isCurrent,
+                            request: () => source.isMethodAvailable('listDirectory'),
+                        });
+                        if (available === null) return;
                         if (!available) {
-                            setError(getUnavailableDirectoryRpcMessage(descriptor.kind));
+                            if (isCurrent()) setError(getUnavailableDirectoryRpcMessage(descriptor.kind));
                             return;
                         }
-                        const result = await source.listDirectory(path);
-                        if (result.success && result.entries) {
+                        const result = await runSessionActionRequest({
+                            isCurrent,
+                            request: () => source.listDirectory(path),
+                        });
+                        if (result !== null && isCurrent() && result.success && result.entries) {
                             const children: LocalTreeNode[] = result.entries.map((entry) => ({
                                 name: entry.name,
                                 path: `${path}/${entry.name}`,
@@ -200,6 +224,9 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
     }, [descriptor.kind, source]);
 
     const refresh = React.useCallback(() => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        if (!isCurrent()) return;
         setExpanded(new Set());
         setTree([]);
         if (!effectiveRootPath) {
@@ -209,24 +236,35 @@ export function useDirectoryTree(sourceDescriptor: DirectoryTreeSourceDescriptor
         setIsLoading(true);
 
         const load = async () => {
+            if (!isCurrent()) return;
             setError(null);
             try {
-                const available = await source.isMethodAvailable('getDirectoryTree');
+                const available = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => source.isMethodAvailable('getDirectoryTree'),
+                });
+                if (available === null) return;
                 if (!available) {
-                    setError(getUnavailableDirectoryRpcMessage(descriptor.kind));
-                    setTree([]);
+                    if (isCurrent()) {
+                        setError(getUnavailableDirectoryRpcMessage(descriptor.kind));
+                        setTree([]);
+                    }
                     return;
                 }
-                const result = await source.getDirectoryTree(effectiveRootPath, 1);
+                const result = await runSessionActionRequest({
+                    isCurrent,
+                    request: () => source.getDirectoryTree(effectiveRootPath, 1),
+                });
+                if (result === null || !isCurrent()) return;
                 if (result.success && result.tree) {
                     setTree(sortLocalTree((result.tree.children ?? []).map(toLocalTreeNode)));
                 } else {
                     setError(result.error ?? 'Failed to load directory');
                 }
             } catch (e) {
-                setError(e instanceof Error ? e.message : 'Unknown error');
+                if (isCurrent()) setError(e instanceof Error ? e.message : 'Unknown error');
             } finally {
-                setIsLoading(false);
+                if (isCurrent()) setIsLoading(false);
             }
         };
         load();

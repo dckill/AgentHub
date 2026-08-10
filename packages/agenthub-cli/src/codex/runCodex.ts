@@ -48,13 +48,26 @@ import {
 } from './codexGoalStatus';
 import { routeCodexUserMessage } from './routeCodexUserMessage';
 import { createRunnerShutdownCoordinator, type RunnerShutdownCoordinator } from '@/sessionProtocol/RunnerShutdownCoordinator';
-import { registerRunnerSignalHandlers } from '@/sessionProtocol/processSignalHandlers';
+import { registerRunnerFatalHandlers, registerRunnerSignalHandlers } from '@/sessionProtocol/processSignalHandlers';
 import { createEnvelope, type SessionEnvelope } from '@artsum/agenthub-wire';
+import { enqueueCodexUserText, isCodexClearText } from './codexClearCommand';
+import { prepareCodexInlineImageInputs, type InlineImage } from './utils/imageInput';
 
-export function buildCodexTurnPrompt(message: string, shouldRequestTitleUpdate: boolean): string {
-    return shouldRequestTitleUpdate
-        ? message + '\n\n' + CHANGE_TITLE_INSTRUCTION
-        : message;
+export function buildCodexTurnPrompt(opts: {
+    message: string;
+    appendSystemPrompt?: string;
+    includeAppendSystemPrompt: boolean;
+    includeTitleInstruction: boolean;
+}): string {
+    const parts: string[] = [];
+    if (opts.includeAppendSystemPrompt && opts.appendSystemPrompt) {
+        parts.push(opts.appendSystemPrompt);
+    }
+    parts.push(opts.message);
+    if (opts.includeTitleInstruction) {
+        parts.push(CHANGE_TITLE_INSTRUCTION);
+    }
+    return parts.join('\n\n');
 }
 
 export function buildCodexMessageModeHash(mode: {
@@ -62,12 +75,20 @@ export function buildCodexMessageModeHash(mode: {
     model?: string;
     effort?: string;
     clientUserMessageId?: string;
+    appendSystemPrompt?: string;
+    images?: InlineImage[];
 }): string {
     return hashObject({
         permissionMode: mode.permissionMode,
         model: mode.model,
         effort: mode.effort,
         clientUserMessageId: mode.clientUserMessageId,
+        appendSystemPrompt: mode.appendSystemPrompt,
+        images: mode.images?.map((image) => ({
+            mimeType: image.mimeType,
+            length: image.data.length,
+            prefix: image.data.slice(0, 24),
+        })),
     });
 }
 
@@ -124,6 +145,8 @@ export async function runCodex(opts: {
         model?: string;
         effort?: string;
         clientUserMessageId?: string;
+        appendSystemPrompt?: string;
+        images?: InlineImage[];
     }
 
     //
@@ -163,6 +186,7 @@ export async function runCodex(opts: {
 
     const forkedFromSessionId = process.env.AGENTHUB_FORKED_FROM_SESSION_ID;
     const forkedFromMessageId = process.env.AGENTHUB_FORKED_FROM_MESSAGE_ID;
+    const isSideChat = process.env.AGENTHUB_SIDE_CHAT === '1';
 
     const { state, metadata } = createSessionMetadata({
         flavor: 'codex',
@@ -171,6 +195,7 @@ export async function runCodex(opts: {
         sandbox: sandboxConfig,
         ...(forkedFromSessionId ? { parentSessionId: forkedFromSessionId } : {}),
         ...(forkedFromMessageId ? { forkedFromMessageId } : {}),
+        ...(isSideChat ? { isSideChat: true } : {}),
     });
     const skillCommands = await discoverCodexSkillCommands();
     if (skillCommands.length > 0) {
@@ -267,6 +292,7 @@ export async function runCodex(opts: {
     let currentPermissionMode: import('@/api/types').PermissionMode | undefined = opts.initialPermissionMode;
     let currentModel: string | undefined = opts.initialModel;
     let currentEffort: string | undefined;
+    let currentAppendSystemPrompt: string | undefined;
 
     // Valid Codex permission modes from remote messages. Matches the modes
     // the mobile UI exposes for Codex sessions (see modelModeOptions.ts:
@@ -297,13 +323,16 @@ export async function runCodex(opts: {
     };
 
     session.onUserMessage((message) => {
-        session.recordLastUserMessageTitle(message);
-        rememberCodexEnvelope(createEnvelope('user', {
-            t: 'text',
-            text: message.content.text,
-        }, {
-            id: message.localKey,
-        }));
+        const isClearCommand = isCodexClearText(message.content.text);
+        if (!isClearCommand) {
+            session.recordLastUserMessageTitle(message);
+            rememberCodexEnvelope(createEnvelope('user', {
+                t: 'text',
+                text: message.content.text,
+            }, {
+                id: message.localKey,
+            }));
+        }
 
         // Resolve permission mode (validate against Codex-native modes)
         let messagePermissionMode = currentPermissionMode;
@@ -337,12 +366,29 @@ export async function runCodex(opts: {
             logger.debug(`[Codex] Reasoning effort updated from user message: ${messageEffort || 'reset to default'}`);
         }
 
+        let messageAppendSystemPrompt = currentAppendSystemPrompt;
+        if (message.meta?.hasOwnProperty('appendSystemPrompt')) {
+            messageAppendSystemPrompt = message.meta.appendSystemPrompt || undefined;
+            currentAppendSystemPrompt = messageAppendSystemPrompt;
+        }
+
         const enhancedMode: EnhancedMode = {
             permissionMode: messagePermissionMode || 'default',
             model: messageModel,
             effort: messageEffort,
             clientUserMessageId: message.localKey,
+            appendSystemPrompt: messageAppendSystemPrompt,
+            images: message.meta?.images,
         };
+        if (isClearCommand) {
+            enqueueCodexUserText({
+                text: message.content.text,
+                mode: enhancedMode,
+                queue: messageQueue,
+            });
+            void handleAbort();
+            return;
+        }
         if (!client) {
             messageQueue.push(message.content.text, enhancedMode);
             return;
@@ -354,6 +400,7 @@ export async function runCodex(opts: {
             text: message.content.text,
             mode: enhancedMode,
             clientUserMessageId: message.localKey,
+            forceQueue: Boolean(enhancedMode.images?.length),
         }).catch((error) => {
             logger.debug('[Codex] Failed to route user message through active turn steering; queueing as next turn', error);
             messageQueue.push(message.content.text, enhancedMode);
@@ -402,7 +449,9 @@ export async function runCodex(opts: {
         try {
             const kinds = handles.map((h: any) => (h && h.constructor ? h.constructor.name : typeof h));
             logger.debug(`[codex][handles] kinds=${JSON.stringify(kinds)}`);
-        } catch { }
+        } catch {
+            // Best effort debug inspection; failure to enumerate handles must not affect the session.
+        }
     }
 
     //
@@ -453,7 +502,7 @@ export async function runCodex(opts: {
     };
 
     let shutdownCoordinator: RunnerShutdownCoordinator | null = null;
-    let disposeRunnerSignalHandlers = () => {};
+    let disposeRunnerProcessHandlers = () => {};
     const closeSessionAndBackend = async (
         archiveReason: string,
         turnStatus: 'completed' | 'failed' | 'cancelled' = 'cancelled',
@@ -485,7 +534,7 @@ export async function runCodex(opts: {
             flush: () => session.flush(),
             closeSession: () => session.close(),
             cleanupLocalResources: async () => {
-                disposeRunnerSignalHandlers();
+                disposeRunnerProcessHandlers();
                 try { permissionHandler?.reset(); } catch (error) { logger.debug('[Codex] permission cleanup failed', error); }
                 try { reasoningProcessor?.abort(); } catch (error) { logger.debug('[Codex] reasoning cleanup failed', error); }
                 try { diffProcessor?.reset(); } catch (error) { logger.debug('[Codex] diff cleanup failed', error); }
@@ -505,8 +554,13 @@ export async function runCodex(opts: {
         shouldExit = true;
         messageQueue.close();
         abortController.abort();
-        await closeSessionAndBackend(archiveReason, turnStatus);
-        process.exit(exitCode);
+        try {
+            await closeSessionAndBackend(archiveReason, turnStatus);
+        } catch (error) {
+            logger.debug('[Codex] Shutdown cleanup failed:', error);
+        } finally {
+            process.exit(exitCode);
+        }
     };
 
     /**
@@ -579,10 +633,24 @@ export async function runCodex(opts: {
         void requestProcessShutdown('Archive requested remotely', 0);
     });
 
-    disposeRunnerSignalHandlers = registerRunnerSignalHandlers({
+    const disposeSignalHandlers = registerRunnerSignalHandlers({
         onSigterm: () => requestProcessShutdown('Received SIGTERM', 0),
         onSigint: () => requestProcessShutdown('Received SIGINT', 0),
     });
+    const disposeFatalHandlers = registerRunnerFatalHandlers({
+        onUncaughtException: (error) => {
+            logger.debug('[Codex] Uncaught exception:', error);
+            return requestProcessShutdown('Codex runner uncaught exception', 1, 'failed');
+        },
+        onUnhandledRejection: (reason) => {
+            logger.debug('[Codex] Unhandled rejection:', reason);
+            return requestProcessShutdown('Codex runner unhandled rejection', 1, 'failed');
+        },
+    });
+    disposeRunnerProcessHandlers = () => {
+        disposeSignalHandlers();
+        disposeFatalHandlers();
+    };
 
     //
     // Initialize Ink UI
@@ -648,6 +716,8 @@ export async function runCodex(opts: {
             });
         },
     });
+    // Clear approvals orphaned by an earlier runner before accepting turns.
+    permissionHandler.reset('Previous CLI process exited before responding');
     reasoningProcessor = new ReasoningProcessor((message) => {
         const envelopes = mapCodexProcessorMessageToSessionEnvelopes(message, { currentTurnId });
         for (const envelope of envelopes) {
@@ -884,6 +954,7 @@ export async function runCodex(opts: {
         }
     } as const;
     let shouldRequestTitleUpdate = true;
+    let appendSystemPromptInjected = false;
     let officialThreadSyncThreadId: string | null = null;
 
     const startOfficialThreadSync = async (threadId: string, logPrefix: string) => {
@@ -908,6 +979,7 @@ export async function runCodex(opts: {
             threadId,
             seenEnvelopeIds: seenCodexEnvelopeIds,
             seenEnvelopes: observedCodexEnvelopes.values(),
+            skipInitialHistory: isSideChat,
         });
         await officialThreadSync.poll();
         officialThreadSyncInterval = setInterval(() => {
@@ -916,6 +988,15 @@ export async function runCodex(opts: {
             });
         }, 2000);
         logger.debug(`[${logPrefix}] Synced envelopes from official thread ${threadId}`);
+    };
+
+    const stopOfficialThreadSync = () => {
+        if (officialThreadSyncInterval) {
+            clearInterval(officialThreadSyncInterval);
+            officialThreadSyncInterval = null;
+        }
+        officialThreadSync = null;
+        officialThreadSyncThreadId = null;
     };
 
     try {
@@ -983,6 +1064,7 @@ export async function runCodex(opts: {
                         threadId: forkCodexThreadId,
                         cwd: process.cwd(),
                         mcpServers,
+                        announce: !isSideChat,
                     });
                     syncThreadId = resumedThread.threadId;
                 } else {
@@ -1023,6 +1105,38 @@ export async function runCodex(opts: {
             // Defensive check for TS narrowing
             if (!message) {
                 break;
+            }
+
+            if (isCodexClearText(message.message)) {
+                logger.debug('[Codex] Handling /clear command locally');
+                closeActiveCodexTurn('cancelled');
+                client.clearThreadState();
+                stopOfficialThreadSync();
+                pendingMirrorCodexThreadId = null;
+                codexFinalAnswerMessageId = null;
+                codexStartedSubagents = new Set<string>();
+                codexActiveSubagents = new Set<string>();
+                codexProviderSubagentToSessionSubagent = new Map<string, string>();
+                permissionHandler.reset('Codex context cleared');
+                reasoningProcessor.abort();
+                diffProcessor?.reset();
+                appendSystemPromptInjected = false;
+                thinking = false;
+                session.keepAlive(false, 'remote');
+                session.updateMetadata((currentMetadata) => {
+                    const nextMetadata = { ...currentMetadata };
+                    delete nextMetadata.codexThreadId;
+                    return nextMetadata;
+                });
+                messageBuffer.addMessage('Context was reset', 'status');
+                session.sendSessionEvent({ type: 'message', message: 'Context was reset' });
+                emitReadyIfIdle({
+                    pending,
+                    queueSize: () => messageQueue.size(),
+                    shouldExit,
+                    sendReady,
+                });
+                continue;
             }
 
             // Display user messages in the UI
@@ -1076,7 +1190,25 @@ export async function runCodex(opts: {
                     continue;
                 }
 
-                const turnPrompt = buildCodexTurnPrompt(message.message, shouldRequestTitleUpdate);
+                const includeAppendSystemPrompt = Boolean(
+                    message.mode.appendSystemPrompt && !appendSystemPromptInjected,
+                );
+                const imageInputs = await prepareCodexInlineImageInputs(message.mode.images, {
+                    sessionId: session.sessionId,
+                });
+                if (message.mode.images?.length && imageInputs.inputItems.length === 0 && !message.message.trim()) {
+                    session.sendSessionEvent({
+                        type: 'message',
+                        message: 'No supported images were available to send to Codex.',
+                    });
+                    continue;
+                }
+                const turnPrompt = buildCodexTurnPrompt({
+                    message: message.message,
+                    appendSystemPrompt: message.mode.appendSystemPrompt,
+                    includeAppendSystemPrompt,
+                    includeTitleInstruction: shouldRequestTitleUpdate,
+                });
 
                 const result = await client.sendTurnAndWait(turnPrompt, {
                     clientUserMessageId: message.mode.clientUserMessageId,
@@ -1084,8 +1216,12 @@ export async function runCodex(opts: {
                     effort: message.mode.effort,
                     approvalPolicy: executionPolicy.approvalPolicy,
                     sandbox: executionPolicy.sandbox,
+                    extraInputItems: imageInputs.inputItems,
                 });
                 shouldRequestTitleUpdate = false;
+                if (includeAppendSystemPrompt) {
+                    appendSystemPromptInjected = true;
+                }
 
                 if (result.aborted) {
                     // Turn was aborted (user abort or permission cancel).
@@ -1139,12 +1275,16 @@ export async function runCodex(opts: {
         // Clean up ink UI
         if (process.stdin.isTTY) {
             logger.debug('[codex]: setRawMode(false)');
-            try { process.stdin.setRawMode(false); } catch { }
+            try { process.stdin.setRawMode(false); } catch {
+                // Best effort terminal cleanup; the session has already been closed.
+            }
         }
         // Stop reading from stdin so the process can exit
         if (hasTTY) {
             logger.debug('[codex]: stdin.pause()');
-            try { process.stdin.pause(); } catch { }
+            try { process.stdin.pause(); } catch {
+                // Best effort terminal cleanup; stdin may already be closed by the host.
+            }
         }
         // Clear periodic keep-alive to avoid keeping event loop alive
         logger.debug('[codex]: clearInterval(keepAlive)');

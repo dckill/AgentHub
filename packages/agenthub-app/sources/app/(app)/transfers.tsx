@@ -39,6 +39,8 @@ import {
 import { getAmberRaisedButtonVisuals } from '@/components/amberVisuals';
 import { getDirectoryLabelFromSafUri } from '@/utils/downloadDirectoryPrompt';
 import { t, type TranslationKey } from '@/text';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 type StatusFilter = FileTransferStatus | 'active' | null;
 
@@ -118,7 +120,10 @@ async function startAndroidIntentSequence(intents: AndroidIntentSpec[]): Promise
     throw new Error(t('transferManager.noFileHandler'));
 }
 
-async function openLocalFile(task: FileTransferTask) {
+async function openLocalFile(task: FileTransferTask, isCurrent: () => boolean = () => true) {
+    if (!isCurrent()) {
+        return;
+    }
     if (!task.localUri) {
         Modal.alert(t('transferManager.fileNotDownloaded'));
         return;
@@ -126,6 +131,9 @@ async function openLocalFile(task: FileTransferTask) {
     try {
         if (Platform.OS === 'android') {
             const openUri = await toAndroidReadableUri(task.localUri);
+            if (!isCurrent()) {
+                return;
+            }
             await startAndroidIntentSequence(buildAndroidFileOpenIntents({
                 fileName: task.fileName,
                 uri: openUri,
@@ -134,11 +142,17 @@ async function openLocalFile(task: FileTransferTask) {
         }
         await Linking.openURL(task.localUri);
     } catch (error) {
+        if (!isCurrent()) {
+            return;
+        }
         Modal.alert(t('transferManager.cannotOpenFile'), error instanceof Error ? error.message : t('transferManager.unknownError'));
     }
 }
 
-async function openDirectory(directoryUri: string | undefined) {
+async function openDirectory(directoryUri: string | undefined, isCurrent: () => boolean = () => true) {
+    if (!isCurrent()) {
+        return;
+    }
     if (!directoryUri) {
         Modal.alert(t('transferManager.directoryUnavailable'));
         return;
@@ -158,6 +172,9 @@ async function openDirectory(directoryUri: string | undefined) {
         }
         await Linking.openURL(directoryUri);
     } catch (error) {
+        if (!isCurrent()) {
+            return;
+        }
         Modal.alert(t('transferManager.cannotOpenDirectory'), error instanceof Error ? error.message : t('transferManager.noDirectoryHandler'));
     }
 }
@@ -203,6 +220,7 @@ function TransferTaskRow({
     onResume,
     onCancel,
     onRemove,
+    onOpenFile,
     showDivider,
 }: {
     task: FileTransferTask;
@@ -212,6 +230,7 @@ function TransferTaskRow({
     onResume: () => void;
     onCancel: () => void;
     onRemove: () => void;
+    onOpenFile: () => void;
     showDivider?: boolean;
 }) {
     const { theme } = useUnistyles();
@@ -243,7 +262,7 @@ function TransferTaskRow({
             return <IconButton name="play-outline" accessibilityLabel={t('transferManager.resumeDownload')} color={theme.colors.accent} onPress={onResume} />;
         }
         if (task.status === 'completed') {
-            return <IconButton name="open-outline" accessibilityLabel={t('transferManager.openFile')} color={theme.colors.accent} onPress={() => openLocalFile(task)} />;
+            return <IconButton name="open-outline" accessibilityLabel={t('transferManager.openFile')} color={theme.colors.accent} onPress={onOpenFile} />;
         }
         return null;
     })();
@@ -792,6 +811,8 @@ export default function TransfersScreen() {
         : t('transferManager.title');
 
     const showTaskDetail = React.useCallback((task: FileTransferTask) => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         Modal.show({
             component: TransferTaskDetailModal,
             frame: false,
@@ -799,8 +820,8 @@ export default function TransfersScreen() {
             props: {
                 task,
                 machineName: getMachineName(machineMap.get(task.machineId), task.machineId),
-                onOpenFile: () => openLocalFile(task),
-                onOpenDirectory: () => openDirectory(getTaskDirectoryUri(task)),
+                onOpenFile: () => openLocalFile(task, isCurrent),
+                onOpenDirectory: () => openDirectory(getTaskDirectoryUri(task), isCurrent),
             },
         });
     }, [machineMap]);
@@ -815,8 +836,10 @@ export default function TransfersScreen() {
     }, [params.taskId, showTaskDetail, tasks]);
 
     const openDefaultDirectory = React.useCallback(() => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         const directoryUri = settings.downloadDirectoryUri || getPrivateDownloadRootUri();
-        openDirectory(directoryUri);
+        void openDirectory(directoryUri, isCurrent);
     }, [settings.downloadDirectoryUri]);
 
     const showDownloadDirectory = React.useCallback(() => {
@@ -829,6 +852,8 @@ export default function TransfersScreen() {
     }, [settings]);
 
     const chooseDownloadDirectory = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         if (Platform.OS !== 'android') {
             Modal.alert(t('transferManager.unsupportedDirectoryTitle'), t('transferManager.unsupportedDirectoryMessage'));
             return;
@@ -836,25 +861,42 @@ export default function TransfersScreen() {
 
         try {
             const initialUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
-            const result = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri),
+            });
+            if (!result) {
+                return;
+            }
             if (!result.granted) {
                 return;
             }
             const label = getDirectoryLabelFromSafUri(result.directoryUri);
+            if (!isCurrent()) {
+                return;
+            }
             setDownloadDirectory({
                 downloadDirectoryUri: result.directoryUri,
                 downloadDirectoryLabel: label,
             });
             Modal.alert(t('transferManager.locationUpdated'), t('transferManager.locationUpdatedMessage', { label }));
         } catch (error) {
+            if (!isCurrent()) {
+                return;
+            }
             Modal.alert(t('transferManager.cannotSetDirectory'), error instanceof Error ? error.message : t('transferManager.unknownError'));
         }
     }, [setDownloadDirectory]);
 
     const resetDownloadDirectory = React.useCallback(async () => {
-        const confirmed = await Modal.confirm(t('transferManager.restorePrivateTitle'), t('transferManager.restorePrivateMessage'), {
-            cancelText: t('common.cancel'),
-            confirmText: t('transferManager.restore'),
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(t('transferManager.restorePrivateTitle'), t('transferManager.restorePrivateMessage'), {
+                cancelText: t('common.cancel'),
+                confirmText: t('transferManager.restore'),
+            }),
         });
         if (confirmed) {
             setDownloadDirectory({});
@@ -863,39 +905,49 @@ export default function TransfersScreen() {
 
     const completedTaskIds = React.useMemo(() => getCompletedTransferTaskIds(tasks, currentFilter), [currentFilter, tasks]);
     const handleClearCompleted = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
         const count = completedTaskIds.length;
         if (count === 0) {
             Modal.alert(t('transferManager.nothingToClear'));
             return;
         }
-        const confirmed = await Modal.confirm(
-            t('transferManager.clearCompletedTitle'),
-            t('transferManager.clearCompletedMessage', { count }),
-            {
-                cancelText: t('common.cancel'),
-                confirmText: t('transferManager.clear'),
-                destructive: true,
-            },
-        );
+        const confirmed = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.confirm(
+                t('transferManager.clearCompletedTitle'),
+                t('transferManager.clearCompletedMessage', { count }),
+                {
+                    cancelText: t('common.cancel'),
+                    confirmText: t('transferManager.clear'),
+                    destructive: true,
+                },
+            ),
+        });
         if (confirmed) {
             clearCompletedTasks(currentFilter);
         }
     }, [clearCompletedTasks, completedTaskIds.length, currentFilter]);
 
     const handleRemoveTask = React.useCallback(async (task: FileTransferTask) => {
-        const decision = await new Promise<RemoveTransferDecision>((resolve) => {
-            Modal.show({
-                component: RemoveTransferModal,
-                frame: false,
-                accessibilityLabel: t('transferManager.removeTitle'),
-                props: {
-                    task,
-                    defaultDeleteLocalFile: settings.deleteLocalFileOnRemove === true,
-                    onResolve: resolve,
-                },
-            });
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const decision = await runSessionActionRequest({
+            isCurrent,
+            request: () => new Promise<RemoveTransferDecision>((resolve) => {
+                Modal.show({
+                    component: RemoveTransferModal,
+                    frame: false,
+                    accessibilityLabel: t('transferManager.removeTitle'),
+                    props: {
+                        task,
+                        defaultDeleteLocalFile: settings.deleteLocalFileOnRemove === true,
+                        onResolve: resolve,
+                    },
+                });
+            }),
         });
-        if (!decision.confirmed) {
+        if (!decision?.confirmed || !isCurrent()) {
             return;
         }
 
@@ -904,8 +956,17 @@ export default function TransfersScreen() {
         }
 
         try {
-            await removeTask(task.id, { deleteLocalFile: decision.deleteLocalFile });
+            const result = await runSessionActionRequest({
+                isCurrent,
+                request: () => removeTask(task.id, { deleteLocalFile: decision.deleteLocalFile }),
+            });
+            if (result === null) {
+                return;
+            }
         } catch (error) {
+            if (!isCurrent()) {
+                return;
+            }
             Modal.alert(t('transferManager.deleteLocalFailed'), error instanceof Error ? error.message : t('transferManager.unknownError'));
         }
     }, [removeTask, setDeleteLocalFileOnRemove, settings.deleteLocalFileOnRemove]);
@@ -1009,25 +1070,33 @@ export default function TransfersScreen() {
                             showChevron={false}
                         />
                     ) : (
-                        filteredTasks.map((task) => (
-                            <TransferTaskRow
-                                key={task.id}
-                                task={task}
-                                machineName={getMachineName(machineMap.get(task.machineId), task.machineId)}
-                                onPress={() => showTaskDetail(task)}
-                                onPause={() => pauseTask(task.id)}
-                                onResume={() => retryTask(task.id)}
-                                onCancel={async () => {
-                                    const confirmed = await Modal.confirm(t('transferManager.cancelDownloadTitle'), task.fileName, {
-                                        cancelText: t('transferManager.keepDownload'),
-                                        confirmText: t('transferManager.cancelDownload'),
-                                        destructive: true,
-                                    });
-                                    if (confirmed) cancelTask(task.id);
-                                }}
-                                onRemove={() => handleRemoveTask(task)}
-                            />
-                        ))
+                        filteredTasks.map((task) => {
+                            const generation = sync.getAccountGeneration();
+                            const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+                            return (
+                                <TransferTaskRow
+                                    key={task.id}
+                                    task={task}
+                                    machineName={getMachineName(machineMap.get(task.machineId), task.machineId)}
+                                    onPress={() => showTaskDetail(task)}
+                                    onPause={() => { if (isCurrent()) pauseTask(task.id); }}
+                                    onResume={() => { if (isCurrent()) retryTask(task.id); }}
+                                    onOpenFile={() => { void openLocalFile(task, isCurrent); }}
+                                    onCancel={async () => {
+                                        const confirmed = await runSessionActionRequest({
+                                            isCurrent,
+                                            request: () => Modal.confirm(t('transferManager.cancelDownloadTitle'), task.fileName, {
+                                                cancelText: t('transferManager.keepDownload'),
+                                                confirmText: t('transferManager.cancelDownload'),
+                                                destructive: true,
+                                            }),
+                                        });
+                                        if (confirmed && isCurrent()) cancelTask(task.id);
+                                    }}
+                                    onRemove={() => handleRemoveTask(task)}
+                                />
+                            );
+                        })
                     )}
                 </ItemGroup>
             </ItemList>

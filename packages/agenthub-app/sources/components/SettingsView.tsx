@@ -1,5 +1,4 @@
 import { View, Text, Platform, Linking } from 'react-native';
-import { Image } from 'expo-image';
 import * as React from 'react';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -12,58 +11,8 @@ import { trackWhatsNewClicked } from '@/track';
 import { Modal } from '@/modal';
 import { useMultiClick } from '@/hooks/useMultiClick';
 import { useUnistyles } from 'react-native-unistyles';
-import { layout } from '@/components/layout';
 import { t } from '@/text';
-import { useItemScale } from '@/components/ItemScaleContext';
 import { useUpdates } from '@/hooks/useUpdates';
-
-const SettingsHeader = React.memo(function SettingsHeader() {
-    const { theme } = useUnistyles();
-    const s = useItemScale();
-
-    return (
-        <View style={{ maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}>
-            <View style={{
-                marginTop: s(14),
-                marginHorizontal: s(16),
-                padding: s(4),
-                borderRadius: s(18),
-                borderWidth: 1,
-                borderColor: theme.colors.borderStrong,
-                backgroundColor: theme.dark ? 'rgba(255, 178, 46, 0.08)' : theme.colors.surfaceRaised,
-                shadowColor: theme.dark ? '#000000' : theme.colors.glass.shadow,
-                shadowOpacity: theme.dark ? 0.28 : 0.10,
-                shadowRadius: s(14),
-                shadowOffset: { width: 0, height: s(8) },
-                elevation: 2,
-            }}>
-                <View style={{
-                    borderRadius: s(14),
-                    overflow: 'hidden',
-                    borderWidth: 1,
-                    borderColor: theme.dark ? 'rgba(255, 178, 46, 0.22)' : theme.colors.border,
-                    backgroundColor: theme.colors.canvas,
-                }}>
-                    <Image
-                        source={theme.dark ? require('@/assets/images/agenthub-settings-banner-dark.png') : require('@/assets/images/agenthub-settings-banner-light.png')}
-                        contentFit="cover"
-                        alt=""
-                        accessibilityLabel=""
-                        accessible={false}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no-hide-descendants"
-                        style={{
-                            width: '100%',
-                            aspectRatio: 1774 / 443,
-                            minHeight: s(72),
-                            maxHeight: s(168),
-                        }}
-                    />
-                </View>
-            </View>
-        </View>
-    );
-});
 
 export const SettingsView = React.memo(function SettingsView() {
     const { theme } = useUnistyles();
@@ -122,9 +71,6 @@ export const SettingsView = React.memo(function SettingsView() {
                 {t('settings.title')}
             </Text>
             <ItemList style={{ paddingTop: 0 }}>
-            {/* App Info Header */}
-            <SettingsHeader />
-
             <ItemGroup title={t('settings.account')}>
                 <Item
                     title={t('settings.account')}

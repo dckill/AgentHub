@@ -3,7 +3,7 @@ import { Settings, settingsDefaults, settingsParse, SettingsSchema } from './set
 import { LocalSettings, localSettingsDefaults, localSettingsParse } from './localSettings';
 import { Purchases, purchasesDefaults, purchasesParse } from './purchases';
 import { Profile, profileDefaults, profileParse } from './profile';
-import type { PermissionModeKey } from '@/components/PermissionModeSelector';
+import type { PermissionModeKey } from '@/utils/permissionMode';
 import { coerceSupportedClientAgent, type SupportedClientAgent } from './agentTypes';
 import type { FileTransferSettings, FileTransferTask } from '@/utils/fileTransfers';
 
@@ -83,118 +83,236 @@ export interface NewSessionDraft {
     updatedAt: number;
 }
 
+// The new-session store reads this value during initialization and then persists
+// every field update. Keep a module-local snapshot so repeated consumers do not
+// re-parse the same MMKV payload; writes and clears replace the snapshot.
+let newSessionDraftCache: NewSessionDraft | null | undefined;
+let settingsCache: { settings: Settings, version: number | null } | undefined;
+let pendingSettingsCache: Partial<Settings> | undefined;
+let localSettingsCache: LocalSettings | undefined;
+let sessionDraftsCache: Record<string, string> | undefined;
+let purchasesCache: Purchases | undefined;
+let profileCache: Profile | undefined;
+let fileTransferTasksCache: FileTransferTask[] | undefined;
+let fileTransferSettingsCache: FileTransferSettings | undefined;
+let sessionPermissionModesCache: Record<string, string> | undefined;
+let sessionModelModesCache: Record<string, string> | undefined;
+let sessionEffortLevelsCache: Record<string, string> | undefined;
+let registeredPushTokenCache: string | null | undefined;
+let sessionLastViewedAtCache: Record<string, number> | undefined;
+let sessionUnviewedCompletionAtCache: Record<string, number> | undefined;
+let sessionLastViewedStateCache: Record<string, string> | undefined;
+
+function cloneLocalSettings(settings: LocalSettings): LocalSettings {
+    return {
+        ...settings,
+        sidebarPanelsOpen: [...settings.sidebarPanelsOpen],
+        acknowledgedCliVersions: { ...settings.acknowledgedCliVersions },
+    };
+}
+
+function cloneSettings(settings: Settings): Settings {
+    return {
+        ...settings,
+        recentMachinePaths: settings.recentMachinePaths.map((entry) => ({ ...entry })),
+        dismissedCLIWarnings: {
+            perMachine: Object.fromEntries(
+                Object.entries(settings.dismissedCLIWarnings.perMachine).map(([machineId, warning]) => (
+                    [machineId, { ...warning }]
+                )),
+            ),
+            global: { ...settings.dismissedCLIWarnings.global },
+        },
+        machineGroups: { ...settings.machineGroups },
+        machineGroupOrder: [...settings.machineGroupOrder],
+        projectCustomizations: Object.fromEntries(
+            Object.entries(settings.projectCustomizations).map(([projectId, customization]) => (
+                [projectId, { ...customization }]
+            )),
+        ),
+    };
+}
+
+function clonePendingSettings(settings: Partial<Settings>): Partial<Settings> {
+    return {
+        ...settings,
+        recentMachinePaths: settings.recentMachinePaths?.map((entry) => ({ ...entry })),
+        dismissedCLIWarnings: settings.dismissedCLIWarnings ? {
+            perMachine: Object.fromEntries(
+                Object.entries(settings.dismissedCLIWarnings.perMachine).map(([machineId, warning]) => (
+                    [machineId, { ...warning }]
+                )),
+            ),
+            global: { ...settings.dismissedCLIWarnings.global },
+        } : undefined,
+        machineGroups: settings.machineGroups ? { ...settings.machineGroups } : undefined,
+        machineGroupOrder: settings.machineGroupOrder ? [...settings.machineGroupOrder] : undefined,
+        projectCustomizations: settings.projectCustomizations ? Object.fromEntries(
+            Object.entries(settings.projectCustomizations).map(([projectId, customization]) => (
+                [projectId, { ...customization }]
+            )),
+        ) : undefined,
+    };
+}
+
+function clonePurchases(purchases: Purchases): Purchases {
+    return {
+        activeSubscriptions: [...purchases.activeSubscriptions],
+        entitlements: { ...purchases.entitlements },
+    };
+}
+
+function cloneProfile(profile: Profile): Profile {
+    return {
+        ...profile,
+        avatar: profile.avatar ? { ...profile.avatar } : null,
+    };
+}
+
+function cloneFileTransferTasks(tasks: FileTransferTask[]): FileTransferTask[] {
+    return tasks.map((task) => ({ ...task }));
+}
+
+function cloneFileTransferSettings(settings: FileTransferSettings): FileTransferSettings {
+    return { ...settings };
+}
+
 export function loadSettings(): { settings: Settings, version: number | null } {
+    if (settingsCache) {
+        return { settings: cloneSettings(settingsCache.settings), version: settingsCache.version };
+    }
+
     const settings = mmkv.getString('settings');
     if (settings) {
         try {
             const parsed = JSON.parse(settings);
-            return { settings: settingsParse(parsed.settings), version: parsed.version };
+            settingsCache = { settings: settingsParse(parsed.settings), version: parsed.version };
+            return { settings: cloneSettings(settingsCache.settings), version: settingsCache.version };
         } catch (e) {
             console.error('Failed to parse settings', e);
-            return { settings: { ...settingsDefaults }, version: null };
+            settingsCache = { settings: { ...settingsDefaults }, version: null };
+            return { settings: cloneSettings(settingsCache.settings), version: settingsCache.version };
         }
     }
-    return { settings: { ...settingsDefaults }, version: null };
+    settingsCache = { settings: { ...settingsDefaults }, version: null };
+    return { settings: cloneSettings(settingsCache.settings), version: settingsCache.version };
 }
 
 export function saveSettings(settings: Settings, version: number) {
+    settingsCache = { settings: cloneSettings(settings), version };
     mmkv.set('settings', JSON.stringify({ settings, version }));
 }
 
 export function loadPendingSettings(): Partial<Settings> {
+    if (pendingSettingsCache !== undefined) {
+        return clonePendingSettings(pendingSettingsCache);
+    }
+
     const pending = mmkv.getString('pending-settings');
     if (pending) {
         try {
             const parsed = JSON.parse(pending);
-            return SettingsSchema.partial().parse(parsed);
+            pendingSettingsCache = SettingsSchema.partial().parse(parsed);
+            return clonePendingSettings(pendingSettingsCache);
         } catch (e) {
             console.error('Failed to parse pending settings', e);
+            pendingSettingsCache = {};
             return {};
         }
     }
+    pendingSettingsCache = {};
     return {};
 }
 
 export function savePendingSettings(settings: Partial<Settings>) {
+    pendingSettingsCache = clonePendingSettings(settings);
     mmkv.set('pending-settings', JSON.stringify(settings));
 }
 
 export function loadLocalSettings(): LocalSettings {
+    if (localSettingsCache) {
+        return cloneLocalSettings(localSettingsCache);
+    }
+
     const localSettings = mmkv.getString('local-settings');
     if (localSettings) {
         try {
             const parsed = JSON.parse(localSettings);
-            return localSettingsParse(parsed);
+            localSettingsCache = localSettingsParse(parsed);
+            return cloneLocalSettings(localSettingsCache);
         } catch (e) {
             console.error('Failed to parse local settings', e);
-            return { ...localSettingsDefaults };
+            localSettingsCache = { ...localSettingsDefaults };
+            return cloneLocalSettings(localSettingsCache);
         }
     }
-    return { ...localSettingsDefaults };
+    localSettingsCache = { ...localSettingsDefaults };
+    return cloneLocalSettings(localSettingsCache);
 }
 
 export function saveLocalSettings(settings: LocalSettings) {
+    localSettingsCache = cloneLocalSettings(settings);
     mmkv.set('local-settings', JSON.stringify(settings));
 }
 
 export function loadThemePreference(): 'light' | 'dark' | 'adaptive' {
-    const localSettings = mmkv.getString('local-settings');
-    if (localSettings) {
-        try {
-            const parsed = JSON.parse(localSettings);
-            const settings = localSettingsParse(parsed);
-            return settings.themePreference;
-        } catch (e) {
-            console.error('Failed to parse local settings for theme preference', e);
-            return localSettingsDefaults.themePreference;
-        }
-    }
-    return localSettingsDefaults.themePreference;
+    return loadLocalSettings().themePreference;
 }
 
 export function loadPurchases(): Purchases {
+    if (purchasesCache) {
+        return clonePurchases(purchasesCache);
+    }
+
     const purchases = mmkv.getString('purchases');
     if (purchases) {
         try {
             const parsed = JSON.parse(purchases);
-            return purchasesParse(parsed);
+            purchasesCache = purchasesParse(parsed);
+            return clonePurchases(purchasesCache);
         } catch (e) {
             console.error('Failed to parse purchases', e);
-            return { ...purchasesDefaults };
+            purchasesCache = clonePurchases(purchasesDefaults);
+            return clonePurchases(purchasesCache);
         }
     }
-    return { ...purchasesDefaults };
+    purchasesCache = clonePurchases(purchasesDefaults);
+    return clonePurchases(purchasesCache);
 }
 
 export function savePurchases(purchases: Purchases) {
+    purchasesCache = clonePurchases(purchases);
     mmkv.set('purchases', JSON.stringify(purchases));
 }
 
 export function loadSessionDrafts(): Record<string, string> {
-    const drafts = mmkv.getString('session-drafts');
-    if (drafts) {
-        try {
-            return JSON.parse(drafts);
-        } catch (e) {
-            console.error('Failed to parse session drafts', e);
-            return {};
-        }
+    if (sessionDraftsCache !== undefined) {
+        return { ...sessionDraftsCache };
     }
-    return {};
+
+    sessionDraftsCache = loadStringMap('session-drafts', 'session drafts');
+    return { ...sessionDraftsCache };
 }
 
 export function saveSessionDrafts(drafts: Record<string, string>) {
+    sessionDraftsCache = { ...drafts };
     mmkv.set('session-drafts', JSON.stringify(drafts));
 }
 
 export function loadNewSessionDraft(): NewSessionDraft | null {
+    if (newSessionDraftCache !== undefined) {
+        return newSessionDraftCache ? { ...newSessionDraftCache } : null;
+    }
+
     const raw = mmkv.getString(NEW_SESSION_DRAFT_KEY);
     if (!raw) {
+        newSessionDraftCache = null;
         return null;
     }
     try {
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') {
+            newSessionDraftCache = null;
             return null;
         }
 
@@ -214,7 +332,7 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
         const selectedCredentialId = typeof parsed.selectedCredentialId === 'string' ? parsed.selectedCredentialId : null;
         const updatedAt = typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now();
 
-        return {
+        newSessionDraftCache = {
             input,
             selectedMachineId,
             selectedPath,
@@ -227,43 +345,60 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
             selectedCredentialId,
             updatedAt,
         };
+        return { ...newSessionDraftCache };
     } catch (e) {
         console.error('Failed to parse new session draft', e);
+        newSessionDraftCache = null;
         return null;
     }
 }
 
 export function saveNewSessionDraft(draft: NewSessionDraft) {
+    newSessionDraftCache = { ...draft };
     mmkv.set(NEW_SESSION_DRAFT_KEY, JSON.stringify(draft));
 }
 
 export function clearNewSessionDraft() {
+    newSessionDraftCache = null;
     mmkv.delete(NEW_SESSION_DRAFT_KEY);
 }
 
 export function loadRegisteredPushToken(): string | null {
-    return mmkv.getString(REGISTERED_PUSH_TOKEN_KEY) ?? null;
+    if (registeredPushTokenCache !== undefined) {
+        return registeredPushTokenCache;
+    }
+
+    registeredPushTokenCache = mmkv.getString(REGISTERED_PUSH_TOKEN_KEY) ?? null;
+    return registeredPushTokenCache;
 }
 
 export function saveRegisteredPushToken(token: string) {
+    registeredPushTokenCache = token;
     mmkv.set(REGISTERED_PUSH_TOKEN_KEY, token);
 }
 
 export function clearRegisteredPushToken() {
+    registeredPushTokenCache = null;
     mmkv.delete(REGISTERED_PUSH_TOKEN_KEY);
 }
 
 export function loadFileTransferTasks(): FileTransferTask[] {
+    if (fileTransferTasksCache !== undefined) {
+        return cloneFileTransferTasks(fileTransferTasksCache);
+    }
+
     const raw = mmkv.getString(FILE_TRANSFER_TASKS_KEY);
     if (!raw) {
+        fileTransferTasksCache = [];
         return [];
     }
     try {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) {
+            fileTransferTasksCache = [];
             return [];
         }
-        return parsed.filter((item): item is FileTransferTask => {
+        fileTransferTasksCache = parsed.filter((item): item is FileTransferTask => {
             return item
                 && typeof item === 'object'
                 && typeof item.id === 'string'
@@ -276,131 +411,148 @@ export function loadFileTransferTasks(): FileTransferTask[] {
                 && typeof item.createdAt === 'number'
                 && typeof item.updatedAt === 'number';
         });
+        return cloneFileTransferTasks(fileTransferTasksCache);
     } catch (e) {
         console.error('Failed to parse file transfer tasks', e);
+        fileTransferTasksCache = [];
         return [];
     }
 }
 
 export function saveFileTransferTasks(tasks: FileTransferTask[]) {
+    fileTransferTasksCache = cloneFileTransferTasks(tasks);
     mmkv.set(FILE_TRANSFER_TASKS_KEY, JSON.stringify(tasks));
 }
 
 export function loadFileTransferSettings(): FileTransferSettings {
+    if (fileTransferSettingsCache !== undefined) {
+        return cloneFileTransferSettings(fileTransferSettingsCache);
+    }
+
     const raw = mmkv.getString(FILE_TRANSFER_SETTINGS_KEY);
     if (!raw) {
+        fileTransferSettingsCache = {};
         return {};
     }
     try {
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') {
+            fileTransferSettingsCache = {};
             return {};
         }
-        return {
+        fileTransferSettingsCache = {
             downloadDirectoryUri: typeof parsed.downloadDirectoryUri === 'string' ? parsed.downloadDirectoryUri : undefined,
             downloadDirectoryLabel: typeof parsed.downloadDirectoryLabel === 'string' ? parsed.downloadDirectoryLabel : undefined,
             deleteLocalFileOnRemove: parsed.deleteLocalFileOnRemove === true,
         };
+        return cloneFileTransferSettings(fileTransferSettingsCache);
     } catch (e) {
         console.error('Failed to parse file transfer settings', e);
+        fileTransferSettingsCache = {};
         return {};
     }
 }
 
 export function saveFileTransferSettings(settings: FileTransferSettings) {
+    fileTransferSettingsCache = cloneFileTransferSettings(settings);
     mmkv.set(FILE_TRANSFER_SETTINGS_KEY, JSON.stringify(settings));
 }
 
 export function loadSessionPermissionModes(): Record<string, string> {
-    const modes = mmkv.getString('session-permission-modes');
-    if (modes) {
-        try {
-            return JSON.parse(modes);
-        } catch (e) {
-            console.error('Failed to parse session permission modes', e);
-            return {};
-        }
-    }
-    return {};
+    if (sessionPermissionModesCache !== undefined) return { ...sessionPermissionModesCache };
+    sessionPermissionModesCache = loadStringMap('session-permission-modes', 'session permission modes');
+    return { ...sessionPermissionModesCache };
 }
 
 export function saveSessionPermissionModes(modes: Record<string, string>) {
+    sessionPermissionModesCache = { ...modes };
     mmkv.set('session-permission-modes', JSON.stringify(modes));
 }
 
 export function loadSessionModelModes(): Record<string, string> {
-    const modes = mmkv.getString('session-model-modes');
-    if (modes) {
-        try {
-            return JSON.parse(modes);
-        } catch (e) {
-            console.error('Failed to parse session model modes', e);
-            return {};
-        }
-    }
-    return {};
+    if (sessionModelModesCache !== undefined) return { ...sessionModelModesCache };
+    sessionModelModesCache = loadStringMap('session-model-modes', 'session model modes');
+    return { ...sessionModelModesCache };
 }
 
 export function saveSessionModelModes(modes: Record<string, string>) {
+    sessionModelModesCache = { ...modes };
     mmkv.set('session-model-modes', JSON.stringify(modes));
 }
 
 export function loadSessionEffortLevels(): Record<string, string> {
-    const levels = mmkv.getString('session-effort-levels');
-    if (levels) {
-        try {
-            return JSON.parse(levels);
-        } catch (e) {
-            console.error('Failed to parse session effort levels', e);
-            return {};
-        }
-    }
-    return {};
+    if (sessionEffortLevelsCache !== undefined) return { ...sessionEffortLevelsCache };
+    sessionEffortLevelsCache = loadStringMap('session-effort-levels', 'session effort levels');
+    return { ...sessionEffortLevelsCache };
 }
 
 export function saveSessionEffortLevels(levels: Record<string, string>) {
+    sessionEffortLevelsCache = { ...levels };
     mmkv.set('session-effort-levels', JSON.stringify(levels));
 }
 
 export function loadSessionLastViewedAt(): Record<string, number> {
-    return loadNumberMap(SESSION_LAST_VIEWED_AT_KEY, 'session last viewed timestamps');
+    if (sessionLastViewedAtCache !== undefined) {
+        return { ...sessionLastViewedAtCache };
+    }
+    sessionLastViewedAtCache = loadNumberMap(SESSION_LAST_VIEWED_AT_KEY, 'session last viewed timestamps');
+    return { ...sessionLastViewedAtCache };
 }
 
 export function saveSessionLastViewedAt(viewedAt: Record<string, number>) {
+    sessionLastViewedAtCache = { ...viewedAt };
     saveNumberMap(SESSION_LAST_VIEWED_AT_KEY, viewedAt);
 }
 
 export function loadSessionUnviewedCompletionAt(): Record<string, number> {
-    return loadNumberMap(SESSION_UNVIEWED_COMPLETION_AT_KEY, 'session unviewed completion timestamps');
+    if (sessionUnviewedCompletionAtCache !== undefined) {
+        return { ...sessionUnviewedCompletionAtCache };
+    }
+    sessionUnviewedCompletionAtCache = loadNumberMap(SESSION_UNVIEWED_COMPLETION_AT_KEY, 'session unviewed completion timestamps');
+    return { ...sessionUnviewedCompletionAtCache };
 }
 
 export function saveSessionUnviewedCompletionAt(completionAt: Record<string, number>) {
+    sessionUnviewedCompletionAtCache = { ...completionAt };
     saveNumberMap(SESSION_UNVIEWED_COMPLETION_AT_KEY, completionAt);
 }
 
 export function loadSessionLastViewedState(): Record<string, string> {
-    return loadStringMap(SESSION_LAST_VIEWED_STATE_KEY, 'session last viewed states');
+    if (sessionLastViewedStateCache !== undefined) {
+        return { ...sessionLastViewedStateCache };
+    }
+    sessionLastViewedStateCache = loadStringMap(SESSION_LAST_VIEWED_STATE_KEY, 'session last viewed states');
+    return { ...sessionLastViewedStateCache };
 }
 
 export function saveSessionLastViewedState(states: Record<string, string>) {
+    sessionLastViewedStateCache = { ...states };
     saveStringMap(SESSION_LAST_VIEWED_STATE_KEY, states);
 }
 
 export function loadProfile(): Profile {
+    if (profileCache) {
+        return cloneProfile(profileCache);
+    }
+
     const profile = mmkv.getString('profile');
     if (profile) {
         try {
             const parsed = JSON.parse(profile);
-            return profileParse(parsed);
+            profileCache = profileParse(parsed);
+            return cloneProfile(profileCache);
         } catch (e) {
             console.error('Failed to parse profile', e);
-            return { ...profileDefaults };
+            profileCache = cloneProfile(profileDefaults);
+            return cloneProfile(profileCache);
         }
     }
-    return { ...profileDefaults };
+    profileCache = cloneProfile(profileDefaults);
+    return cloneProfile(profileCache);
 }
 
 export function saveProfile(profile: Profile) {
+    profileCache = cloneProfile(profile);
     mmkv.set('profile', JSON.stringify(profile));
 }
 
@@ -423,4 +575,20 @@ export function retrieveTempText(id: string): string | null {
 
 export function clearPersistence() {
     mmkv.clearAll();
+    newSessionDraftCache = undefined;
+    settingsCache = undefined;
+    pendingSettingsCache = undefined;
+    localSettingsCache = undefined;
+    sessionDraftsCache = undefined;
+    purchasesCache = undefined;
+    profileCache = undefined;
+    fileTransferTasksCache = undefined;
+    fileTransferSettingsCache = undefined;
+    sessionPermissionModesCache = undefined;
+    sessionModelModesCache = undefined;
+    sessionEffortLevelsCache = undefined;
+    registeredPushTokenCache = undefined;
+    sessionLastViewedAtCache = undefined;
+    sessionUnviewedCompletionAtCache = undefined;
+    sessionLastViewedStateCache = undefined;
 }

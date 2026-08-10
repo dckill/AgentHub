@@ -18,6 +18,8 @@ import { CLIENT_AGENT_LABELS, SUPPORTED_CLIENT_AGENTS, coerceSupportedClientAgen
 import { SettingsPage } from '@/components/SettingsPage';
 import { SelectRow } from '@/components/SelectRow';
 import { Typography } from '@/constants/Typography';
+import { sync } from '@/sync/sync';
+import { runCredentialEditLoad, runCredentialEditSave } from '../credentialEditLifecycle';
 
 const AGENT_OPTIONS = SUPPORTED_CLIENT_AGENTS.map((key) => ({
     key,
@@ -50,28 +52,31 @@ export default React.memo(function EditCredentialScreen() {
     const [saving, setSaving] = useState(false);
 
     const loadCredential = useCallback(async (signal?: AbortSignal) => {
-        if (!id || !auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!id || !credentials || generation === null) {
             setLoadState('error');
             setOperationError(t('credentials.loadFailed'));
             return;
         }
-        setLoadState('loading');
-        setOperationError(null);
-        try {
-            const cred = await getCredential(auth.credentials, id, signal);
-            if (signal?.aborted) return;
-            setLabel(cred.label);
-            setAgent(coerceSupportedClientAgent(cred.agent));
-            setApiKey('');
-            setBaseUrl(cred.baseUrl ?? '');
-            setModelOverrides(cred.modelOverrides ?? {});
-            setShowModelOverrides(Boolean(cred.modelOverrides && Object.keys(cred.modelOverrides).length > 0));
-            setLoadState('ready');
-        } catch {
-            if (signal?.aborted) return;
-            setLoadState('error');
-            setOperationError(t('credentials.loadFailed'));
-        }
+        const isCurrent = () => !signal?.aborted
+            && sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
+        await runCredentialEditLoad({
+            fetchCredential: () => getCredential(credentials, id, signal),
+            isCurrent,
+            apply: (cred) => {
+                setLabel(cred.label);
+                setAgent(coerceSupportedClientAgent(cred.agent));
+                setApiKey('');
+                setBaseUrl(cred.baseUrl ?? '');
+                setModelOverrides(cred.modelOverrides ?? {});
+                setShowModelOverrides(Boolean(cred.modelOverrides && Object.keys(cred.modelOverrides).length > 0));
+            },
+            setLoadState,
+            setError: setOperationError,
+            errorMessage: t('credentials.loadFailed'),
+        });
     }, [auth.credentials, id]);
 
     useFocusEffect(useCallback(() => {
@@ -84,7 +89,9 @@ export default React.memo(function EditCredentialScreen() {
     }, [isEditing, loadCredential]));
 
     const doSave = useCallback(async () => {
-        if (!auth.credentials) return;
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) return;
         if (!label.trim()) {
             Modal.alert(t('common.error'), t('credentials.validationLabelRequired'));
             return;
@@ -94,6 +101,8 @@ export default React.memo(function EditCredentialScreen() {
             return;
         }
 
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
         setSaving(true);
         setOperationError(null);
         const input: any = {
@@ -104,20 +113,30 @@ export default React.memo(function EditCredentialScreen() {
         };
 
         try {
-            if (isEditing && id) {
-                await updateCredential(auth.credentials, id, input);
-            } else {
-                input.agent = agent;
-                input.apiKey = apiKey.trim();
-                await createCredential(auth.credentials, input);
-            }
-            router.back();
-        } catch {
-            setOperationError(t('credentials.saveFailed'));
+            await runCredentialEditSave({
+                save: async () => {
+                    if (isEditing && id) {
+                        await updateCredential(credentials, id, input);
+                    } else {
+                        input.agent = agent;
+                        input.apiKey = apiKey.trim();
+                        await createCredential(credentials, input);
+                    }
+                },
+                isCurrent,
+                onSuccess: () => router.back(),
+                setError: setOperationError,
+                errorMessage: t('credentials.saveFailed'),
+            });
         } finally {
-            setSaving(false);
+            if (isCurrent()) setSaving(false);
         }
     }, [agent, apiKey, auth.credentials, baseUrl, id, isEditing, label, modelOverrides, router, showModelOverrides]);
+
+    React.useEffect(() => {
+        setSaving(false);
+        setOperationError(null);
+    }, [auth.credentials?.token, id]);
 
     return (
         <>

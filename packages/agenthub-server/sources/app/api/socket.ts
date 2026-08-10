@@ -1,11 +1,12 @@
 import { onShutdown } from "@/utils/shutdown";
 import { Fastify } from "./types";
-import { buildMachineActivityEphemeral, ClientConnection, eventRouter } from "@/app/events/eventRouter";
+import { buildMachineActivityEphemeral, buildSessionControlEphemeral, ClientConnection, eventRouter } from "@/app/events/eventRouter";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-streams-adapter";
 import { Redis } from "ioredis";
 import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
+import { db } from "@/storage/db";
 import { getMetricsLabelsFromSocket, redisStreamLagMsGauge, websocketConnectionsGauge, websocketEventsCounter } from "../monitoring/metrics2";
 import { usageHandler } from "./socket/usageHandler";
 import { rpcHandler } from "./socket/rpcHandler";
@@ -19,6 +20,11 @@ import { getAllowedOriginsForLog, resolveCorsOrigin } from "./utils/security";
 import { SOCKET_MESSAGE_LIMIT_BYTES } from "./utils/resourceLimits";
 import { enableSocketResourceLimits } from "./utils/enableSocketResourceLimits";
 import { scheduleMachineOfflineCheck } from "../presence/machineDisconnectGrace";
+import { sessionControlHandler } from "./socket/sessionControlHandler";
+import { scheduleDisconnectedDeviceControlCleanup } from "@/app/session/sessionControl";
+import { validateSocketScope } from "./socket/socketScope";
+import { startSocketAuthRevalidation } from "./socket/socketAuthRevalidation";
+import { isUserAppState } from '@/app/presence/appStatePresence';
 
 export function startSocket(app: Fastify) {
     log({ module: 'websocket', allowedOrigins: getAllowedOriginsForLog() }, 'Socket.IO CORS policy configured');
@@ -69,7 +75,7 @@ export function startSocket(app: Fastify) {
             lastReadOffset = offset;
             return origOnRawMessage(msg, offset);
         };
-        setInterval(async () => {
+        const streamLagTimer = setInterval(async () => {
             try {
                 const info = await streamClient.xinfo("STREAM", "socket.io") as any[];
                 const headId = String(info[info.indexOf("last-generated-id") + 1]);
@@ -78,6 +84,10 @@ export function startSocket(app: Fastify) {
                 redisStreamLagMsGauge.set(headMs - readMs);
             } catch { /* stream may not exist yet */ }
         }, 5000);
+        onShutdown('redis-socket', async () => {
+            clearInterval(streamLagTimer);
+            await streamClient.quit();
+        });
     }
 
     // Initialize event router with Socket.IO server instance
@@ -92,6 +102,12 @@ export function startSocket(app: Fastify) {
         const clientType = socket.handshake.auth.clientType as 'session-scoped' | 'user-scoped' | 'machine-scoped' | undefined;
         const sessionId = socket.handshake.auth.sessionId as string | undefined;
         const machineId = socket.handshake.auth.machineId as string | undefined;
+        const deviceId = typeof socket.handshake.auth.deviceId === 'string'
+            ? socket.handshake.auth.deviceId.trim() || undefined
+            : undefined;
+        const appState = isUserAppState(socket.handshake.auth.appState)
+            ? socket.handshake.auth.appState
+            : undefined;
 
         if (!token) {
             log({ module: 'websocket' }, `No token provided`);
@@ -118,10 +134,31 @@ export function startSocket(app: Fastify) {
             return;
         }
 
+        try {
+            const scopeValid = await validateSocketScope({
+                db,
+                userId: verified.userId,
+                clientType,
+                sessionId,
+                machineId,
+            });
+            if (!scopeValid) {
+                log({ module: 'websocket', userId: verified.userId, clientType, sessionId, machineId }, 'Socket scope does not belong to authenticated account');
+                next(new Error('Socket scope is not owned by authenticated account'));
+                return;
+            }
+        } catch (error) {
+            log({ module: 'websocket', level: 'error', userId: verified.userId, clientType, sessionId, machineId, error }, 'Failed to validate socket scope');
+            next(new Error('Unable to validate socket scope'));
+            return;
+        }
+
         socket.data.userId = verified.userId;
         socket.data.clientType = clientType;
         socket.data.sessionId = sessionId;
         socket.data.machineId = machineId;
+        socket.data.deviceId = deviceId;
+        socket.data.appState = appState;
         socket.data.agenthubClient = socket.handshake.auth.agenthubClient as string
             || socket.handshake.headers['x-agenthub-client'] as string
             || undefined;
@@ -130,10 +167,16 @@ export function startSocket(app: Fastify) {
 
     io.on("connection", (socket) => {
         const userId = socket.data.userId as string;
+        const stopTokenAuthRevalidation = startSocketAuthRevalidation({
+            token: socket.handshake.auth.token as string,
+            verifyToken: (token) => auth.verifyToken(token),
+            disconnect: (close) => socket.disconnect(close),
+        });
         enableSocketResourceLimits(socket, { subject: userId });
         const clientType = socket.data.clientType as 'session-scoped' | 'user-scoped' | 'machine-scoped' | undefined;
         const sessionId = socket.data.sessionId as string | undefined;
         const machineId = socket.data.machineId as string | undefined;
+        const deviceId = socket.data.deviceId as string | undefined;
         const labels = getMetricsLabelsFromSocket(socket);
 
         log({ module: 'websocket' }, `Token verified: ${userId}, clientType: ${clientType || 'user-scoped'}, client: ${labels.client}, sessionId: ${sessionId || 'none'}, machineId: ${machineId || 'none'}, socketId: ${socket.id}`);
@@ -146,20 +189,23 @@ export function startSocket(app: Fastify) {
                 connectionType: 'session-scoped',
                 socket,
                 userId,
-                sessionId
+                sessionId,
+                deviceId
             };
         } else if (metadata.clientType === 'machine-scoped' && machineId) {
             connection = {
                 connectionType: 'machine-scoped',
                 socket,
                 userId,
-                machineId
+                machineId,
+                deviceId
             };
         } else {
             connection = {
                 connectionType: 'user-scoped',
                 socket,
-                userId
+                userId,
+                deviceId
             };
         }
         eventRouter.addConnection(userId, connection);
@@ -177,6 +223,7 @@ export function startSocket(app: Fastify) {
         }
 
         socket.on('disconnect', () => {
+            stopTokenAuthRevalidation();
             websocketEventsCounter.inc({ event_type: 'disconnect', ...labels });
 
             // Cleanup connections
@@ -184,6 +231,24 @@ export function startSocket(app: Fastify) {
             websocketConnectionsGauge.dec({ type: connection.connectionType, ...labels });
 
             log({ module: 'websocket' }, `User disconnected: ${userId}`);
+
+            if (connection.connectionType === 'user-scoped' && connection.deviceId) {
+                scheduleDisconnectedDeviceControlCleanup({
+                    io,
+                    accountId: userId,
+                    deviceId: connection.deviceId,
+                    socketId: socket.id,
+                    onReleased: (states) => {
+                        for (const state of states) {
+                            eventRouter.emitEphemeral({
+                                userId,
+                                payload: buildSessionControlEphemeral(state),
+                                recipientFilter: { type: 'all-interested-in-session', sessionId: state.sessionId },
+                            });
+                        }
+                    },
+                });
+            }
 
             // Broadcast daemon offline status
             if (connection.connectionType === 'machine-scoped') {
@@ -207,6 +272,7 @@ export function startSocket(app: Fastify) {
 
         // Handlers
         rpcHandler(userId, socket, io);
+        sessionControlHandler(userId, socket, deviceId);
         fileTransferHandler(userId, socket, io);
         usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);

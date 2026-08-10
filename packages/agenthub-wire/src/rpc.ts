@@ -136,6 +136,7 @@ const commonRpcMethodSchemas = {
       officialMirrorCodexThreadId: z.string().optional(),
       parentSessionId: z.string().optional(),
       forkedFromMessageId: z.string().optional(),
+      isSideChat: z.boolean().optional(),
     }),
     response: spawnSessionResultSchema,
   },
@@ -274,6 +275,43 @@ const commonRpcMethodSchemas = {
     request: z.object({}),
     response: cliUpdateRequestResultSchema,
   },
+  'get-system-metrics': {
+    request: z.object({}),
+    response: z.object({
+      sampledAt: z.number().int().nonnegative(),
+      system: z.object({
+        platform: z.string(),
+        name: z.string(),
+        release: z.string(),
+        architecture: z.string(),
+        hostname: z.string(),
+        uptimeSeconds: z.number().nonnegative(),
+      }),
+      cpu: z.object({
+        usagePercent: z.number().min(0).max(100),
+        logicalCores: z.number().int().positive(),
+        model: z.string().optional(),
+      }),
+      memory: z.object({
+        totalBytes: z.number().nonnegative(),
+        usedBytes: z.number().nonnegative(),
+        availableBytes: z.number().nonnegative(),
+        usagePercent: z.number().min(0).max(100),
+      }),
+      network: z.object({
+        receivedBytes: z.number().nonnegative(),
+        sentBytes: z.number().nonnegative(),
+      }).default({ receivedBytes: 0, sentBytes: 0 }),
+      disks: z.array(z.object({
+        name: z.string(),
+        mountPoint: z.string(),
+        totalBytes: z.number().nonnegative(),
+        usedBytes: z.number().nonnegative(),
+        availableBytes: z.number().nonnegative(),
+        usagePercent: z.number().min(0).max(100),
+      })),
+    }),
+  },
   bash: {
     request: z.object({
       command: z.string(),
@@ -392,6 +430,7 @@ export type RpcCodexRewindPoint = z.infer<typeof codexRewindPointSchema>;
 export type RpcCodexRewindResult = z.infer<(typeof commonRpcMethodSchemas)['codex-list-rewind-points']['response']>;
 export type RpcCodexModel = z.infer<typeof RpcCodexModelSchema>;
 export type RpcCodexModelsResult = z.infer<(typeof commonRpcMethodSchemas)['codex-list-models']['response']>;
+export type RpcSystemMetrics = z.infer<(typeof commonRpcMethodSchemas)['get-system-metrics']['response']>;
 export type RpcOfficialThread = z.infer<typeof officialThreadSchema>;
 export type RpcOfficialThreadState = z.infer<(typeof commonRpcMethodSchemas)['codex-list-official-thread-states']['response']>['threadStates'][number];
 export type RpcListOfficialThreadsRequest = z.infer<(typeof commonRpcMethodSchemas)['codex-list-official-threads']['request']>;

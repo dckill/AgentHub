@@ -16,6 +16,7 @@ import { CodexBashViewFull } from './CodexBashViewFull';
 import { CodexPatchView } from './CodexPatchView';
 import { CodexDiffView } from './CodexDiffView';
 import { AskUserQuestionView } from './AskUserQuestionView';
+import { FileView } from './FileView';
 
 export type ToolViewProps = {
     tool: ToolCall;
@@ -42,6 +43,7 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
     Task: TaskView,
     Agent: TaskView,
     AskUserQuestion: AskUserQuestionView,
+    file: FileView,
 };
 
 export const toolFullViewRegistry: Record<string, ToolViewComponent> = {
@@ -79,3 +81,4 @@ export { ExitPlanToolView } from './ExitPlanToolView';
 export { MultiEditView } from './MultiEditView';
 export { TaskView } from './TaskView';
 export { AskUserQuestionView } from './AskUserQuestionView';
+export { FileView } from './FileView';

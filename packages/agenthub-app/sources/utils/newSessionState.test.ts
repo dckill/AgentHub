@@ -5,9 +5,34 @@ import {
     shouldShowCredentialSelectorRow,
     shouldClearSelectedCredential,
     getNewSessionConfigItems,
+    getInitialMachineId,
+    resolveModeSelection,
+    resolveNewSessionAgent,
 } from './newSessionState';
 
 describe('newSessionState', () => {
+    it('prefers the first online machine and falls back to the existing order', () => {
+        expect(getInitialMachineId([
+            { id: 'offline-latest', active: false },
+            { id: 'online-older', active: true },
+        ])).toBe('online-older');
+        expect(getInitialMachineId([
+            { id: 'offline-latest', active: false },
+        ])).toBe('offline-latest');
+        expect(getInitialMachineId([])).toBeNull();
+    });
+
+    it('resolves a persisted mode key without relying on an array index', () => {
+        const options = [
+            { key: 'default', name: 'Default' },
+            { key: 'fast', name: 'Fast' },
+        ];
+
+        expect(resolveModeSelection(options, 'fast', 'default')).toEqual(options[1]);
+        expect(resolveModeSelection(options, 'removed', 'default')).toEqual(options[0]);
+        expect(resolveModeSelection([], 'fast', 'default')).toBeNull();
+    });
+
     it('falls back to all agents when machine availability reports none installed', () => {
         const agents = getAvailableNewSessionAgents({
             claude: false,
@@ -26,6 +51,20 @@ describe('newSessionState', () => {
         });
 
         expect(getNextNewSessionAgentKey(agents, 'claude')).toBe('codex');
+    });
+
+    it('replaces a stale Claude draft with Codex at launch time', () => {
+        expect(resolveNewSessionAgent('claude', {
+            claude: false,
+            codex: true,
+            detectedAt: 1,
+        })).toBe('codex');
+    });
+
+    it('keeps the persisted agent when capability metadata is missing or inconclusive', () => {
+        expect(resolveNewSessionAgent('claude', undefined)).toBe('claude');
+        expect(resolveNewSessionAgent('claude', { claude: false, codex: false })).toBe('claude');
+        expect(resolveNewSessionAgent('claude', { claude: false })).toBe('claude');
     });
 
     it('clears credentials that do not belong to the selected agent', () => {

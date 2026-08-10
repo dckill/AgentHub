@@ -20,3 +20,11 @@ export function startSystemdDaemon(): void {
     { stdio: 'ignore' },
   );
 }
+
+export function restartSystemdDaemon(): void {
+  execFileSync(
+    'systemctl',
+    ['--user', 'restart', `${AGENTHUB_DAEMON_SERVICE_NAME}.service`],
+    { stdio: 'ignore' },
+  );
+}

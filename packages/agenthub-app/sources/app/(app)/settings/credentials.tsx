@@ -15,6 +15,8 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { GlassIconButton } from '@/components/glass';
 import { StyleSheet } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
+import { sync } from '@/sync/sync';
+import { runCredentialsLoad } from './credentialsLifecycle';
 
 const agentIcons: Record<SupportedClientAgent, string> = {
     claude: 'code-working-outline',
@@ -31,23 +33,24 @@ export default React.memo(function CredentialsScreen() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const loadCredentials = useCallback(async (signal?: AbortSignal) => {
-        if (!auth.credentials) {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
+        if (!credentials || generation === null) {
             setLoadState('error');
             setError(t('credentials.loadFailed'));
             return;
         }
-        setLoadState('loading');
-        setError(null);
-        try {
-            const list = await listCredentials(auth.credentials, signal);
-            if (signal?.aborted) return;
-            setCredentials(list);
-            setLoadState('ready');
-        } catch {
-            if (signal?.aborted) return;
-            setLoadState('error');
-            setError(t('credentials.loadFailed'));
-        }
+        const isCurrent = () => !signal?.aborted
+            && sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
+        await runCredentialsLoad({
+            fetchCredentials: () => listCredentials(credentials, signal),
+            isCurrent,
+            setCredentials,
+            setLoadState,
+            setError,
+            errorMessage: t('credentials.loadFailed'),
+        });
     }, [auth.credentials]);
 
     useFocusEffect(useCallback(() => {
@@ -58,24 +61,40 @@ export default React.memo(function CredentialsScreen() {
         };
     }, [loadCredentials]));
 
+    React.useEffect(() => {
+        setCredentials([]);
+        setError(null);
+        setDeletingId(null);
+    }, [auth.credentials?.token]);
+
     const handleDelete = useCallback(async (id: string) => {
+        const credentials = auth.credentials;
+        const generation = sync.getAccountGeneration();
         const confirmed = await Modal.confirm(
             t('credentials.deleteCredential'),
             t('credentials.deleteConfirm'),
             { destructive: true, confirmText: t('credentials.deleteCredential') }
         );
-        if (!confirmed || !auth.credentials) return;
+        if (!confirmed || !credentials || generation === null) return;
+        const isCurrent = () => sync.getAccountGeneration() === generation
+            && sync.getCredentials()?.token === credentials.token;
+        if (!isCurrent()) return;
         setDeletingId(id);
         setError(null);
         try {
-            await deleteCredential(auth.credentials, id);
+            await deleteCredential(credentials, id);
+            if (!isCurrent()) return;
             setCredentials(current => current.filter(credential => credential.id !== id));
             setLoadState('ready');
         } catch {
-            setError(t('credentials.deleteFailed'));
-            setLoadState('error');
+            if (isCurrent()) {
+                setError(t('credentials.deleteFailed'));
+                setLoadState('error');
+            }
         } finally {
-            setDeletingId(null);
+            if (isCurrent()) {
+                setDeletingId(null);
+            }
         }
     }, [auth.credentials]);
 

@@ -39,6 +39,8 @@ export default function AppearanceSettingsScreen() {
     const [wrapLinesInDiffs, setWrapLinesInDiffs] = useSettingMutable('wrapLinesInDiffs');
     const [diffStyle, setDiffStyle] = useSettingMutable('diffStyle');
     const [alwaysShowContextSize, setAlwaysShowContextSize] = useSettingMutable('alwaysShowContextSize');
+    const [sessionStatusBarDisplay, setSessionStatusBarDisplay] = useSettingMutable('sessionStatusBarDisplay');
+    const [usageLimitShowRemaining, setUsageLimitShowRemaining] = useSettingMutable('usageLimitShowRemaining');
     const [collapseAgentWork, setCollapseAgentWork] = useSettingMutable('collapseAgentWork');
     const [themePreference, setThemePreference] = useLocalSettingMutable('themePreference');
     const [preferredLanguage] = useSettingMutable('preferredLanguage');
@@ -265,6 +267,40 @@ export default function AppearanceSettingsScreen() {
                             accessibilityLabel={t('settingsAppearance.alwaysShowContextSize')}
                             value={alwaysShowContextSize}
                             onValueChange={setAlwaysShowContextSize}
+                        />
+                    }
+                />
+                <Item
+                    title={t('settingsAppearance.sessionStatusBar')}
+                    titleLines={0}
+                    subtitle={t('settingsAppearance.sessionStatusBarDescription')}
+                    subtitleLines={0}
+                    icon={<Ionicons name="pulse-outline" size={29} color={theme.colors.accent} />}
+                    showChevron={false}
+                    rightElement={
+                        <SegmentedControl
+                            accessibilityLabel={t('settingsAppearance.sessionStatusBar')}
+                            value={sessionStatusBarDisplay}
+                            options={[
+                                { value: 'hidden', label: t('settingsAppearance.sessionStatusBarHidden') },
+                                { value: 'above', label: t('settingsAppearance.sessionStatusBarAbove') },
+                                { value: 'below', label: t('settingsAppearance.sessionStatusBarBelow') },
+                            ]}
+                            onChange={setSessionStatusBarDisplay}
+                        />
+                    }
+                />
+                <Item
+                    title={t('settingsAppearance.usageLimitShowRemaining')}
+                    titleLines={0}
+                    subtitle={t('settingsAppearance.usageLimitShowRemainingDescription')}
+                    subtitleLines={0}
+                    icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accent} />}
+                    rightElement={
+                        <Switch
+                            accessibilityLabel={t('settingsAppearance.usageLimitShowRemaining')}
+                            value={usageLimitShowRemaining}
+                            onValueChange={setUsageLimitShowRemaining}
                         />
                     }
                 />

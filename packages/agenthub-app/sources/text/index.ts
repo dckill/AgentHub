@@ -59,7 +59,7 @@ export type TranslationParams<K extends TranslationKey> = GetParams<GetValue<Tra
  * Re-export language types and configuration
  */
 export type { SupportedLanguage } from './_all';
-export { SUPPORTED_LANGUAGES, SUPPORTED_LANGUAGE_CODES, DEFAULT_LANGUAGE, getLanguageNativeName, getLanguageEnglishName } from './_all';
+export { SUPPORTED_LANGUAGES, SUPPORTED_LANGUAGE_CODES, SUPPORTED_TRANSLATION_LANGUAGE_CODES, DEFAULT_LANGUAGE, getLanguageNativeName, getLanguageEnglishName } from './_all';
 
 /**
  * Translation objects for all supported languages

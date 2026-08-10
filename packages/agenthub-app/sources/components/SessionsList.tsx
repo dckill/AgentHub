@@ -16,6 +16,7 @@ import {
     collectProjectSessionIds,
     refreshOfficialThreadsForProjectList,
 } from '@/sync/sessionListRefresh';
+import { sync } from '@/sync/sync';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -88,12 +89,19 @@ export function SessionsList() {
 
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        if (generation === null) {
+            return () => {
+                cancelled = true;
+            };
+        }
         void refreshOfficialThreadsForProjectList({
             projectItems: dataRef.current,
             machines,
             sessions: storage.getState().sessions,
+            isCurrent: () => !cancelled && sync.getAccountGeneration() === generation,
             applyOfficialThreads: (machineId, threads) => {
-                if (!cancelled) {
+                if (!cancelled && sync.getAccountGeneration() === generation) {
                     storage.getState().applyOfficialCodexThreads(machineId, threads);
                 }
             },

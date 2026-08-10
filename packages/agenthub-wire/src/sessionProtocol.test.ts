@@ -54,7 +54,8 @@ describe('session protocol schemas', () => {
   it('rejects malformed events', () => {
     expect(sessionEventSchema.safeParse({ t: 'tool-call-start', call: '1' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x' }).success).toBe(false);
-    expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x', size: 1, image: { width: 10, height: 10 } }).success).toBe(false);
+    expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x', size: 1, image: { width: 10, height: 10 } }).success).toBe(true);
+    expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x', size: 1, image: { width: 10 } }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'turn-end' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'turn-end', status: 'canceled' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'start', title: 1 }).success).toBe(false);
@@ -142,6 +143,8 @@ describe('createEnvelope', () => {
         time: 12345,
         turn: 'turn-1',
         subagent,
+        claudeUuid: 'claude-message-1',
+        codexItemId: 'codex-item-1',
       }
     );
 
@@ -151,6 +154,8 @@ describe('createEnvelope', () => {
       role: 'agent',
       turn: 'turn-1',
       subagent,
+      claudeUuid: 'claude-message-1',
+      codexItemId: 'codex-item-1',
       ev: { t: 'tool-call-end', call: 'call-1' },
     });
   });

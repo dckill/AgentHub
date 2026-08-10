@@ -18,9 +18,14 @@ export async function ignoreOfficialThreadsFromWorkbench(input: {
     getThreads: (machineId: string) => OfficialCodexThread[];
     applyThreads: (machineId: string, threads: OfficialCodexThread[]) => void;
     ignoreThread?: (machineId: string, officialId: string) => Promise<void>;
+    isCurrent?: () => boolean;
 }): Promise<void> {
+    const isCurrent = input.isCurrent ?? (() => true);
     const uniqueOfficialIds = Array.from(new Set(input.officialIds.filter(Boolean)));
     if (uniqueOfficialIds.length === 0) {
+        return;
+    }
+    if (!isCurrent()) {
         return;
     }
 
@@ -31,10 +36,15 @@ export async function ignoreOfficialThreadsFromWorkbench(input: {
     const ignoreThread = input.ignoreThread ?? (await import('./officialThreads')).ignoreOfficialCodexThread;
     try {
         for (const officialId of uniqueOfficialIds) {
+            if (!isCurrent()) {
+                return;
+            }
             await ignoreThread(input.machineId, officialId);
         }
     } catch (error) {
-        input.applyThreads(input.machineId, previous);
+        if (isCurrent()) {
+            input.applyThreads(input.machineId, previous);
+        }
         throw error;
     }
 }

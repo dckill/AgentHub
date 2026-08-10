@@ -488,5 +488,34 @@ describe('ActivityUpdateAccumulator Smart Debounce', () => {
                 new Map([['session1', update3]])
             );
         });
+
+        it('should discard a delayed update when reset is called before the debounce fires', () => {
+            const update1: ApiEphemeralActivityUpdate = {
+                type: 'activity',
+                id: 'old-session',
+                active: true,
+                activeAt: 1000,
+                thinking: false,
+            };
+            const update2: ApiEphemeralActivityUpdate = {
+                type: 'activity',
+                id: 'old-session',
+                active: true,
+                activeAt: 1100,
+                thinking: false,
+            };
+
+            accumulator.addUpdate(update1);
+            accumulator.addUpdate(update2);
+            expect(mockFlushHandler).toHaveBeenCalledTimes(1);
+
+            accumulator.reset();
+            vi.advanceTimersByTime(500);
+
+            expect(mockFlushHandler).toHaveBeenCalledTimes(1);
+            expect(mockFlushHandler).not.toHaveBeenLastCalledWith(
+                new Map([['old-session', update2]]),
+            );
+        });
     });
 });

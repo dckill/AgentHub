@@ -15,6 +15,7 @@ import { layout } from '@/components/layout';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useFileScale } from '@/hooks/useScale';
+import { sync } from '@/sync/sync';
 
 interface InlineFileDiffProps {
     sessionId: string;
@@ -43,13 +44,22 @@ export const InlineFileDiff = React.memo(function InlineFileDiff({ sessionId, fu
 
     React.useEffect(() => {
         let cancelled = false;
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => !cancelled
+            && generation !== null
+            && sync.getAccountGeneration() === generation;
         setLoading(true);
         setError(null);
         setContent(null);
 
+        if (!isCurrent()) {
+            setLoading(false);
+            return;
+        }
+
         (async () => {
             if (!sessionPath || !gitDiffPath) {
-                if (!cancelled) {
+                if (isCurrent()) {
                     setLoading(false);
                     setError('File is outside the session root.');
                 }
@@ -62,7 +72,7 @@ export const InlineFileDiff = React.memo(function InlineFileDiff({ sessionId, fu
                         cwd: sessionPath,
                         timeout: 5000,
                     });
-                    if (cancelled) return;
+                    if (!isCurrent()) return;
                     if (!res.success) {
                         setError(res.error || t('components.inlineDiff.failedToReadFile'));
                         return;
@@ -76,16 +86,16 @@ export const InlineFileDiff = React.memo(function InlineFileDiff({ sessionId, fu
                     cwd: sessionPath,
                     timeout: 5000,
                 });
-                if (cancelled) return;
+                if (!isCurrent()) return;
                 if (!res.success) {
                     setError(res.error || t('components.inlineDiff.failedToFetchDiff'));
                     return;
                 }
                 setContent({ kind: 'patch', patch: res.stdout ?? '' });
             } catch (err) {
-                if (!cancelled) setError(err instanceof Error ? err.message : t('components.inlineDiff.failedToFetchDiff'));
+                if (isCurrent()) setError(err instanceof Error ? err.message : t('components.inlineDiff.failedToFetchDiff'));
             } finally {
-                if (!cancelled) setLoading(false);
+                if (isCurrent()) setLoading(false);
             }
         })();
 
@@ -118,7 +128,7 @@ export const InlineFileDiff = React.memo(function InlineFileDiff({ sessionId, fu
                     showToggle={Platform.OS === 'web'}
                 />
                 {loading ? (
-                    <View style={styles.centered}>
+                    <View accessible accessibilityRole="progressbar" accessibilityLabel={t('common.loading')} style={styles.centered}>
                         <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                     </View>
                 ) : error ? (
@@ -192,7 +202,13 @@ const DiffPaneHeader = React.memo(function DiffPaneHeader({
                 </View>
             ) : null}
             {showToggle ? <DiffStyleToggle value={diffStyle} onChange={onDiffStyleChange} /> : null}
-            <Pressable onPress={onClose} hitSlop={15} style={styles.closeButton}>
+            <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+                onPress={onClose}
+                hitSlop={15}
+                style={styles.closeButton}
+            >
                 <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
             </Pressable>
         </View>
@@ -214,10 +230,22 @@ const DiffStyleToggle = React.memo<{ value: 'unified' | 'split'; onChange: (v: '
     });
     return (
         <View style={[toggleStyles.container, { backgroundColor: theme.colors.groupped.background, borderColor: theme.colors.divider }]}>
-            <Pressable onPress={() => onChange('unified')} style={buttonStyle(value === 'unified')}>
+            <Pressable
+                accessibilityRole="radio"
+                accessibilityLabel={t('settingsAppearance.diffStyleOptions.unified')}
+                accessibilityState={{ selected: value === 'unified' }}
+                onPress={() => onChange('unified')}
+                style={buttonStyle(value === 'unified')}
+            >
                 <Text style={textStyle(value === 'unified')}>{t('settingsAppearance.diffStyleOptions.unified')}</Text>
             </Pressable>
-            <Pressable onPress={() => onChange('split')} style={buttonStyle(value === 'split')}>
+            <Pressable
+                accessibilityRole="radio"
+                accessibilityLabel={t('settingsAppearance.diffStyleOptions.split')}
+                accessibilityState={{ selected: value === 'split' }}
+                onPress={() => onChange('split')}
+                style={buttonStyle(value === 'split')}
+            >
                 <Text style={textStyle(value === 'split')}>{t('settingsAppearance.diffStyleOptions.split')}</Text>
             </Pressable>
         </View>

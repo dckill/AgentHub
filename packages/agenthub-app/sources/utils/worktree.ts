@@ -142,7 +142,9 @@ export async function listWorktrees(
         machineId,
         { executable: 'git', args: ['worktree', 'list', '--porcelain'], cwd: basePath },
     );
-    if (!result.success) return [];
+    if (!result.success) {
+        throw new Error(result.stderr || 'Failed to load worktrees');
+    }
 
     // Porcelain output has blocks separated by blank lines.
     // First block is the main worktree — skip it.

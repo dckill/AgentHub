@@ -5,6 +5,8 @@ import type { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { Counter, Histogram, register } from 'prom-client';
 import { rpcMethodNames } from '@artsum/agenthub-wire';
 import { ConcurrencyLimiter } from '../utils/resourceLimits';
+import { db } from '@/storage/db';
+import { canControlSession } from '@/app/session/sessionControl';
 
 // RPC routing uses Socket.IO rooms. A daemon registering method M for user U
 // joins room `rpc:U:M`. Callers look the daemon up cross-replica via
@@ -34,6 +36,41 @@ const RPC_PRESENCE_FETCH_TIMEOUT_MS = 500;
 // under load while still catching a daemon mid-reconnect.
 const RPC_RECONNECT_GRACE_MS = 15_000;
 const RPC_RECONNECT_POLL_MS = 200;
+
+const SESSION_CONTROL_METHODS = new Set([
+    'abort',
+    'permission',
+    'permission-mode',
+    'switch',
+    'goal-action',
+    'killSession',
+    'bash',
+    'exec',
+    'writeFile',
+    'deleteFile',
+    'createDirectory',
+]);
+
+function isSessionControlMethod(method: string): boolean {
+    const separator = method.indexOf(':');
+    return separator > 0 && SESSION_CONTROL_METHODS.has(method.slice(separator + 1));
+}
+
+async function isUserSessionControlDenied(userId: string, socket: Socket, method: string): Promise<boolean> {
+    if (!isSessionControlMethod(method)) {
+        return false;
+    }
+    const separator = method.indexOf(':');
+    const scopeId = method.slice(0, separator);
+    const session = await db.session.findFirst({
+        where: { id: scopeId, accountId: userId },
+        select: { id: true },
+    });
+    if (!session) {
+        return false;
+    }
+    return !(await canControlSession(userId, scopeId, socket.data.deviceId));
+}
 
 const rpcCallCounter = new Counter({
     name: 'rpc_calls_total',
@@ -196,6 +233,20 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
             if (!method || typeof method !== 'string') {
                 finish('invalid_params');
                 callback?.({ ok: false, error: 'Invalid parameters: method is required' });
+                return;
+            }
+            if (socket.data?.clientType === 'user-scoped'
+                && typeof socket.data?.deviceId !== 'string'
+                && isSessionControlMethod(method)) {
+                finish('control_denied');
+                callback?.({ ok: false, error: 'Session control requires a device identity' });
+                return;
+            }
+            if (socket.data?.clientType === 'user-scoped'
+                && typeof socket.data?.deviceId === 'string'
+                && await isUserSessionControlDenied(userId, socket, method)) {
+                finish('control_denied');
+                callback?.({ ok: false, error: 'Session control is held by another device' });
                 return;
             }
             releaseConcurrency = inFlightCalls.acquire(socket.id);

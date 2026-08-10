@@ -118,7 +118,7 @@ describe('session entry and project workbench i18n boundary', () => {
         expect(projectEditor).toContain('aria-modal');
         expect(projectEditor).toContain("accessibilityLabel={t('project.nameLabel')}");
         expect(projectEditor.match(/accessibilityRole="button"/g)?.length).toBeGreaterThanOrEqual(3);
-        expect(fab).toContain("accessibilityLabel={t('newSession.title')}");
+        expect(fab).toContain("accessibilityLabel ?? t('newSession.title')");
         expect(gitLog).toContain("accessibilityLabel={t('common.close')}");
     });
 });

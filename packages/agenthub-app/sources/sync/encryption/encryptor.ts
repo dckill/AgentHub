@@ -1,8 +1,10 @@
 import { decryptBox, decryptSecretBox, encryptBox, encryptSecretBox } from "@/encryption/libsodium";
 import { encodeBase64, decodeBase64 } from "@/encryption/base64";
 import sodium from '@/encryption/libsodium.lib';
-import { decodeUTF8, encodeUTF8 } from "@/encryption/text";
+import { encodeUTF8 } from "@/encryption/text";
 import { decryptAESGCMString, encryptAESGCMString } from "@/encryption/aes";
+import { unwrapDataKeyBundle, wrapDataKeyBundle } from './dataKeyBundle';
+import { decryptBoxItem } from './boxPayloadProjection';
 
 //
 // IMPORTANT: Right now there is a bug in the AES implementation and it works only with a normal strings converted to Uint8Array. 
@@ -25,7 +27,8 @@ export class SecretBoxEncryption implements Encryptor, Decryptor {
     }
 
     async decrypt(data: Uint8Array[]): Promise<(any | null)[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: (any | null)[] = [];
         for (const item of data) {
             results.push(decryptSecretBox(item, this.secretKey));
@@ -34,7 +37,8 @@ export class SecretBoxEncryption implements Encryptor, Decryptor {
     }
 
     async encrypt(data: any[]): Promise<Uint8Array[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: Uint8Array[] = [];
         for (const item of data) {
             results.push(encryptSecretBox(item, this.secretKey));
@@ -55,7 +59,8 @@ export class BoxEncryption implements Encryptor, Decryptor {
     }
 
     async encrypt(data: any[]): Promise<Uint8Array[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: Uint8Array[] = [];
         for (const item of data) {
             results.push(encryptBox(encodeUTF8(JSON.stringify(item)), this.publicKey));
@@ -64,15 +69,11 @@ export class BoxEncryption implements Encryptor, Decryptor {
     }
 
     async decrypt(data: Uint8Array[]): Promise<(any | null)[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: (any | null)[] = [];
         for (const item of data) {
-            let decrypted = decryptBox(item, this.privateKey);
-            if (!decrypted) {
-                results.push(null);
-                continue;
-            }
-            results.push(JSON.parse(decodeUTF8(decrypted)));
+            results.push(decryptBoxItem(item, (value) => decryptBox(value, this.privateKey)));
         }
         return results;
     }
@@ -88,29 +89,29 @@ export class AES256Encryption implements Encryptor, Decryptor {
     }
 
     async encrypt(data: any[]): Promise<Uint8Array[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: Uint8Array[] = [];
         for (const item of data) {
             // Serialize to JSON string first
             const encrypted = decodeBase64(await encryptAESGCMString(JSON.stringify(item), this.secretKeyB64));
-            let output = new Uint8Array(encrypted.length + 1);
-            output[0] = 0;
-            output.set(encrypted, 1);
-            results.push(output);
+            results.push(wrapDataKeyBundle(encrypted));
         }
         return results;
     }
 
     async decrypt(data: Uint8Array[]): Promise<(any | null)[]> {
-        // Process as batch, not Promise.all - more efficient
+        // Keep one ciphertext per item: the wire protocol expects independent ciphertext blocks.
+        // Do not batch-serialize the entire array; that would change the message format.
         const results: (any | null)[] = [];
         for (const item of data) {
             try {
-                if (item[0] !== 0) {
+                const encrypted = unwrapDataKeyBundle(item);
+                if (!encrypted) {
                     results.push(null);
                     continue;
                 }
-                const decryptedString = await decryptAESGCMString(encodeBase64(item.slice(1)), this.secretKeyB64);
+                const decryptedString = await decryptAESGCMString(encodeBase64(encrypted), this.secretKeyB64);
                 if (!decryptedString) {
                     results.push(null);
                 } else {

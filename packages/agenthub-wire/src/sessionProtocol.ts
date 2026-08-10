@@ -50,7 +50,7 @@ export const sessionFileEventSchema = z.object({
     .object({
       width: z.number(),
       height: z.number(),
-      thumbhash: z.string(),
+      thumbhash: z.string().optional(),
     })
     .optional(),
 });
@@ -103,6 +103,8 @@ export const sessionEnvelopeSchema = z
         message: 'subagent must be a cuid2 value',
       })
       .optional(),
+    claudeUuid: z.string().min(1).optional(),
+    codexItemId: z.string().min(1).optional(),
     ev: sessionEventSchema,
   })
   .superRefine((envelope, ctx) => {
@@ -129,6 +131,8 @@ export type CreateEnvelopeOptions = {
   time?: number;
   turn?: string;
   subagent?: string;
+  claudeUuid?: string;
+  codexItemId?: string;
 };
 
 export function createEnvelope(role: SessionRole, ev: SessionEvent, opts: CreateEnvelopeOptions = {}): SessionEnvelope {
@@ -138,6 +142,8 @@ export function createEnvelope(role: SessionRole, ev: SessionEvent, opts: Create
     role,
     ...(opts.turn ? { turn: opts.turn } : {}),
     ...(opts.subagent ? { subagent: opts.subagent } : {}),
+    ...(opts.claudeUuid ? { claudeUuid: opts.claudeUuid } : {}),
+    ...(opts.codexItemId ? { codexItemId: opts.codexItemId } : {}),
     ev,
   });
 }

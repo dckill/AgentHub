@@ -1,12 +1,14 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { z } from 'zod';
 import { httpClient } from './authenticatedHttpClient';
+import { getOrCreateDeviceId } from './deviceIdentity';
 
 const PushTokenSchema = z.object({
     id: z.string(),
     token: z.string(),
     createdAt: z.number(),
     updatedAt: z.number(),
+    deviceId: z.string().nullable().optional(),
 });
 
 const PushTokenListResponseSchema = z.object({
@@ -20,7 +22,7 @@ export async function registerPushToken(credentials: AuthCredentials, token: str
     await httpClient.request(credentials, '/v1/push-tokens', {
             method: 'POST',
             signal,
-            body: { token },
+            body: { token, deviceId: getOrCreateDeviceId() },
             schema: SuccessResponseSchema,
     });
 }

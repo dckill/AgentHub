@@ -299,6 +299,8 @@ export const OAuthViewRender = React.memo((props: {
             <View style={[styles.errorContainer]}>
                 <Text style={[styles.errorText, { color: props.foregroundColor }]}>{error}</Text>
                 <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.retry')}
                     style={styles.retryButton}
                     onPress={props.onRetry}
                 >
@@ -334,13 +336,23 @@ export const OAuthViewRender = React.memo((props: {
                 userAgent='Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) AppleWebKit/602.1.50 (KHTML, like Gecko) CriOS/56.0.2924.75 Mobile/14E5239e Safari/602.1'
             />
             {webViewLoading && (
-                <Animated.View style={[styles.loadingOverlay, webViewLoadingAnimatedStyle, { backgroundColor: props.backgroundColor }]}>
+                <Animated.View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={t('common.loading')}
+                    style={[styles.loadingOverlay, webViewLoadingAnimatedStyle, { backgroundColor: props.backgroundColor }]}
+                >
                     <ActivityIndicator size="large" color={props.foregroundColor || theme.colors.text} />
                     <Text style={[styles.loadingText, { color: props.foregroundColor }]}>{t('common.loading')}</Text>
                 </Animated.View>
             )}
             {exchangingTokens && (
-                <Animated.View style={[styles.loadingOverlay, tokenExchangeAnimatedStyle, { backgroundColor: props.backgroundColor }]}>
+                <Animated.View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={t('settings.exchangingTokens')}
+                    style={[styles.loadingOverlay, tokenExchangeAnimatedStyle, { backgroundColor: props.backgroundColor }]}
+                >
                     <ActivityIndicator size="large" color={props.foregroundColor || theme.colors.text} />
                     <Text style={[styles.loadingText, { color: props.foregroundColor }]}>{t('settings.exchangingTokens')}</Text>
                 </Animated.View>

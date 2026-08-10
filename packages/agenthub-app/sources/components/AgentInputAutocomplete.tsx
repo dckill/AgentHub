@@ -32,6 +32,9 @@ export const AgentInputAutocomplete = React.memo((props: AgentInputAutocompleteP
                                 ? theme.colors.surfaceSelected
                                 : 'transparent',
                     })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Suggestion ${index + 1}`}
+                    accessibilityState={{ selected: selectedIndex === index }}
                 >
                     {suggestion}
                 </Pressable>

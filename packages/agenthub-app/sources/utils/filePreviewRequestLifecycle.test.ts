@@ -8,6 +8,9 @@ describe('file preview request lifecycle', () => {
             path.resolve(process.cwd(), 'sources/app/(app)/session/[id]/file.tsx'),
             'utf8',
         );
+        expect(source).toContain("import { sync } from '@/sync/sync';");
+        expect(source).toContain('const generation = sync.getAccountGeneration();');
+        expect(source).toContain('sync.getAccountGeneration() === generation');
         const effect = source.match(
             /\/\/ Load file content[\s\S]*?React\.useEffect\(\(\) => \{[\s\S]*?\n    \}, \[([^\]]+)\]\);/,
         );

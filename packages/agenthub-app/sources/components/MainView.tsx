@@ -32,6 +32,8 @@ import { useUpdates } from '@/hooks/useUpdates';
 import { useRefreshProjectSessionList } from '@/hooks/useRefreshProjectSessionList';
 import { getAccessibleActionProps } from './accessibilityProps';
 import { HomeOverview } from './HomeOverview';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 interface MainViewProps {
     variant: 'phone' | 'sidebar';
@@ -219,13 +221,18 @@ const MachinesHeaderActions = React.memo(() => {
     );
 
     const handleCreateGroup = React.useCallback(async () => {
-        const name = await Modal.prompt(
-            t('machines.newGroup'),
-            t('machines.enterGroupName'),
-            { placeholder: t('machines.groupName'), confirmText: t('common.create') },
-        );
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const name = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('machines.newGroup'),
+                t('machines.enterGroupName'),
+                { placeholder: t('machines.groupName'), confirmText: t('common.create') },
+            ),
+        });
         const trimmed = name?.trim();
-        if (!trimmed) return;
+        if (!trimmed || !isCurrent()) return;
         if (groupNames.includes(trimmed)) {
             Modal.alert(t('common.error'), t('machines.groupAlreadyExists'));
             return;
@@ -235,15 +242,20 @@ const MachinesHeaderActions = React.memo(() => {
     }, [groupNames, setMachineGroupOrder]);
 
     const handleManualUrl = React.useCallback(async () => {
-        const url = await Modal.prompt(
-            t('modals.authenticateTerminal'),
-            t('modals.pasteUrlFromTerminal'),
-            {
-                placeholder: 'agenthub://terminal?...',
-                confirmText: t('common.continue'),
-            },
-        );
-        if (url?.trim()) {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const url = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('modals.authenticateTerminal'),
+                t('modals.pasteUrlFromTerminal'),
+                {
+                    placeholder: 'agenthub://terminal?...',
+                    confirmText: t('common.continue'),
+                },
+            ),
+        });
+        if (url?.trim() && isCurrent()) {
             connectWithUrl(url.trim());
         }
     }, [connectWithUrl]);

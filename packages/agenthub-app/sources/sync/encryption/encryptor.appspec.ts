@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@/dev/testRunner';
 import { SecretBoxEncryption, BoxEncryption, AES256Encryption } from './encryptor';
+import { DATA_KEY_BUNDLE_VERSION } from '@artsum/agenthub-wire';
 import { getRandomBytes } from 'expo-crypto';
 
 describe('SecretBoxEncryption', () => {
@@ -292,6 +293,7 @@ describe('AES256Encryption', () => {
         const encryptor = new AES256Encryption(secretKey);
         
         const encrypted = await encryptor.encrypt(['Hello, AES!']);
+        expect(encrypted[0][0]).toBe(DATA_KEY_BUNDLE_VERSION);
         const decrypted = await encryptor.decrypt(encrypted);
         
         expect(decrypted.length).toBe(1);

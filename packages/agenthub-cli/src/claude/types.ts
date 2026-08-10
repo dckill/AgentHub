@@ -12,7 +12,8 @@ export const UsageSchema = z.object({
   cache_read_input_tokens: z.number().int().nonnegative().optional(),
   output_tokens: z.number().int().nonnegative(),
   context_window: z.number().int().positive().optional(),
-  service_tier: z.string().optional(),
+  // Synthetic API-error messages use null instead of omitting this field.
+  service_tier: z.string().nullish(),
 }).passthrough();
 
 // Main schema with minimal validation for only the fields we use
@@ -37,7 +38,9 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
     uuid: z.string(),
     type: z.literal("assistant"),
     message: z.object({
-      usage: UsageSchema.optional(), // Used in apiSession.ts
+      // Usage is diagnostic metadata. A malformed usage block must not drop
+      // the assistant message (and therefore the visible API error) itself.
+      usage: UsageSchema.optional().catch(undefined), // Used in apiSession.ts
       model: z.string().optional(), // Used for cost calculation
     }).passthrough().optional()
   }).passthrough(),

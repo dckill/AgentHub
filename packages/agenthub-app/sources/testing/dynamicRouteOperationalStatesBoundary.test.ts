@@ -74,6 +74,9 @@ describe('dynamic route operational state boundary', () => {
         const hook = read('hooks/useGitStatusFiles.ts');
         const files = read('app/(app)/session/[id]/files.tsx');
 
+        expect(hook).toContain("import { sync } from '@/sync/sync';");
+        expect(hook).toContain('const generation = sync.getAccountGeneration();');
+        expect(hook).toContain('sync.getAccountGeneration() === generation');
         expect(hook).toContain('classifyGitStatusLoadResult');
         expect(hook).toContain('error: hasError || cachedState.kind === \'error\'');
         expect(files).toContain('error: gitStatusError');

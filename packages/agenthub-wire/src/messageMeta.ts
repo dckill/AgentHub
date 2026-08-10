@@ -2,6 +2,7 @@ import * as z from 'zod';
 
 export const MessageMetaSchema = z.object({
   sentFrom: z.string().optional(),
+  turnOriginDevice: z.string().trim().min(1).max(256).optional(),
   // Preserve provider/plugin modes in transit; runners validate support before execution.
   permissionMode: z.string().optional(),
   model: z.string().nullable().optional(),

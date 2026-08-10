@@ -30,6 +30,8 @@ import { allowUnsignedLocalFiles } from "@/config/env";
 import { HTTP_BODY_LIMIT_BYTES } from "./utils/resourceLimits";
 import { enableResourceLimits } from "./utils/enableResourceLimits";
 import { externalSharesRoutes } from "./routes/externalSharesRoutes";
+import { attachmentRoutes } from "./routes/attachmentRoutes";
+import { applySecurityHeaders } from "./utils/securityHeaders";
 
 export async function startApi() {
 
@@ -46,6 +48,10 @@ export async function startApi() {
         allowedHeaders: ['Authorization', 'Content-Type', 'X-AgentHub-Client', 'X-AgentHub-Debug-Secret'],
         methods: ['GET', 'POST', 'DELETE']
     });
+    app.addHook('onSend', async (_request, reply) => {
+        applySecurityHeaders(reply);
+    });
+    app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
     log({ module: 'cors', allowedOrigins: getAllowedOriginsForLog() }, 'CORS policy configured');
     app.get('/', function (request, reply) {
         reply.send('Welcome to AgentHub Server!');
@@ -101,6 +107,7 @@ export async function startApi() {
     kvRoutes(typed);
     v3SessionRoutes(typed);
     v4SyncRoutes(typed);
+    attachmentRoutes(typed);
 
     // Start HTTP 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 13017;

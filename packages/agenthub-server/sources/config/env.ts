@@ -57,8 +57,8 @@ export function validateServerEnv() {
         if (!allowedOrigins) {
             log({ module: 'env', level: 'warn' }, 'No CORS origin allowlist configured; browser requests with an Origin header will be rejected in production');
         }
-        if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && !process.env.AGENTHUB_DEBUG_LOG_SECRET) {
-            log({ module: 'env', level: 'warn' }, 'Debug log endpoint is enabled without AGENTHUB_DEBUG_LOG_SECRET; Bearer authentication is still required');
+        if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING === 'true') {
+            throw new Error('DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING is not allowed in production');
         }
     }
 }

@@ -29,6 +29,8 @@ export const ArchivedSessionsOverlay = React.memo(({ visible, onClose, projectIc
         <Pressable
             style={styles.sessionRow}
             onPress={() => handleSessionPress(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={item.name}
         >
             <ProjectIcon icon={projectIcon} size={20} />
             <View style={styles.sessionContent}>
@@ -48,7 +50,13 @@ export const ArchivedSessionsOverlay = React.memo(({ visible, onClose, projectIc
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <Pressable onPress={onClose} hitSlop={12} style={styles.backButton}>
+                <Pressable
+                    onPress={onClose}
+                    hitSlop={12}
+                    style={styles.backButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.back')}
+                >
                     <Text style={styles.backButtonText}>{t('common.back')}</Text>
                 </Pressable>
                 <Text style={styles.headerTitle} numberOfLines={1}>

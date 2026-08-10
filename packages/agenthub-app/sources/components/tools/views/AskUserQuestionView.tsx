@@ -4,6 +4,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { ToolViewProps } from './_all';
 import { ToolSectionView } from '../ToolSectionView';
 import { sessionAllow } from '@/sync/ops';
+import { runPermissionAction } from '@/sync/permissionActionLifecycle';
 import { t } from '@/text';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -238,8 +239,10 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
         try {
             // AskUserQuestion expects answers to be returned as part of the tool input,
             // not as a follow-up plain text message.
-            if (tool.permission?.id) {
-                await sessionAllow(sessionId, tool.permission.id, undefined, undefined, 'approved', { answers });
+            const permissionId = tool.permission?.id;
+            if (permissionId) {
+                const result = await runPermissionAction(() => sessionAllow(sessionId, permissionId, undefined, undefined, 'approved', { answers }));
+                if (result === null) return;
             }
         } catch (error) {
             console.error('Failed to submit answer:', error);
@@ -300,6 +303,9 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
                                             onPress={() => handleOptionToggle(qIndex, oIndex, question.multiSelect)}
                                             disabled={!canInteract}
                                             activeOpacity={0.7}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={option.label}
+                                            accessibilityState={{ selected: isSelected, disabled: !canInteract }}
                                         >
                                             {question.multiSelect ? (
                                                 <View style={[
@@ -342,6 +348,9 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
                             onPress={handleSubmit}
                             disabled={!allQuestionsAnswered || isSubmitting}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('tools.askUserQuestion.submit')}
+                            accessibilityState={{ disabled: !allQuestionsAnswered || isSubmitting }}
                         >
                             {isSubmitting ? (
                                 <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />

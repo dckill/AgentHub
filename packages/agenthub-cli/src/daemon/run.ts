@@ -21,7 +21,7 @@ import { spawnAgentHubCLI } from '@/utils/spawnAgentHubCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession } from '@/persistence';
 import type { PersistedSession } from '@/persistence';
 
-import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledAgentHubVersion, stopDaemon } from './controlClient';
+import { checkIfDaemonRunningAndCleanupStaleState, cleanupDaemonState, isDaemonRunningCurrentlyInstalledAgentHubVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
 import { randomBytes } from 'node:crypto';
 import { join } from 'path';
@@ -52,6 +52,8 @@ import { probeExternalProcessState } from './externalProcessMonitor';
 import { TerminalOutboxJournal } from '@/api/terminalOutboxJournal';
 import { CliUpdateManager } from '@/update/cliUpdater';
 import type { CliUpdateStatus } from '@artsum/agenthub-wire';
+import { isSystemdDaemonInstalled, restartSystemdDaemon } from './systemdSupervisor';
+import { resolveDaemonVersionMismatch } from './daemonVersionMismatch';
 export { initialMachineMetadata };
 
 function shellQuoteArg(value: string): string {
@@ -149,12 +151,23 @@ export async function startDaemon(): Promise<void> {
   // Check if running daemon version matches current CLI version
   const runningDaemonVersionMatches = await isDaemonRunningCurrentlyInstalledAgentHubVersion();
   if (!runningDaemonVersionMatches) {
-    // TODO: This hand-rolled self-restart path is awkward to reason about and awkward to test.
-    // We should probably migrate this daemon to native system service management
-    // (launchd/systemd), so startup/start-at-login and upgrades
-    // are owned by the OS instead of by the daemon trying to replace itself in-process.
-    logger.debug('[DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version');
-    await stopDaemon();
+    const daemonRunning = await checkIfDaemonRunningAndCleanupStaleState();
+    if (daemonRunning) {
+      const restartResolution = await resolveDaemonVersionMismatch({
+        daemonRunning,
+        systemdInstalled: isSystemdDaemonInstalled(),
+        restartSystemdDaemon,
+        stopDaemon,
+      });
+      logger.debug(`[DAEMON RUN] Daemon version mismatch resolved through ${restartResolution}`);
+      if (restartResolution === 'systemd') {
+        // The user service owns the replacement process. Do not acquire a second
+        // lock or continue startup in this caller after systemd restart succeeds.
+        process.exit(0);
+      }
+    } else {
+      logger.debug('[DAEMON RUN] No existing daemon found; starting normally');
+    }
   } else {
     logger.debug('[DAEMON RUN] Daemon version matches, keeping existing daemon');
     console.log('Daemon already running with matching version');
@@ -464,6 +477,9 @@ export async function startDaemon(): Promise<void> {
         }
         if (options.forkedFromMessageId) {
           extraEnv.AGENTHUB_FORKED_FROM_MESSAGE_ID = options.forkedFromMessageId;
+        }
+        if (options.isSideChat) {
+          extraEnv.AGENTHUB_SIDE_CHAT = '1';
         }
         if (options.resumeClaudeSessionId) {
           extraEnv.AGENTHUB_FORK_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;

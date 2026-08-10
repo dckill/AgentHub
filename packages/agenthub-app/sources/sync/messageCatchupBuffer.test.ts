@@ -84,11 +84,13 @@ describe('MessageCatchupBuffer', () => {
     });
 
     it('is wired into multi-page catch-up instead of committing every 100-message page directly', () => {
-        const source = readFileSync(new URL('./sync.ts', import.meta.url), 'utf8');
+        const runnerSource = readFileSync(new URL('./messageCatchupRunner.ts', import.meta.url), 'utf8');
+        const pageApplicationSource = readFileSync(new URL('./messageFetchPageApplication.ts', import.meta.url), 'utf8');
 
-        expect(source).toContain('new MessageCatchupBuffer<NormalizedMessage>');
-        expect(source).toContain('catchup.push(processed.normalizedMessages');
-        expect(source).toContain('catchup.flush()');
-        expect(source.match(/this\.applyMessages\(sessionId, processed\.normalizedMessages\);/g)).toHaveLength(2);
+        expect(runnerSource).toContain('new MessageCatchupBuffer<NormalizedMessage>');
+        expect(runnerSource).toContain('catchup.push(processed.normalizedMessages');
+        expect(runnerSource).toContain('catchup.flush()');
+        expect(pageApplicationSource).toContain('runMessageCatchup({');
+        expect(pageApplicationSource).toContain('params.applyMessages(messages);');
     });
 });

@@ -25,36 +25,42 @@ function DemoComposer(props: { locked?: boolean; attachments?: boolean }) {
             placeholder="Ask AgentHub to inspect, edit, or explain..."
             value={value}
             onChangeText={setValue}
-            sessionId="agenthub-composer-demo"
+            sessionContext={{
+                sessionId: 'agenthub-composer-demo',
+                metadata: {
+                    flavor: 'codex',
+                    path: '/workspace/agenthub',
+                    home: '/home/agenthub',
+                } as any,
+                agentType: 'codex',
+                machineName: 'agenthub-devbox',
+                onMachineClick: () => {},
+                currentPath: '/workspace/agenthub',
+                onPathClick: () => {},
+            }}
             onSend={() => {}}
-            permissionMode={mode}
-            onPermissionModeChange={setMode}
-            availableModes={permissionModes}
-            modelMode={model}
-            onModelModeChange={setModel}
-            availableModels={modelModes}
-            metadata={{
-                flavor: 'codex',
-                path: '/workspace/agenthub',
-                home: '/home/agenthub',
-            } as any}
-            agentType="codex"
+            settings={{
+                permissionMode: mode,
+                onPermissionModeChange: setMode,
+                availableModes: permissionModes,
+                modelMode: model,
+                onModelModeChange: setModel,
+                availableModels: modelModes,
+            }}
             connectionStatus={{
                 text: 'connected',
                 color: '#158A4B',
                 dotColor: '#158A4B',
             }}
             blockSend={props.locked}
-            machineName="agenthub-devbox"
-            onMachineClick={() => {}}
-            currentPath="/workspace/agenthub"
-            onPathClick={() => {}}
-            fileReferences={props.attachments ? ['packages/agenthub-app/sources/components/AgentInput.tsx'] : []}
-            onFileReferencesChange={() => {}}
-            onFilePickerOpen={() => {}}
-            localFiles={props.attachments ? localFiles : []}
-            onLocalFileRemove={() => {}}
-            onLocalFilePick={() => {}}
+            attachments={{
+                fileReferences: props.attachments ? ['packages/agenthub-app/sources/components/AgentInput.tsx'] : [],
+                onFileReferencesChange: () => {},
+                onFilePickerOpen: () => {},
+                localFiles: props.attachments ? localFiles : [],
+                onLocalFileRemove: () => {},
+                onLocalFilePick: () => {},
+            }}
             onSlashCommandSelect={() => {}}
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={async () => []}

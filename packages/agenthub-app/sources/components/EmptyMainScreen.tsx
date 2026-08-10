@@ -6,6 +6,8 @@ import { useConnectTerminal } from '@/hooks/useConnectTerminal';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { runSessionActionRequest } from '@/sync/sessionActionRequestLifecycle';
+import { sync } from '@/sync/sync';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -89,6 +91,26 @@ export function EmptyMainScreen() {
     const { connectTerminal, connectWithUrl, isLoading } = useConnectTerminal();
     const { theme } = useUnistyles();
     const styles = stylesheet;
+    const handleManualUrl = React.useCallback(async () => {
+        const generation = sync.getAccountGeneration();
+        const isCurrent = () => generation !== null && sync.getAccountGeneration() === generation;
+        const url = await runSessionActionRequest({
+            isCurrent,
+            request: () => Modal.prompt(
+                t('modals.authenticateTerminal'),
+                t('modals.pasteUrlFromTerminal'),
+                {
+                    placeholder: 'agenthub://terminal?...',
+                    cancelText: t('common.cancel'),
+                    confirmText: t('common.authenticate'),
+                },
+            ),
+        });
+
+        if (url?.trim() && isCurrent()) {
+            connectWithUrl(url.trim());
+        }
+    }, [connectWithUrl]);
 
     return (
         <View style={styles.container}>
@@ -146,21 +168,7 @@ export function EmptyMainScreen() {
                                 title={t('connect.enterUrlManually')}
                                 size="normal"
                                 display="inverted"
-                                onPress={async () => {
-                                    const url = await Modal.prompt(
-                                        t('modals.authenticateTerminal'),
-                                        t('modals.pasteUrlFromTerminal'),
-                                        {
-                                            placeholder: 'agenthub://terminal?...',
-                                            cancelText: t('common.cancel'),
-                                            confirmText: t('common.authenticate')
-                                        }
-                                    );
-
-                                    if (url?.trim()) {
-                                        connectWithUrl(url.trim());
-                                    }
-                                }}
+                                onPress={handleManualUrl}
                             />
                         </View>
                     </View>

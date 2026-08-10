@@ -176,6 +176,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                     ]}
                     onPress={handlePress}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={toolTitle}
                 >
                     <View style={[styles.headerLeft, { gap: s(8) }]}>
                         <View style={[styles.iconContainer, { width: s(24), height: s(24) }]}>

@@ -33,6 +33,7 @@ import { consumeDevWebCredentials } from '@/auth/devWebCredentials';
 import { initializeRootRuntime, type RootInitializationState } from '@/auth/rootInitialization';
 import { Typography } from '@/constants/Typography';
 import { loadCurrentTranslations, t } from '@/text';
+import { BrowserNavigationShortcuts } from '@/hooks/useBrowserNavigationShortcuts';
 
 // Configure notification handler for foreground notifications
 Notifications.setNotificationHandler({
@@ -390,6 +391,7 @@ export default function RootLayout() {
                         <ThemeProvider value={navigationTheme}>
                             <StatusBarProvider />
                             <ModalProvider>
+                                <BrowserNavigationShortcuts />
                                 <CommandPaletteProvider>
                                     <HorizontalSafeAreaWrapper>
                                         <SidebarNavigator />

@@ -47,6 +47,18 @@ describe('reconcileSessionSnapshot', () => {
         expect(result.map((item) => item.id)).toEqual(['failed', 'fresh']);
     });
 
+    it('keeps the last known sessions when every non-empty snapshot record fails to decrypt', () => {
+        const existing = session('existing');
+
+        const result = reconcileSessionSnapshot({
+            rawSessionIds: ['replacement'],
+            decryptedSessions: [],
+            existingSessions: { existing },
+        });
+
+        expect(result).toEqual([existing]);
+    });
+
     it('does not let an older REST snapshot overwrite newer socket state', () => {
         const existing = session('session-1', {
             seq: 9,

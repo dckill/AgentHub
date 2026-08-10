@@ -109,10 +109,12 @@ model AccountPushToken {
     accountId String
     account   Account  @relation(fields: [accountId], references: [id])
     token     String
+    deviceId  String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
     @@unique([accountId, token])
+    @@index([accountId, deviceId])
 }
 
 //
@@ -147,6 +149,8 @@ model Session {
     lastActiveAt      DateTime         @default(now())
     thinking          Boolean          @default(false)
     thinkingAt        DateTime?
+    activeDeviceId    String?
+    activeDeviceAt    DateTime?
     createdAt         DateTime         @default(now())
     updatedAt         DateTime         @updatedAt
     messages          SessionMessage[]
@@ -155,6 +159,7 @@ model Session {
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
+    @@index([accountId, activeDeviceId])
 }
 
 model SessionMessage {

@@ -61,6 +61,16 @@ export const it: TranslationStructure = {
         close: 'Chiudi',
         backAgainToExit: 'Premi di nuovo Indietro per uscire da AgentHub',
         unknownError: 'Errore sconosciuto',
+        attachmentUploadFailedTitle: 'Caricamento allegato non riuscito',
+        attachmentUploadFailedMessage: 'Non è stato possibile caricare l’immagine in modo sicuro. Il contenuto è stato conservato; controlla la connessione e riprova.',
+        attachmentUploadPartialTitle: 'Alcuni allegati non sono stati caricati',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `Impossibile caricare ${count} immagini. Gli altri allegati e il messaggio sono stati inviati.`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `Allegato: ${name}`,
+        sessionControlObserver: 'Sola lettura: un altro dispositivo controlla questa sessione',
+        sessionControlController: 'Questo dispositivo controlla la sessione',
+        sessionControlRelease: 'Rilascia controllo',
+        sessionControlClaim: 'Prendi controllo',
+        sessionControlClaimFailed: 'Questa sessione è controllata da un altro dispositivo',
         saveAs: 'Salva con nome',
     },
 
@@ -201,6 +211,13 @@ export const it: TranslationStructure = {
         },
         alwaysShowContextSize: 'Mostra sempre dimensione contesto',
         alwaysShowContextSizeDescription: 'Mostra l\'uso del contesto anche quando non è vicino al limite',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'Scala',
         scalingDescription: 'Regola le dimensioni degli elementi dell\'interfaccia',
@@ -476,6 +493,16 @@ export const it: TranslationStructure = {
         newSessionPlaceholder: 'Su cosa vorresti lavorare?',
         importOfficialTitle: 'Acquisizione della sessione del computer',
         importOfficialDescription: 'Importazione della conversazione, ripristino del contesto e sincronizzazione dello stato corrente. La sessione non è disponibile fino al termine.',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -587,6 +614,14 @@ export const it: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: 'Pronto a programmare?',
@@ -888,7 +923,9 @@ export const it: TranslationStructure = {
         }
     },
 
+    sideChat: { panelTitle: 'Chat laterali', allFiles: 'Tutti i file', newChat: 'Nuova chat laterale', startButton: 'Avvia chat laterale', creating: 'Creazione…', unavailable: 'Questa sessione non può essere biforcata mentre la macchina è offline o i metadati del provider non sono disponibili.', emptyTitle: 'Nessuna chat laterale', emptySubtitle: 'Avvia una conversazione isolata che conserva il contesto principale senza scrivere nella relativa trascrizione.', close: 'Chiudi chat laterale', expand: 'Apri chat laterale a schermo intero', defaultTitle: ({ index }: { index: number }) => `Chat laterale ${index}` },
     files: {
+        addPanel: 'Add workbench panel',
         loadFailed: 'Impossibile caricare le modifiche. Controlla la connessione e riprova.',
         fileLoadFailed: 'Impossibile caricare questo file. Controlla la connessione e riprova.',
         searchFailed: 'Impossibile cercare i file. Riprova.',
@@ -1205,6 +1242,16 @@ export const it: TranslationStructure = {
         notFound: 'Macchina non trovata',
         launchNewSessionInDirectory: 'Avvia nuova sessione nella directory',
         statusAndProperties: 'Stato e proprietà',
+        systemResources: 'Risorse di sistema',
+        memory: 'Memoria',
+        network: 'Rete',
+        downloadSpeed: 'Download',
+        uploadSpeed: 'Upload',
+        storage: 'Archiviazione',
+        used: 'Usato',
+        available: 'Disponibile',
+        metricsUnavailable: 'Metriche in tempo reale non disponibili',
+        metricsStale: 'Visualizzazione dell’ultima istantanea disponibile',
         actions: 'Funzioni',
         startSessionOnThisMachine: 'Avvia sessione su questo dispositivo',
         startSessionOnThisMachineSubtitle: 'Apre la schermata nuova sessione con questo dispositivo selezionato.',

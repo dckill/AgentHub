@@ -64,6 +64,16 @@ export const ja: TranslationStructure = {
         close: '閉じる',
         backAgainToExit: 'もう一度戻るを押すとAgentHubを終了します',
         unknownError: '不明なエラー',
+        attachmentUploadFailedTitle: '添付ファイルをアップロードできませんでした',
+        attachmentUploadFailedMessage: '画像を安全にアップロードできませんでした。内容は保持されています。接続を確認して再試行してください。',
+        attachmentUploadPartialTitle: '一部の添付ファイルをアップロードできませんでした',
+        attachmentUploadPartialMessage: ({ count }: { count: number }) => `${count} 件の画像をアップロードできませんでした。残りの添付ファイルとメッセージは送信されました。`,
+        attachmentAccessibilityLabel: ({ name }: { name: string }) => `添付ファイル: ${name}`,
+        sessionControlObserver: '読み取り専用：別のデバイスがこのセッションを制御中',
+        sessionControlController: 'このデバイスがセッションを制御中',
+        sessionControlRelease: '制御を解放',
+        sessionControlClaim: '制御を取得',
+        sessionControlClaimFailed: 'このセッションは別のデバイスが制御しています',
         saveAs: '名前を付けて保存',
     },
 
@@ -204,6 +214,13 @@ export const ja: TranslationStructure = {
         },
         alwaysShowContextSize: '常にコンテキストサイズを表示',
         alwaysShowContextSizeDescription: '上限に近づいていなくてもコンテキスト使用量を表示',
+        sessionStatusBar: 'Session status bar',
+        sessionStatusBarDescription: 'Show branch, model, effort, context, and plan limits around the composer',
+        sessionStatusBarHidden: 'Off',
+        sessionStatusBarAbove: 'Above',
+        sessionStatusBarBelow: 'Below',
+        usageLimitShowRemaining: 'Show quota remaining',
+        usageLimitShowRemainingDescription: 'Display plan-limit percentages as remaining instead of used',
         // Scaling
         scaling: 'スケーリング',
         scalingDescription: 'インターフェース要素のサイズを調整',
@@ -479,6 +496,16 @@ export const ja: TranslationStructure = {
         newSessionPlaceholder: '何に取り組みますか？',
         importOfficialTitle: 'コンピューターのセッションを引き継いでいます',
         importOfficialDescription: '会話を取り込み、コンテキストを復元し、現在の状態を同期しています。完了するまでこのセッションは操作できません。',
+        forkSession: 'Fork complete session',
+        duplicateSession: 'Fork from a message',
+        duplicateMessageHint: 'Long press to create a branch from this message',
+        duplicateSheetTitle: 'Create a conversation branch',
+        duplicateSheetSubtitle: 'Choose the user message that the new independent session should include through.',
+        duplicateSheetEmpty: 'No valid user-message rewind points were found.',
+        duplicateSheetConfirm: 'Create branch',
+        forkErrorMissingMetadata: 'This session is missing the machine or provider metadata required to fork it.',
+        forkErrorGeneric: 'Unable to create the conversation branch.',
+        forkMachineOffline: 'The source machine must be online to create a conversation branch.',
     },
 
     commandPalette: {
@@ -590,6 +617,14 @@ export const ja: TranslationStructure = {
     },
 
     components: {
+        sessionStatusBar: {
+            contextUsage: ({ used, total, percent }: { used: string; total: string; percent: number }) => `Context: ${used} of ${total} tokens (${percent}%)`,
+            limitFiveHour: '5-hour limit',
+            limitSevenDay: '7-day limit',
+            limitRemaining: ({ percent }: { percent: number }) => `${percent}% left`,
+            limitResets: ({ time }: { time: string }) => `resets ${time}`,
+            limitAsOf: ({ age }: { age: string }) => `updated ${age} ago`,
+        },
         emptyMainScreen: {
             // Used by EmptyMainScreen component
             readyToCode: 'コーディングを始めますか？',
@@ -891,7 +926,9 @@ export const ja: TranslationStructure = {
         }
     },
 
+    sideChat: { panelTitle: 'サイドチャット', allFiles: 'すべてのファイル', newChat: '新しいサイドチャット', startButton: 'サイドチャットを開始', creating: '作成中…', unavailable: 'マシンがオフライン、またはプロバイダーのメタデータが利用できないため、このセッションはフォークできません。', emptyTitle: 'サイドチャットはまだありません', emptySubtitle: '親コンテキストを引き継ぎつつトランスクリプトに書き戻さない、独立した会話を開始します。', close: 'サイドチャットを閉じる', expand: 'サイドチャットを全画面で開く', defaultTitle: ({ index }: { index: number }) => `サイドチャット ${index}` },
     files: {
+        addPanel: 'Add workbench panel',
         loadFailed: '変更を読み込めませんでした。接続を確認して再試行してください。',
         fileLoadFailed: 'このファイルを読み込めませんでした。接続を確認して再試行してください。',
         searchFailed: 'ファイルを検索できませんでした。再試行してください。',
@@ -1208,6 +1245,16 @@ export const ja: TranslationStructure = {
         notFound: 'マシンが見つかりません',
         launchNewSessionInDirectory: 'ディレクトリで新しいセッションを起動',
         statusAndProperties: 'ステータスと属性',
+        systemResources: 'システムリソース',
+        memory: 'メモリ',
+        network: 'ネットワーク',
+        downloadSpeed: 'ダウンロード',
+        uploadSpeed: 'アップロード',
+        storage: 'ストレージ',
+        used: '使用済み',
+        available: '空き',
+        metricsUnavailable: 'リアルタイム指標を取得できません',
+        metricsStale: '最後に取得したデータを表示しています',
         actions: '機能',
         startSessionOnThisMachine: 'このデバイスでセッションを開始',
         startSessionOnThisMachineSubtitle: 'このデバイスを選択した状態で新規セッション画面を開きます。',

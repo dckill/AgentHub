@@ -39,6 +39,22 @@ export const ApiDeleteMachineSchema = z.object({
     machineId: z.string(),
 });
 
+/** Machine creation update, including the key required for first decryption. */
+export const ApiUpdateNewMachineSchema = z.object({
+    t: z.literal('new-machine'),
+    machineId: z.string(),
+    seq: z.number(),
+    metadata: z.string(),
+    metadataVersion: z.number(),
+    daemonState: z.string().nullish(),
+    daemonStateVersion: z.number(),
+    dataEncryptionKey: z.string().nullish(),
+    active: z.boolean(),
+    activeAt: z.number(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+});
+
 export const ApiUpdateAccountSchema = z.object({
     t: z.literal('update-account'),
     id: z.string(),
@@ -102,6 +118,7 @@ export const ApiUpdateSchema = z.union([
     ApiUpdateSessionStateSchema,
     ApiUpdateAccountSchema,
     ApiUpdateMachineStateSchema,
+    ApiUpdateNewMachineSchema,
     ApiDeleteMachineSchema,
     ApiNewArtifactSchema,
     ApiUpdateArtifactSchema,
@@ -167,10 +184,18 @@ export const ApiEphemeralMachineActivityUpdateSchema = z.object({
     activeAt: z.number(),
 });
 
+export const ApiEphemeralSessionControlUpdateSchema = z.object({
+    type: z.literal('session-control'),
+    sessionId: z.string(),
+    activeDeviceId: z.string().nullable(),
+    activeDeviceAt: z.number().nullable(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
     ApiEphemeralActivityUpdateSchema,
     ApiEphemeralUsageUpdateSchema,
     ApiEphemeralMachineActivityUpdateSchema,
+    ApiEphemeralSessionControlUpdateSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<typeof ApiEphemeralActivityUpdateSchema>;

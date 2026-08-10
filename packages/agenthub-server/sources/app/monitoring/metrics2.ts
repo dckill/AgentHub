@@ -4,6 +4,7 @@ import { forever } from '@/utils/forever';
 import { delay } from '@/utils/delay';
 import { shutdownSignal } from '@/utils/shutdown';
 import { Socket } from 'socket.io';
+import { createBackgroundLoopObserver } from '@/utils/backgroundLoopObserver';
 
 // Global default labels — applied to ALL metrics at scrape time
 register.setDefaultLabels({ app: 'agenthub-server' });
@@ -115,6 +116,25 @@ export const databaseRecordCountGauge = new Gauge({
     registers: [register]
 });
 
+export const backgroundLoopFailuresCounter = new Counter({
+    name: 'background_loop_failures_total',
+    help: 'Total failures observed in continuously running background loops',
+    labelNames: ['loop'] as const,
+    registers: [register],
+});
+
+export const backgroundLoopConsecutiveFailuresGauge = new Gauge({
+    name: 'background_loop_consecutive_failures',
+    help: 'Current consecutive failure count for continuously running background loops',
+    labelNames: ['loop'] as const,
+    registers: [register],
+});
+
+export const backgroundLoopObserver = createBackgroundLoopObserver({
+    failures: backgroundLoopFailuresCounter,
+    consecutive: backgroundLoopConsecutiveFailuresGauge,
+});
+
 // Database metrics updater
 export async function updateDatabaseMetrics(): Promise<void> {
     // Query counts for each table
@@ -138,7 +158,7 @@ export function startDatabaseMetricsUpdater(): void {
         
         // Wait 60 seconds before next update
         await delay(60 * 1000, shutdownSignal);
-    });
+    }, backgroundLoopObserver);
 }
 
 // Redis stream lag — how far behind this pod's reader is from the stream head

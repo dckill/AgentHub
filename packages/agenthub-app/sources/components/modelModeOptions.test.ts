@@ -4,6 +4,7 @@ import {
     getAvailableModels,
     getAvailablePermissionModes,
     getCodexModelModes,
+    getClaudeModelModes,
     getEffortLevelsForModel,
     getClaudePermissionModes,
     mapMetadataOptions,
@@ -31,8 +32,24 @@ describe('modelModeOptions', () => {
 
     it('builds codex model fallbacks', () => {
         const models = getCodexModelModes();
-        expect(models.map((model) => model.key)).toEqual(['default']);
+        expect(models.map((model) => model.key)).toEqual([
+            'default', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna',
+            'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex',
+            'gpt-5.1-codex-max', 'gpt-5.2', 'gpt-5.1-codex-mini',
+        ]);
         expect(models[0].name).toBe('default model');
+    });
+
+    it('builds current Claude fallbacks without introducing unsupported providers', () => {
+        expect(getClaudeModelModes().map((model) => model.key)).toEqual([
+            'default', 'claude-opus-5', 'opus', 'fable', 'sonnet', 'haiku',
+        ]);
+    });
+
+    it('offers Claude effort on the default model and includes xhigh', () => {
+        expect(getEffortLevelsForModel('claude', 'default', translate).map((level) => level.key)).toEqual([
+            'low', 'medium', 'high', 'xhigh', 'max',
+        ]);
     });
 
     it('prefers metadata models for supported agents', () => {
@@ -54,7 +71,7 @@ describe('modelModeOptions', () => {
             ],
         } as any, translate);
 
-        expect(models.map((model) => model.key)).toEqual(['default', 'opus', 'sonnet', 'haiku']);
+        expect(models.map((model) => model.key)).toEqual(['default', 'claude-opus-5', 'opus', 'fable', 'sonnet', 'haiku']);
     });
 
     it('adds codex default model option when metadata models are present', () => {

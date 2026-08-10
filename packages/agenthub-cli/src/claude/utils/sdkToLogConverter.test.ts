@@ -200,6 +200,65 @@ describe('SDKToLogConverter', () => {
             // Error results are not converted to summaries
             expect(logMessage).toBeFalsy()
         })
+
+        it('applies each model context window to later assistant usage', () => {
+            converter.convert({
+                type: 'result',
+                subtype: 'success',
+                is_error: false,
+                session_id: 'context-session',
+                modelUsage: {
+                    'claude-opus': { contextWindow: 1_000_000 },
+                    'claude-haiku': { contextWindow: 200_000 },
+                },
+            } as unknown as SDKResultMessage)
+
+            const opus = converter.convert({
+                type: 'assistant',
+                message: {
+                    role: 'assistant',
+                    model: 'claude-opus',
+                    content: [{ type: 'text', text: 'done' }],
+                    usage: { input_tokens: 10, output_tokens: 5 },
+                },
+            } as unknown as SDKAssistantMessage)
+            const haiku = converter.convert({
+                type: 'assistant',
+                message: {
+                    role: 'assistant',
+                    model: 'claude-haiku',
+                    content: [{ type: 'text', text: 'done' }],
+                    usage: { input_tokens: 3, output_tokens: 2 },
+                },
+            } as unknown as SDKAssistantMessage)
+
+            expect((opus as any).message.usage.context_window).toBe(1_000_000)
+            expect((haiku as any).message.usage.context_window).toBe(200_000)
+        })
+
+        it('ignores invalid context windows and leaves unknown models untouched', () => {
+            converter.convert({
+                type: 'result',
+                subtype: 'success',
+                is_error: false,
+                session_id: 'context-session',
+                modelUsage: {
+                    'claude-opus': { contextWindow: 0 },
+                },
+            } as unknown as SDKResultMessage)
+
+            const message = converter.convert({
+                type: 'assistant',
+                message: {
+                    role: 'assistant',
+                    model: 'claude-opus',
+                    content: [],
+                    usage: { input_tokens: 1, output_tokens: 1 },
+                },
+            } as unknown as SDKAssistantMessage)
+
+            expect((message as any).message.usage).not.toHaveProperty('context_window')
+        })
     })
 
     describe('Parent-child relationships', () => {

@@ -84,7 +84,9 @@ export class SessionEncryption {
                         content: null,
                         createdAt: message.createdAt,
                     };
-                    this.cache.setCachedMessage(message.id, result);
+                    // A null decrypted payload is a recoverable crypto/cache miss,
+                    // not an immutable message value. Do not poison the message
+                    // cache or later retries will never attempt decryption again.
                     results[index] = result;
                 }
             }
@@ -178,7 +180,7 @@ export class SessionEncryption {
     /**
      * Decrypt agent state using session-specific encryption
      */
-    async decryptAgentState(version: number, encrypted: string | null | undefined): Promise<AgentState> {
+    async decryptAgentState(version: number, encrypted: string | null | undefined): Promise<AgentState | null> {
         if (!encrypted) {
             return {};
         }
@@ -193,11 +195,11 @@ export class SessionEncryption {
         const encryptedData = decodeBase64(encrypted, 'base64');
         const decrypted = await this.encryptor.decrypt([encryptedData]);
         if (!decrypted[0]) {
-            return {};
+            return null;
         }
         const parsed = AgentStateSchema.safeParse(decrypted[0]);
         if (!parsed.success) {
-            return {};
+            return null;
         }
 
         // Cache the result

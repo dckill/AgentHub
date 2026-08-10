@@ -34,6 +34,7 @@ export default {
         runtimeVersion: "1",
         updates: {
             enabled: !otaDisabled,
+            enableBsdiffPatchSupport: true,
             url: `https://u.expo.dev/${easProjectId}`,
             checkAutomatically: "ON_LOAD",
             fallbackToCacheTimeout: 0,

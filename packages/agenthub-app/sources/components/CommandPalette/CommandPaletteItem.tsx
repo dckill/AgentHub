@@ -49,7 +49,12 @@ export function CommandPaletteItem({ command, isSelected, onPress, onHover }: Co
     }
     
     return (
-        <Pressable {...pressableProps}>
+        <Pressable
+            {...pressableProps}
+            accessibilityRole="button"
+            accessibilityLabel={command.title}
+            accessibilityState={{ selected: isSelected }}
+        >
             <View style={styles.content}>
                 {command.icon && (
                     <View style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceSelected }]}>
