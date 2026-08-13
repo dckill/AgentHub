@@ -20,7 +20,6 @@ pnpm install
 | --- | --- |
 | `pnpm --filter @artsum/agenthub build` | 构建 AgentHub CLI。 |
 | `pnpm web` | 启动 AgentHub App Web。 |
-| `pnpm codium` | 启动 Codium Electron 开发模式。 |
 | `pnpm app-logs` | 启动 App/CLI 调试日志服务。 |
 | `pnpm --filter agenthub-server dev` | 启动后端开发服务。 |
 | `pnpm --filter agenthub-server standalone:dev` | 用 PGlite 启动 standalone 开发服务，默认端口 13017。 |
@@ -187,7 +186,6 @@ pnpm --filter @artsum/agenthub test:integration
 pnpm --filter agenthub-server test
 pnpm --filter agenthub-agent test
 pnpm --filter @artsum/agenthub-wire test
-pnpm --filter codium test
 ```
 
 改动代码时优先运行最小相关测试，再逐步扩大范围。仅改文档时通常不需要运行完整测试，但应检查文档链接和文件名。

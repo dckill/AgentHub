@@ -12,7 +12,6 @@ AgentHub 当前是一个 pnpm monorepo，核心目标是把本机 AI 编码代�
 | `packages/agenthub-wire` | 客户端与服务端共享的 Zod schema 和 TypeScript 类型。 |
 | `packages/agenthub-agent` | 独立远程控制 CLI，用于列机器、创建/发送/等待/停止会话。 |
 | `packages/agenthub-app-logs` | 开发调试用日志聚合服务。 |
-| `packages/codium` | Electron 桌面实验包，独立于主要 App。 |
 
 ## 主数据流
 

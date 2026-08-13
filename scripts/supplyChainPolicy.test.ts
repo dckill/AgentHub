@@ -71,7 +71,6 @@ describe("supply-chain package floors", () => {
       uuid: "11.1.1",
       yaml: "2.8.3",
     });
-    expectFloor("packages/codium/package.json", { "react-router-dom": "7.15.0" });
   });
 
   it("pins known vulnerable transitive packages to patched versions", () => {
@@ -125,7 +124,7 @@ describe("supply-chain package floors", () => {
 
 describe("Claude runtime licensing boundary", () => {
   it("uses the separately installed pinned Claude CLI instead of shipping the proprietary Agent SDK", () => {
-    for (const manifestPath of ["packages/agenthub-cli/package.json", "packages/codium/package.json"]) {
+    for (const manifestPath of ["packages/agenthub-cli/package.json"]) {
       const manifest = readManifest(manifestPath);
       expect(declaredVersion(manifest, "@anthropic-ai/claude-agent-sdk"), manifestPath).toBeUndefined();
     }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  buildCliInstallEnvironment,
   CliUpdateManager,
   compareSemver,
   fetchCliRelease,
@@ -24,6 +25,27 @@ function dependencies(overrides: Partial<CliUpdateDependencies> = {}): CliUpdate
 }
 
 describe('CLI updater', () => {
+  it('prepends the active Node directory for npm shebangs under a restricted daemon PATH', () => {
+    expect(buildCliInstallEnvironment(
+      { PATH: '/usr/local/sbin:/usr/bin' },
+      '/home/agent/.nvm/versions/node/v25.1.0/bin/node',
+    )).toMatchObject({
+      PATH: '/home/agent/.nvm/versions/node/v25.1.0/bin:/usr/local/sbin:/usr/bin',
+      npm_config_loglevel: 'warn',
+    });
+  });
+
+  it('preserves the Windows Path key instead of adding a competing PATH entry', () => {
+    const environment = buildCliInstallEnvironment(
+      { Path: 'C:\\Windows\\System32' },
+      'C:\\Program Files\\nodejs\\node.exe',
+      ';',
+    );
+
+    expect(environment.Path).toBe('C:\\Program Files\\nodejs;C:\\Windows\\System32');
+    expect(environment.PATH).toBeUndefined();
+  });
+
   it('compares stable and prerelease SemVer values without accepting malformed versions', () => {
     expect(compareSemver('1.2.0', '1.1.9')).toBeGreaterThan(0);
     expect(compareSemver('1.2.0', '1.2.0')).toBe(0);

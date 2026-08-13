@@ -23,7 +23,6 @@ model Account {
     id              String      @id @default(cuid())
     publicKey       String      @unique
     seq             Int         @default(0)
-    feedSeq         BigInt      @default(0)
     createdAt       DateTime    @default(now())
     updatedAt       DateTime    @updatedAt
     settings        String?
@@ -46,14 +45,10 @@ model Account {
     Machine             Machine[]
     UploadedFile        UploadedFile[]
     ManagedCredential   ManagedCredential[]
-    RelationshipsFrom   UserRelationship[]    @relation("RelationshipsFrom")
-    RelationshipsTo     UserRelationship[]    @relation("RelationshipsTo")
     Artifact            Artifact[]
     AccessKey           AccessKey[]
-    UserFeedItem        UserFeedItem[]
     AccountSyncEvent    AccountSyncEvent[]
     UserKVStore         UserKVStore[]
-    VoiceConversation   VoiceConversation[]
     AuthToken           AuthToken[]
     ExternalShare       ExternalShare[]
 }
@@ -370,54 +365,6 @@ model AccessKey {
 }
 
 //
-// Social Network - Relationships
-//
-
-enum RelationshipStatus {
-    none
-    requested
-    pending
-    friend
-    rejected
-}
-
-model UserRelationship {
-    fromUserId     String
-    fromUser       Account            @relation("RelationshipsFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-    toUserId       String
-    toUser         Account            @relation("RelationshipsTo", fields: [toUserId], references: [id], onDelete: Cascade)
-    status         RelationshipStatus @default(pending)
-    createdAt      DateTime           @default(now())
-    updatedAt      DateTime           @updatedAt
-    acceptedAt     DateTime?
-    lastNotifiedAt DateTime?
-
-    @@id([fromUserId, toUserId])
-    @@index([toUserId, status])
-    @@index([fromUserId, status])
-}
-
-//
-// Feed
-//
-
-model UserFeedItem {
-    id        String   @id @default(cuid())
-    userId    String
-    user      Account  @relation(fields: [userId], references: [id], onDelete: Cascade)
-    counter   BigInt
-    repeatKey String?
-    /// [FeedBody]
-    body      Json
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([userId, counter])
-    @@unique([userId, repeatKey])
-    @@index([userId, counter(sort: Desc)])
-}
-
-//
 // Key-Value Storage
 //
 
@@ -433,19 +380,4 @@ model UserKVStore {
 
     @@unique([accountId, key])
     @@index([accountId])
-}
-
-//
-// Voice Conversations — tracks ElevenLabs conversations per user for rate limiting
-//
-
-model VoiceConversation {
-    id                         String   @id @default(cuid())
-    accountId                  String
-    account                    Account  @relation(fields: [accountId], references: [id])
-    elevenLabsConversationId   String   @unique
-    durationSecs               Int?     // Filled in lazily from ElevenLabs API
-    createdAt                  DateTime @default(now())
-
-    @@index([accountId, createdAt(sort: Desc)])
 }

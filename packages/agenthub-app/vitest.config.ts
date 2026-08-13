@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'node:path'
+import coverageBaseline from './coverage-baseline.json'
 
 export default defineConfig({
     test: {
@@ -19,10 +20,10 @@ export default defineConfig({
                 'sources/testing/**',
             ],
             thresholds: {
-                statements: 36.53,
-                branches: 77.63,
-                functions: 45.17,
-                lines: 36.53,
+                statements: coverageBaseline.coverage.statements,
+                branches: coverageBaseline.coverage.branches,
+                functions: coverageBaseline.coverage.functions,
+                lines: coverageBaseline.coverage.lines,
             },
         },
     },

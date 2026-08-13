@@ -111,6 +111,7 @@ import { runSessionOutboxLifecycle } from './sessionOutboxLifecycle';
 import { runSendMessageLifecycle } from './sendMessageLifecycle';
 import { createSyncRealtimeUpdateContexts } from './syncRealtimeUpdateContext';
 import { createSyncEphemeralUpdateContext } from './syncEphemeralUpdateContext';
+import { createArtifactOperations } from './artifactOperations';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -169,8 +170,17 @@ class Sync {
     private cancelRealtimeSubscriptions: (() => void) | null = null;
     private removeAppStateListener: (() => void) | null = null;
     private readonly accountLifecycle = new AccountLifecycle();
+    private readonly artifactOperations;
 
     constructor() {
+        this.artifactOperations = createArtifactOperations({
+            getCredentials: () => this.credentials,
+            getEncryption: () => this._encryption,
+            requireGeneration: () => this.requireAccountGeneration(),
+            accountLifecycle: this.accountLifecycle,
+            dataKeys: this.dataKeys,
+            scheduleListRetry: () => this.artifactsSync.invalidate(),
+        });
         this.createAccountSyncs(0);
         this.activityAccumulator = new ActivityUpdateAccumulator(this.flushActivityUpdates.bind(this), 2000);
         this.backgroundSendWatchdog = new BackgroundSendWatchdog({
@@ -764,134 +774,19 @@ class Sync {
     public getAccountGeneration(): number | null {
         return this.accountLifecycle.currentGeneration();
     }
+    public fetchArtifactsList = async (generation = this.requireAccountGeneration()): Promise<void> =>
+        this.artifactOperations.fetchList(generation);
 
-    // Artifact methods
-    public fetchArtifactsList = async (generation = this.requireAccountGeneration()): Promise<void> => {
-        return runArtifactListSync({
-            credentials: this.credentials,
-            encryption: this._encryption,
-            generation,
-            runRequest: (requestGeneration, operation) => this.accountLifecycle.runRequest(requestGeneration, operation),
-            assertCurrent: () => this.accountLifecycle.assertCurrent(generation),
-            setDataKey: (artifactId, key) => this.dataKeys.set('artifact', artifactId, key),
-            applyArtifacts: (artifacts) => storage.getState().applyArtifacts(artifacts),
-            scheduleRetry: () => this.artifactsSync.invalidate(),
-            log: (message) => log.log(message),
-            reportError: (message, error) => error === undefined ? console.error(message) : console.error(message, error),
-        });
+    public fetchArtifactWithBody(artifactId: string): Promise<DecryptedArtifact> {
+        return this.artifactOperations.fetchBody(artifactId);
     }
 
-    public async fetchArtifactWithBody(artifactId: string): Promise<DecryptedArtifact> {
-        const credentials = this.credentials;
-        const encryption = this._encryption;
-        if (!credentials || !encryption) {
-            throw new Error('Not authenticated. Please sign in again and retry.');
-        }
-        const generation = this.requireAccountGeneration();
-
-        return runArtifactBodyFetch({
-            generation,
-            runRequest: (requestGeneration, operation) => this.accountLifecycle.runRequest(requestGeneration, operation),
-            fetchArtifact: (signal) => fetchArtifact(credentials, artifactId, signal),
-            applyBody: (artifact, assertCurrent) => applyArtifactBodyFetch({
-                artifact,
-                decryptEncryptionKey: (value) => encryption.decryptEncryptionKey(value),
-                createEncryption: (key) => new ArtifactEncryption(key),
-                assertCurrent,
-            }),
-            assertCurrent: () => this.accountLifecycle.assertCurrent(generation),
-            setDataKey: (id, key) => this.dataKeys.set('artifact', id, key),
-        });
+    public createArtifact(title: string | null, body: string | null, sessions?: string[], draft?: boolean): Promise<string> {
+        return this.artifactOperations.create(title, body, sessions, draft);
     }
 
-    public async createArtifact(
-        title: string | null, 
-        body: string | null,
-        sessions?: string[],
-        draft?: boolean
-    ): Promise<string> {
-        const credentials = this.credentials;
-        const encryption = this._encryption;
-        if (!credentials || !encryption) {
-            throw new Error('Not authenticated. Please sign in again and retry.');
-        }
-        const generation = this.requireAccountGeneration();
-
-        try {
-            return await runArtifactCreate({
-                generation,
-                runRequest: (requestGeneration, operation) => this.accountLifecycle.runRequest(requestGeneration, operation),
-                applyCreate: async (accountRequest) => applyArtifactCreate({
-                    title,
-                    body,
-                    sessions,
-                    draft,
-                    generateId: () => encryption.generateId(),
-                    generateDataEncryptionKey: () => ArtifactEncryption.generateDataEncryptionKey(),
-                    encryptEncryptionKey: (value) => encryption.encryptEncryptionKey(value),
-                    createEncryption: (key) => new ArtifactEncryption(key),
-                    createArtifact: (request) => createArtifact(credentials, request, accountRequest.signal),
-                    assertCurrent: accountRequest.assertCurrent,
-                }),
-                assertCurrent: () => this.accountLifecycle.assertCurrent(generation),
-                setDataKey: (id, key) => this.dataKeys.set('artifact', id, key),
-                addArtifact: (artifact) => storage.getState().addArtifact(artifact),
-            });
-        } catch (error) {
-            console.error('Failed to create artifact:', error);
-            throw error;
-        }
-    }
-
-    public async updateArtifact(
-        artifactId: string, 
-        title: string | null, 
-        body: string | null,
-        sessions?: string[],
-        draft?: boolean
-    ): Promise<void> {
-        const credentials = this.credentials;
-        const encryption = this._encryption;
-        if (!credentials || !encryption) {
-            throw new Error('Not authenticated. Please sign in again and retry.');
-        }
-        const generation = this.requireAccountGeneration();
-
-        try {
-            // Get current artifact to get versions and encryption key
-            const currentArtifact = storage.getState().artifacts[artifactId];
-            if (!currentArtifact) {
-                throw new Error('Artifact not found. Refresh the list and retry.');
-            }
-
-            // Get the data encryption key from memory or fetch it
-            await runArtifactUpdate({
-                generation,
-                runRequest: (requestGeneration, operation) => this.accountLifecycle.runRequest(requestGeneration, operation),
-                applyUpdate: async (accountRequest) => applyArtifactUpdateRequest({
-                    artifactId,
-                    title,
-                    body,
-                    sessions,
-                    draft,
-                    currentArtifact,
-                    dataEncryptionKey: this.dataKeys.get('artifact', artifactId),
-                    fetchArtifact: () => fetchArtifact(credentials, artifactId, accountRequest.signal),
-                    decryptEncryptionKey: (value) => encryption.decryptEncryptionKey(value),
-                    createEncryption: (key) => new ArtifactEncryption(key),
-                    updateArtifact: (request) => updateArtifact(credentials, artifactId, request, accountRequest.signal),
-                    areArtifactSessionsEqual,
-                    assertCurrent: accountRequest.assertCurrent,
-                    now: Date.now,
-                }),
-                assertCurrent: () => this.accountLifecycle.assertCurrent(generation),
-                setDataKey: (id, key) => this.dataKeys.set('artifact', id, key),
-                updateArtifact: (artifact) => storage.getState().updateArtifact(artifact),
-            });
-        } catch (error) {
-            console.error('Failed to update artifact:', error);
-            throw error;
-        }
+    public updateArtifact(artifactId: string, title: string | null, body: string | null, sessions?: string[], draft?: boolean): Promise<void> {
+        return this.artifactOperations.update(artifactId, title, body, sessions, draft);
     }
 
     private fetchMachines = async (generation: number) => {

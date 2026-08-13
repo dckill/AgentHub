@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, join, sep } from 'node:path';
+import { delimiter, dirname, join, sep, win32 } from 'node:path';
 import process from 'node:process';
 import crossSpawn from 'cross-spawn';
 import { z } from 'zod';
@@ -140,6 +140,27 @@ function resolveNpmExecutable(): string {
   return existsSync(sibling) ? sibling : (process.platform === 'win32' ? 'npm.cmd' : 'npm');
 }
 
+export function buildCliInstallEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeExecutable: string = process.execPath,
+  pathDelimiter: string = delimiter,
+): NodeJS.ProcessEnv {
+  const pathKey = Object.keys(environment).find((key) => key.toLowerCase() === 'path')
+    ?? (process.platform === 'win32' ? 'Path' : 'PATH');
+  const runtimeDirectory = pathDelimiter === ';'
+    ? win32.dirname(runtimeExecutable)
+    : dirname(runtimeExecutable);
+  const currentEntries = (environment[pathKey] ?? '')
+    .split(pathDelimiter)
+    .filter((entry) => entry && entry !== runtimeDirectory);
+
+  return {
+    ...environment,
+    [pathKey]: [runtimeDirectory, ...currentEntries].join(pathDelimiter),
+    npm_config_loglevel: 'warn',
+  };
+}
+
 export async function installCliVersion(version: string): Promise<void> {
   const exactVersion = normalizeVersion(version);
   await new Promise<void>((resolve, reject) => {
@@ -148,7 +169,7 @@ export async function installCliVersion(version: string): Promise<void> {
     ], {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, npm_config_loglevel: 'warn' },
+      env: buildCliInstallEnvironment(),
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];

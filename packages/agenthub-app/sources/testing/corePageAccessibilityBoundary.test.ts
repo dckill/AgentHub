@@ -17,6 +17,7 @@ describe('authenticated core page accessibility boundary', () => {
 
     it('keeps every New Session control at a physical 44-point minimum after UI scaling', () => {
         const screen = read('app/(app)/new/index.tsx');
+        const styles = read('app/(app)/new/newSessionStyles.ts');
         const header = read('components/navigation/Header.tsx');
         const sidebar = read('components/SidebarView.tsx');
 
@@ -25,19 +26,19 @@ describe('authenticated core page accessibility boundary', () => {
         expect(screen).toContain('Math.max(MINIMUM_TAP_TARGET + 2, s(COMPOSER_SEND_BUTTON_SIZE))');
         expect(screen).toContain('Math.max(11, s(COMPOSER_INPUT_VERTICAL_PADDING))');
         expect(screen).toContain('<Text role="heading" aria-level={1} style={styles.screenReaderHeading}>');
-        expect(screen).toMatch(/collapseToggle:\s*\{[\s\S]{0,180}minWidth: MINIMUM_TAP_TARGET,[\s\S]{0,80}minHeight: MINIMUM_TAP_TARGET,/);
-        expect(screen).toMatch(/setupChip:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
-        expect(screen).toMatch(/advancedHeader:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
-        expect(screen).toMatch(/advancedPill:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
-        expect(screen).toMatch(/collapsedRow:\s*\{[\s\S]{0,180}minHeight: MINIMUM_TAP_TARGET,/);
-        expect(screen).toMatch(/collapsedIconButton:\s*\{[\s\S]{0,120}width: MINIMUM_TAP_TARGET,[\s\S]{0,80}height: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/collapseToggle:\s*\{[\s\S]{0,180}minWidth: MINIMUM_TAP_TARGET,[\s\S]{0,80}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/setupChip:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/advancedHeader:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/advancedPill:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/collapsedRow:\s*\{[\s\S]{0,180}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/collapsedIconButton:\s*\{[\s\S]{0,120}width: MINIMUM_TAP_TARGET,[\s\S]{0,80}height: MINIMUM_TAP_TARGET,/);
         expect(screen).not.toContain('width: s(34), height: s(28)');
         expect(screen).toContain('minHeight: Math.max(MINIMUM_TAP_TARGET, s(42))');
         expect(screen).toMatch(/setupSubtitle[\s\S]{0,260}numberOfLines=\{2\}/);
         expect(screen).not.toMatch(/<ScrollView\s+horizontal[\s\S]{0,300}styles\.advancedPillRow/);
-        expect(screen).toMatch(/advancedPillRow:\s*\{[\s\S]{0,160}flexWrap: 'wrap',/);
+        expect(styles).toMatch(/advancedPillRow:\s*\{[\s\S]{0,160}flexWrap: 'wrap',/);
         expect(screen).toMatch(/advancedPillText[\s\S]{0,260}numberOfLines=\{2\}/);
-        expect(screen).toMatch(/searchInput:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
+        expect(styles).toMatch(/searchInput:\s*\{[\s\S]{0,100}minHeight: MINIMUM_TAP_TARGET,/);
         expect(header).toMatch(/backButton:\s*\{[\s\S]{0,120}width: 44,[\s\S]{0,80}height: 44,/);
         expect(header).toContain('role="banner"');
         expect(sidebar).toContain('role="navigation"');

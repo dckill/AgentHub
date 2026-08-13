@@ -13,7 +13,7 @@
  * app-server wrapper or approval callbacks. See docs/plans/codex-app-server-migration.md.
  */
 
-import { execSync, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { spawn as crossSpawn } from 'cross-spawn';
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline';
 import { logger } from '@/ui/logger';
@@ -90,10 +90,6 @@ import {
     createPendingApprovalResponder,
 } from './codexApprovalLifecycle';
 import type { TurnCompletionResult } from './codexTurnCompletionWaiter';
-import {
-    isCodexAppServerAvailable,
-    isCodexGoalActionsAvailable,
-} from './codexCapabilities';
 import type { CodexThreadDefaults } from './codexThreadDefaults';
 import {
     applyCodexForkedThread,
@@ -102,42 +98,9 @@ import {
 } from './codexThreadLifecycle';
 import { initializeCodexAppServer } from './codexInitializeHandshake';
 import { spawnCodexAppServerProcess } from './codexProcessSpawn';
-
-export type ApprovalHandler = (params: {
-    type: 'exec' | 'patch' | 'mcp';
-    callId: string;
-    command?: string[];
-    cwd?: string;
-    fileChanges?: Record<string, unknown>;
-    reason?: string | null;
-    toolName?: string;
-    input?: unknown;
-    serverName?: string;
-    message?: string;
-}) => Promise<ReviewDecision>;
-
-/**
- * Check that `codex app-server` is available.
- */
-function isAppServerAvailable(): boolean {
-    try {
-        return isCodexAppServerAvailable(
-            execSync('codex --version', { encoding: 'utf8', windowsHide: true }).trim(),
-        );
-    } catch {
-        return false;
-    }
-}
-
-function isGoalActionsAvailable(): boolean {
-    try {
-        return isCodexGoalActionsAvailable(
-            execSync('codex --version', { encoding: 'utf8', windowsHide: true }).trim(),
-        );
-    } catch {
-        return false;
-    }
-}
+import { isAppServerAvailable, isGoalActionsAvailable } from './codexRuntimeCapabilities';
+import type { ApprovalHandler } from './codexApprovalTypes';
+export type { ApprovalHandler } from './codexApprovalTypes';
 
 export class CodexAppServerClient {
     private process: ChildProcess | null = null;

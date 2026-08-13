@@ -47,7 +47,6 @@ comm -12 \
 | `packages/agenthub-cli/src` |  |  |  |
 | `packages/agenthub-server/sources` |  |  |  |
 | `packages/agenthub-wire/src` |  |  |  |
-| `packages/codium/sources` |  |  |  |
 | 文档/脚本/依赖 |  |  |  |
 
 ## 3. 候选特性列表
@@ -65,7 +64,6 @@ comm -12 \
 | F09 | 新建会话配置移动到 sidebar | `8ed622b2` | 中 | 高 | 暂缓，只参考布局工具函数。 |
 | F10 | Self-host server CLI 与 server 包拆分 | `5981a899`、`d2d2f730` | 中高 | 中高 | 按部署需求单独评估。 |
 | F11 | Smart push routing / active device / web tab title | `0c58ea71`、`2db77937` | 中 | 中高 | 推送专项时处理。 |
-| F12 | Codium projects and agents 集成 | `511917e1` | 中 | 中 | 独立 Codium 分支。 |
 | F13 | Tauri 桌面兼容与签名配置 | `8e4118b0`、`4a64c66a` | 中 | 低中 | 小批次 cherry-pick。 |
 | F14 | agents/sessions 技能与开发文档 | `0bfb7041`、`17937dd1` | 低中 | 低 | 手工合并，不覆盖项目约定。 |
 

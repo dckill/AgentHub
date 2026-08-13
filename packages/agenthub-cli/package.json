@@ -1,6 +1,6 @@
 {
   "name": "@artsum/agenthub",
-  "version": "1.1.6",
+  "version": "1.1.9",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "Kirill Dubovitskiy",
   "license": "Apache-2.0",

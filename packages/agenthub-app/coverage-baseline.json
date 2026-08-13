@@ -1,0 +1,12 @@
+{
+  "observedAt": "2026-08-12",
+  "command": "npx -y pnpm@10.11.0 --filter agenthub-app test:coverage",
+  "testFiles": 530,
+  "tests": 2193,
+  "coverage": {
+    "statements": 39.39,
+    "lines": 39.39,
+    "branches": 79.07,
+    "functions": 50.55
+  }
+}

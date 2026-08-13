@@ -24,7 +24,6 @@
 - [加密外部分享](./external-sharing.md)：选中文本临时分享、客户端加密、撤销和有效期。
 - [agenthub-wire](./agenthub-wire.md)：共享 wire schema 与生产协议状态。
 - [agenthub-agent](./agenthub-agent.md)：远程控制 CLI 的使用方式。
-- [Codium 桌面实验](./codium.md)：Electron 桌面包定位。
 - [部署](./deployment.md)：生产、standalone、Postgres/Redis/S3/PGlite 配置。
 - [本地开发环境](./dev-environments.md)：pnpm workspace、authenticated Web、Android 打包和 daemon 更新。
 - [开源发布准备](./open-source-release.md)：公开仓库前的许可证、历史清理、元数据、安全与发布检查。

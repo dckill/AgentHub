@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { runArtifactListSync } from './artifactListSyncLifecycle';
 
 const syncPath = path.resolve(__dirname, './sync.ts');
+const operationsPath = path.resolve(__dirname, './artifactOperations.ts');
 const lifecyclePath = path.resolve(__dirname, './artifactListSyncLifecycle.ts');
 const syncSource = fs.readFileSync(syncPath, 'utf8');
+const operationsSource = fs.readFileSync(operationsPath, 'utf8');
 
 describe('artifact list sync lifecycle boundary', () => {
     it('owns artifact list fetch orchestration outside Sync', () => {
@@ -13,9 +15,10 @@ describe('artifact list sync lifecycle boundary', () => {
         const lifecycleSource = fs.readFileSync(lifecyclePath, 'utf8');
 
         expect(lifecycleSource).toContain('export async function runArtifactListSync');
-        expect(syncSource).toContain("import { runArtifactListSync } from './artifactListSyncLifecycle';");
+        expect(operationsSource).toContain("import { runArtifactListSync } from './artifactListSyncLifecycle';");
         expect(syncSource).toContain('public fetchArtifactsList = async');
-        expect(syncSource).toContain('runArtifactListSync({');
+        expect(syncSource).toContain('this.artifactOperations.fetchList(generation)');
+        expect(operationsSource).toContain('runArtifactListSync({');
     });
 
     it('preserves retry and partial snapshot application callbacks', () => {

@@ -9,8 +9,8 @@
         "gitlab:evidence": "node scripts/gitlabReleaseEvidence.cjs",
         "gitlab:evidence:test": "node --test scripts/gitlabReleaseEvidence.test.cjs",
         "documentation:status": "node scripts/currentDocumentationStatus.cjs",
-        "documentation:status:test": "node --test scripts/currentDocumentationStatus.test.cjs",
-        "ci:verify": "pnpm dependency-boundary:test && pnpm gitlab:evidence:test && pnpm documentation:status:test && pnpm documentation:status && pnpm pack-contract:test && pnpm cli-pack-install:test && pnpm cli-registry-release-drill:test && pnpm web:budget:test && pnpm web:contract:test && pnpm app:perf:baseline:test && pnpm check && pnpm env:policy && pnpm docker:policy && pnpm release-image:policy && pnpm sbom:test && pnpm provenance:test && pnpm provenance:verify:test && pnpm audit:test && pnpm reachability:test && pnpm license:test && pnpm provider-matrix:test && pnpm metadata:check -- --json && pnpm supply-chain:policy",
+        "documentation:status:test": "node --test scripts/currentDocumentationStatus.test.cjs scripts/remediationBoundaries.test.cjs",
+        "ci:verify": "pnpm dependency-boundary:test && pnpm gitlab:evidence:test && pnpm documentation:status:test && pnpm documentation:status && pnpm app:coverage:baseline:test && pnpm app:coverage:verify && pnpm pack-contract:test && pnpm cli-pack-install:test && pnpm cli-registry-release-drill:test && pnpm web:budget:test && pnpm web:contract:test && pnpm app:perf:baseline:test && pnpm check && pnpm env:policy && pnpm docker:policy && pnpm release-image:policy && pnpm sbom:test && pnpm provenance:test && pnpm provenance:verify:test && pnpm audit:test && pnpm reachability:test && pnpm license:test && pnpm provider-matrix:test && pnpm metadata:check -- --json && pnpm supply-chain:policy",
         "sbom:generate": "node scripts/generateSbom.cjs",
         "provenance:test": "node --test scripts/generateProvenance.test.cjs",
         "provenance:verify:test": "node --test scripts/verifyProvenance.test.cjs",
@@ -19,7 +19,7 @@
         "audit:check": "node scripts/checkDependencyAudit.cjs",
         "reachability:test": "node --test scripts/checkReachableAudit.test.cjs",
         "reachability:check": "node scripts/checkReachableAudit.cjs",
-    "dependency-boundary:test": "node --test scripts/rootDependencyBoundary.test.cjs scripts/trackedGeneratedFiles.test.cjs scripts/reactNativeDrawerOverlayPatch.test.cjs scripts/nobleHashesMetroExportsPatch.test.cjs scripts/pglitePrismaBytesPatch.test.cjs scripts/serverCompiledRuntime.test.cjs scripts/serverRuntimeManifest.test.cjs",
+    "dependency-boundary:test": "node --test scripts/rootDependencyBoundary.test.cjs scripts/trackedGeneratedFiles.test.cjs scripts/reactNativeDrawerOverlayPatch.test.cjs scripts/nobleHashesMetroExportsPatch.test.cjs scripts/pglitePrismaBytesPatch.test.cjs scripts/serverCompiledRuntime.test.cjs scripts/serverRuntimeManifest.test.cjs scripts/productDesktopScope.test.cjs scripts/coreModuleBoundaries.test.cjs",
         "supply-chain:policy": "vitest run --root scripts supplyChainPolicy.test.ts",
         "docker:policy": "vitest run scripts/dockerBuildScope.test.ts scripts/kubernetesAdmissionPolicy.test.ts",
         "release-image:policy": "vitest run scripts/signedKubernetesRelease.test.ts",
@@ -40,7 +40,8 @@
         "web:contract:test": "node --test scripts/webContractCI.test.cjs && pnpm --filter agenthub-app exec vitest run sources/auth/tokenStorage.test.ts sources/auth/authRouteGuard.test.ts sources/auth/accountRuntime.test.ts sources/router/productionRouterBoundary.test.ts sources/testing/rootInitialization.test.ts sources/testing/corePageAccessibilityBoundary.test.ts sources/testing/settingsSubpageAccessibilityBoundary.test.ts sources/testing/sessionWorkbenchAccessibilityBoundary.test.ts sources/testing/appLinksSecurityPolicy.test.ts sources/testing/webPlatformPayloadBoundary.test.ts",
         "app:perf:baseline": "node scripts/runAppPerformanceBaseline.cjs",
         "app:perf:baseline:test": "node --test scripts/appPerformanceBaseline.test.cjs",
-        "codium": "pnpm --filter codium dev",
+        "app:coverage:baseline:test": "node --test scripts/appCoverageBaseline.test.cjs",
+        "app:coverage:verify": "pnpm --filter agenthub-app test:coverage",
         "app-logs": "pnpm --filter agenthub-app-logs start",
         "postinstall": "node ./scripts/postinstall.cjs",
         "env:new": "tsx environments/environments.ts new",
@@ -69,8 +70,7 @@
             "packages/agenthub-cli",
             "packages/agenthub-server",
             "packages/agenthub-wire",
-            "packages/agenthub-app-logs",
-            "packages/codium"
+            "packages/agenthub-app-logs"
         ]
     },
   "pnpm": {

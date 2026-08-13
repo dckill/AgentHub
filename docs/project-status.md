@@ -14,19 +14,18 @@ GitHub 使用审核后的干净历史。正式发布后仍需启用并验证私�
 
 | 组件 | 当前状态 |
 | --- | --- |
-| CLI | `@artsum/agenthub`，版本 `1.1.4`，bin 为 `agenthub` / `agenthub-mcp`，默认服务端 `https://agenthub.yzsd.asia:8443`。 |
+| CLI | `@artsum/agenthub`，版本 `1.1.9`，bin 为 `agenthub` / `agenthub-mcp`，默认服务端 `https://agenthub.yzsd.asia:8443`。 |
 | App | `agenthub-app`，版本 `1.0.0`，`runtimeVersion=1`，Android production 包名 `com.artsum.agenthub`。 |
 | Server | Fastify 5 + Socket.IO + Prisma；支持 standalone PGlite/本地文件和外部 Postgres/Redis/S3。 |
 | Wire | `@artsum/agenthub-wire`，共享 Zod schema 与 TypeScript 协议类型。 |
 | Agent | `agenthub-agent`，支持登录、列机器/会话、spawn、send、history、wait 和 stop；尚未发布到 npm。 |
 | App Logs | 仅供本地开发调试的日志接收服务。 |
-| Codium | 独立 Electron 实验包，不属于主 App 发布面。 |
 
 ## 当前验证基线
 
 - 根级依赖边界、生成物跟踪规则与协议 guardrail 有自动化测试。
 - Evidence 218 的 App 基线为 **251 files / 1452 tests**；Evidence 208 记录的最近完整 coverage 观测为 Branches **77.73%**、Functions **46.02%**。
-- CLI、Server、Wire、Agent 与 Codium 均有包级测试和类型检查入口。
+- CLI、Server、Wire 与 Agent 均有包级测试和类型检查入口；桌面端复用 AgentHub App 的 Web/Tauri 实现。
 - Web/UI 改动使用组件、状态机、语义/无障碍、布局边界、协议测试和 production build 验证，不再以截图或人工点击作为默认门槛。
 - Android production arm64 通过脚本输出到根目录 `artifacts/`；真机、iOS、macOS/Windows 签名公证和生产基础设施属于人工验收范围。
 - 发布元数据检查必须通过 `pnpm release:doctor`；完整本地门禁为 `pnpm ci:verify`。
